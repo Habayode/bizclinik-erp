@@ -1,4 +1,4 @@
-<#
+﻿<#
  .SYNOPSIS
   One-shot deploy of BizClinik ERP on a Windows VPS, fronted by a Cloudflare
   named tunnel.
@@ -53,10 +53,10 @@ function Test-Admin {
 }
 
 if (-not (Test-Admin)) {
-    throw "Run this script in an elevated PowerShell (Right-click → Run as administrator)."
+    throw "Run this script in an elevated PowerShell (Right-click -> Run as administrator)."
 }
 
-Write-Host "BizClinik ERP — VPS bootstrap" -ForegroundColor Green
+Write-Host "BizClinik ERP -- VPS bootstrap" -ForegroundColor Green
 Write-Host "  App root  : $AppRoot"
 Write-Host "  Subdomain : $Subdomain"
 Write-Host "  Tunnel    : $TunnelName"
@@ -107,7 +107,7 @@ if (-not (Test-Path $cfExe)) {
     Invoke-WebRequest -Uri $url -OutFile $cfExe -UseBasicParsing
 }
 # Make sure it's on PATH for this session.
-# Note: avoid "$env:Path" in a double-quoted string — PowerShell 5.1's parser
+# Note: avoid "$env:Path" in a double-quoted string -- PowerShell 5.1's parser
 # misreads the colon. Use straight concatenation.
 $env:Path = $cfDir + ";" + $env:Path
 & $cfExe --version
@@ -162,7 +162,7 @@ ingress:
 Write-Step "Installing cloudflared as a Windows service"
 $svc = Get-Service -Name "cloudflared" -ErrorAction SilentlyContinue
 if ($svc) {
-    Write-Host "  cloudflared service already exists — reinstalling to pick up new config"
+    Write-Host "  cloudflared service already exists -- reinstalling to pick up new config"
     & $cfExe service uninstall | Out-Null
 }
 & $cfExe --config $cfgPath service install
