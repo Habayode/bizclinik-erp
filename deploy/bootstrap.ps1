@@ -107,7 +107,9 @@ if (-not (Test-Path $cfExe)) {
     Invoke-WebRequest -Uri $url -OutFile $cfExe -UseBasicParsing
 }
 # Make sure it's on PATH for this session.
-$env:Path = "$cfDir;$env:Path"
+# Note: avoid "$env:Path" in a double-quoted string — PowerShell 5.1's parser
+# misreads the colon. Use straight concatenation.
+$env:Path = $cfDir + ";" + $env:Path
 & $cfExe --version
 
 
