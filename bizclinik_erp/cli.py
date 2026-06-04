@@ -1,0 +1,223 @@
+"""Command-line entry point for BizClinik ERP.
+
+Usage:
+    python -m bizclinik_erp <command> [options]
+
+Commands:
+    init                       Create tables and seed default COA, tax codes, banks
+    reset                      Drop + recreate tables (destructive)
+    import-bizclinik <path>    Import a BizClinik xlsx workbook
+    trial-balance [--as-of]    Print Trial Balance
+    pnl --from --to            Print P&L
+    balance-sheet [--as-of]    Print Balance Sheet
+    cash-flow --from --to      Print Cash Flow
+    ar-aging [--as-of]         AR aging
+    ap-aging [--as-of]         AP aging
+    vat-return --from --to     VAT return summary
+    invoice-pdf <id> <out>     Generate a PDF for invoice id
+    list-accounts              Chart of accounts dump
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from datetime import date, datetime
+from pathlib import Path
+
+from sqlalchemy import select
+
+from .config import get_settings
+from .db import get_session, init_db, reset_db
+from .models import Account, SalesInvoice
+from .services import banking, payroll, purchase, reports, sales
+from .services.ledger import trial_balance
+from .services.tax import vat_return, wht_position
+
+
+def _parse_date(s: str | None) -> date | None:
+    if not s:
+        return None
+    return datetime.strptime(s, "%Y-%m-%d").date()
+
+
+def _dump(data) -> None:
+    def default(o):
+        if isinstance(o, (date, datetime)):
+            return o.isoformat()
+        return str(o)
+    json.dump(data, sys.stdout, indent=2, default=default, ensure_ascii=False)
+    sys.stdout.write("\n")
+
+
+def _confirm(prompt: str) -> bool:
+    return input(f"{prompt} [type YES to confirm]: ").strip() == "YES"
+
+
+def cmd_init(_args) -> int:
+    init_db()
+    from .services.seed import seed_defaults
+    with get_session() as s:
+        seed_defaults(s)
+    print(f"Initialised {get_settings().db_path}")
+    return 0
+
+
+def cmd_reset(args) -> int:
+    if not args.yes and not _confirm("This will DROP all tables and lose data."):
+        print("Aborted.")
+        return 1
+    reset_db()
+    from .services.seed import seed_defaults
+    with get_session() as s:
+        seed_defaults(s)
+    print("Database reset and seeded.")
+    return 0
+
+
+def cmd_import(args) -> int:
+    from .importers.bizclinik_xlsx import import_workbook
+    init_db()
+    with get_session() as s:
+        summary = import_workbook(s, args.path)
+    _dump({k: v for k, v in summary.items() if k != "skipped"})
+    if summary.get("skipped"):
+        print(f"# {len(summary['skipped'])} rows skipped", file=sys.stderr)
+    return 0
+
+
+def cmd_trial_balance(args) -> int:
+    with get_session() as s:
+        rows = trial_balance(s, as_of=_parse_date(args.as_of))
+    _dump(rows)
+    return 0
+
+
+def cmd_pnl(args) -> int:
+    with get_session() as s:
+        r = reports.profit_and_loss(
+            s, period_start=_parse_date(args.date_from),
+            period_end=_parse_date(args.date_to),
+        )
+    _dump(r)
+    return 0
+
+
+def cmd_balance_sheet(args) -> int:
+    as_of = _parse_date(args.as_of) or date.today()
+    with get_session() as s:
+        r = reports.balance_sheet(s, as_of=as_of)
+    _dump(r)
+    return 0
+
+
+def cmd_cash_flow(args) -> int:
+    with get_session() as s:
+        r = reports.cash_flow(
+            s, period_start=_parse_date(args.date_from),
+            period_end=_parse_date(args.date_to),
+        )
+    _dump(r)
+    return 0
+
+
+def cmd_ar_aging(args) -> int:
+    as_of = _parse_date(args.as_of) or date.today()
+    with get_session() as s:
+        _dump(reports.ar_aging(s, as_of=as_of))
+    return 0
+
+
+def cmd_ap_aging(args) -> int:
+    as_of = _parse_date(args.as_of) or date.today()
+    with get_session() as s:
+        _dump(reports.ap_aging(s, as_of=as_of))
+    return 0
+
+
+def cmd_vat_return(args) -> int:
+    with get_session() as s:
+        _dump({
+            "vat": vat_return(s, period_start=_parse_date(args.date_from),
+                              period_end=_parse_date(args.date_to)),
+            "wht": wht_position(s, period_start=_parse_date(args.date_from),
+                                 period_end=_parse_date(args.date_to)),
+        })
+    return 0
+
+
+def cmd_invoice_pdf(args) -> int:
+    from .exporters.invoice_pdf import write_invoice_pdf
+    with get_session() as s:
+        out = write_invoice_pdf(s, int(args.invoice_id), args.out)
+    print(str(out))
+    return 0
+
+
+def cmd_list_accounts(_args) -> int:
+    with get_session() as s:
+        rows = [{"code": a.code, "name": a.name, "type": a.type.value,
+                  "postable": a.is_postable, "active": a.is_active}
+                 for a in s.execute(select(Account).order_by(Account.code)).scalars()]
+    _dump(rows)
+    return 0
+
+
+def build_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(prog="bizclinik_erp",
+                                 description="BizClinik ERP — CLI")
+    sub = p.add_subparsers(dest="command", required=True)
+
+    sub.add_parser("init", help="Init DB + seed defaults")
+
+    p_reset = sub.add_parser("reset", help="DROP + recreate all tables")
+    p_reset.add_argument("--yes", action="store_true", help="Skip confirmation prompt")
+
+    p_imp = sub.add_parser("import-bizclinik", help="Import BizClinik xlsx")
+    p_imp.add_argument("path")
+
+    for name, help_ in [("trial-balance", "Trial Balance"),
+                         ("balance-sheet", "Balance Sheet"),
+                         ("ar-aging", "AR aging"),
+                         ("ap-aging", "AP aging"),
+                         ("list-accounts", "List accounts")]:
+        sp = sub.add_parser(name, help=help_)
+        sp.add_argument("--as-of", help="YYYY-MM-DD")
+
+    for name, help_ in [("pnl", "Profit & Loss"),
+                         ("cash-flow", "Cash Flow"),
+                         ("vat-return", "VAT return")]:
+        sp = sub.add_parser(name, help=help_)
+        sp.add_argument("--from", dest="date_from", required=True, help="YYYY-MM-DD")
+        sp.add_argument("--to", dest="date_to", required=True, help="YYYY-MM-DD")
+
+    p_pdf = sub.add_parser("invoice-pdf", help="Generate PDF for an invoice id")
+    p_pdf.add_argument("invoice_id")
+    p_pdf.add_argument("out")
+
+    return p
+
+
+HANDLERS = {
+    "init": cmd_init,
+    "reset": cmd_reset,
+    "import-bizclinik": cmd_import,
+    "trial-balance": cmd_trial_balance,
+    "pnl": cmd_pnl,
+    "balance-sheet": cmd_balance_sheet,
+    "cash-flow": cmd_cash_flow,
+    "ar-aging": cmd_ar_aging,
+    "ap-aging": cmd_ap_aging,
+    "vat-return": cmd_vat_return,
+    "invoice-pdf": cmd_invoice_pdf,
+    "list-accounts": cmd_list_accounts,
+}
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
+    return HANDLERS[args.command](args)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

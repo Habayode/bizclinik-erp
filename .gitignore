@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+.env
+
+# SQLite — keep schema in code, never commit live books
+data/*.db
+data/*.db-shm
+data/*.db-wal
+
+# Streamlit + IDE
+.streamlit/secrets.toml
+.vscode/
+.idea/
+
+# Build artefacts
+*.pdf
+dist/
+build/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local test scripts not needed in deploy
+smoke_test.py
+import_test.py
