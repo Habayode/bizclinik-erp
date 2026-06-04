@@ -1,4 +1,4 @@
-﻿<#
+﻿﻿<#
  .SYNOPSIS
   Deploy BizClinik ERP behind a Cloudflare named tunnel using a Cloudflare
   API token instead of the interactive `cloudflared tunnel login` flow.
@@ -171,7 +171,10 @@ if (-not $existing) {
         TunnelName = $TunnelName
         TunnelSecret = $TunnelSecret
     } | ConvertTo-Json -Depth 5
-    Set-Content -Path $credFile -Value $credObj -Encoding UTF8 -Force
+    # IMPORTANT: write as UTF-8 WITHOUT BOM. PowerShell's Set-Content -Encoding
+    # UTF8 prepends a BOM in PS 5.1 which cloudflared's JSON parser rejects
+    # ("invalid character looking for beginning of value").
+    [IO.File]::WriteAllText($credFile, $credObj, (New-Object Text.UTF8Encoding($false)))
 }
 
 
@@ -212,15 +215,37 @@ ingress:
 "@ | Out-File -FilePath $cfgPath -Encoding utf8 -Force
 
 
-# ---- 7. cloudflared service ------------------------------------------------
+# ---- 7. cloudflared as a Scheduled Task -----------------------------------
 
-Write-Step "Installing cloudflared as a Windows service"
+# The native Windows service installer (`cloudflared service install`) doesn't
+# preserve the --config arg cleanly and runs as SYSTEM, which can't read the
+# config + creds sitting in Administrator's profile. A Scheduled Task running
+# as SYSTEM with the explicit --config path is more predictable.
+Write-Step "Registering cloudflared as a Scheduled Task"
+$cfTaskName = "CloudflaredTunnel"
+# Tear down any pre-existing native Windows service from older deploys.
 $svc = Get-Service -Name "cloudflared" -ErrorAction SilentlyContinue
 if ($svc) {
     Stop-Service cloudflared -ErrorAction SilentlyContinue
-    & $cfExe service uninstall | Out-Null
+    & $cfExe service uninstall 2>&1 | Out-Null
+    sc.exe delete cloudflared 2>&1 | Out-Null
 }
-& $cfExe --config $cfgPath service install
+Stop-Process -Name cloudflared -Force -ErrorAction SilentlyContinue
+
+$cfAction  = New-ScheduledTaskAction -Execute $cfExe `
+    -Argument "--no-autoupdate --config `"$cfgPath`" tunnel run"
+$cfTrigger = New-ScheduledTaskTrigger -AtStartup
+$cfSet     = New-ScheduledTaskSettingsSet `
+    -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable `
+    -RestartCount 5 -RestartInterval (New-TimeSpan -Minutes 1) `
+    -ExecutionTimeLimit ([TimeSpan]::Zero)
+$cfPrn     = New-ScheduledTaskPrincipal -UserId "SYSTEM" -RunLevel Highest
+
+if (Get-ScheduledTask -TaskName $cfTaskName -ErrorAction SilentlyContinue) {
+    Unregister-ScheduledTask -TaskName $cfTaskName -Confirm:$false
+}
+Register-ScheduledTask -TaskName $cfTaskName -Action $cfAction -Trigger $cfTrigger `
+    -Settings $cfSet -Principal $cfPrn | Out-Null
 
 
 # ---- 8. SYSTEM env + Scheduled Task for Streamlit -------------------------
@@ -252,7 +277,7 @@ Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger `
 # ---- 9. Start services ----------------------------------------------------
 
 Write-Step "Starting services"
-Start-Service cloudflared
+Start-ScheduledTask -TaskName $cfTaskName
 Start-ScheduledTask -TaskName $taskName
 
 Write-Host ""
