@@ -94,6 +94,14 @@ async def require_api_key(x_api_key: Optional[str] = Header(default=None)):
             raise HTTPException(status_code=403, detail="Tenant inactive")
         db_path = t["db_path"]
 
+        # Plan gate: the REST/webhook API is a Business-tier entitlement.
+        from bizclinik_erp.services import billing
+        if not billing.allows(tenant_slug, "api"):
+            raise HTTPException(
+                status_code=402,
+                detail="API access requires the Business plan. Upgrade on the "
+                       "Billing page to use the REST API.")
+
     token = _db._active_db_path.set(db_path)
     try:
         yield {"tenant": tenant_slug}

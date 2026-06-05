@@ -46,6 +46,33 @@ if sub:
 else:
     st.info("No subscription yet — choose a plan below.")
 
+# ---- what's unlocked right now ---------------------------------------------
+_FEATURE_LABELS = {
+    "bank_reconciliation": "Bank reconciliation",
+    "firs_einvoice": "FIRS e-invoice drafts",
+    "recurring": "Recurring transactions",
+    "multi_currency": "Multi-currency",
+    "crm": "CRM",
+    "budgets": "Budgets",
+    "api": "REST API + webhooks",
+}
+eff = billing.effective_plan(tenant)
+ent = billing.entitlements(tenant)
+st.subheader("What your plan unlocks")
+ec1, ec2 = st.columns([2, 1])
+with ec1:
+    for code in sorted(billing.GATED_FEATURES):
+        label = _FEATURE_LABELS.get(code, code)
+        if code in ent["unlocks"]:
+            st.markdown(f"✅ {label}")
+        else:
+            st.markdown(f"🔒 {label}")
+with ec2:
+    cap = ent["max_users"]
+    st.metric("User accounts", "Unlimited" if cap is None else f"Up to {cap}")
+    st.caption("Core accounting (sales, purchases, inventory, banking, payroll, "
+               "tax, reports) is included on every plan.")
+
 st.divider()
 st.subheader("Plans")
 plans = billing.list_plans()
@@ -53,8 +80,12 @@ cols = st.columns(len(plans))
 for col, p in zip(cols, plans):
     with col:
         price = "Free" if p["is_free"] else f"₦{p['price_ngn']:,.0f}/{p['interval'][:2]}"
-        st.markdown(f"### {p['name']}")
+        current = "  ✓ current" if (sub and eff.code == p["code"]
+                                    and sub["is_active"]) else ""
+        st.markdown(f"### {p['name']}{current}")
         st.markdown(f"**{price}**")
+        cap = p["max_users"]
+        st.caption(f"👥 {'Unlimited users' if cap is None else f'Up to {cap} users'}")
         for f in p["features"]:
             st.markdown(f"- {f}")
         if st.button(f"Choose {p['name']}", key=f"plan_{p['code']}",

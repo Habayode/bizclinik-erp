@@ -67,18 +67,37 @@ with tab_users:
         pw = c1.text_input("Initial password", type="password")
         must_change = c2.checkbox("Force password change on first login", value=True)
         submit = st.form_submit_button("Create user", type="primary")
+    # Plan gate: cap active users to the tenant plan's max_users.
+    from bizclinik_erp.services import billing as _billing
+    _tenant = auth.active_tenant()
+    _limit = _billing.user_limit(_tenant)
+    with get_session() as s:
+        _active_count = len(user_svc.list_users(s, include_inactive=False))
+    if _limit is not None and _active_count >= _limit:
+        st.warning(
+            f"🔒 Your **{_billing.effective_plan(_tenant).name}** plan allows up "
+            f"to **{_limit}** active users (you have {_active_count}). Upgrade on "
+            "the **Billing** page to add more.",
+            icon="🔒",
+        )
+
     if submit:
-        try:
-            with get_session() as s:
-                u = user_svc.create_user(
-                    s, username=username, password=pw, role=role,
-                    email=email or None, full_name=full_name or None,
-                    must_change_password=must_change,
-                    created_by_user_id=auth.current_user_id(),
-                )
-                st.success(f"Created {u.username} ({u.role.value})")
-        except ValueError as e:
-            st.error(str(e))
+        if _limit is not None and _active_count >= _limit:
+            st.error(
+                f"User limit reached ({_active_count}/{_limit}). Upgrade your "
+                "plan to add more users.")
+        else:
+            try:
+                with get_session() as s:
+                    u = user_svc.create_user(
+                        s, username=username, password=pw, role=role,
+                        email=email or None, full_name=full_name or None,
+                        must_change_password=must_change,
+                        created_by_user_id=auth.current_user_id(),
+                    )
+                    st.success(f"Created {u.username} ({u.role.value})")
+            except ValueError as e:
+                st.error(str(e))
 
     st.divider()
     st.subheader("Change role / deactivate")

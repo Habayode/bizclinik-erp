@@ -102,3 +102,102 @@ def test_webhook_activates_on_valid_signature(control_env, monkeypatch):
     out = billing.handle_webhook("fake", body, "valid")
     assert out["verified"] and out["handled"] and out["activated"]
     assert billing.is_active("acme") is True
+
+
+# --------------------------------------------------------------------------- #
+# Entitlements / feature gating                                                #
+# --------------------------------------------------------------------------- #
+
+def test_plan_unlocks_definition():
+    from bizclinik_erp.services import billing
+    # Free unlocks nothing gated; Starter unlocks the 3 starter features;
+    # Business unlocks everything.
+    assert billing.PLANS["free"].unlocks == frozenset()
+    assert billing.PLANS["starter"].unlocks == frozenset(
+        {"bank_reconciliation", "firs_einvoice", "recurring"})
+    assert billing.PLANS["business"].unlocks == billing.GATED_FEATURES
+    # max_users
+    assert billing.PLANS["free"].max_users == 2
+    assert billing.PLANS["starter"].max_users == 5
+    assert billing.PLANS["business"].max_users is None
+
+
+def test_allows_core_features_always():
+    from bizclinik_erp.services import billing
+    # A non-gated (core) feature is allowed regardless of plan/tenant.
+    assert billing.allows("anytenant", "sales") is True
+    assert billing.allows(None, "reports") is True
+
+
+def test_effective_plan_no_tenant_is_unrestricted():
+    from bizclinik_erp.services import billing
+    # Single-tenant / legacy default DB -> Business (nothing gated).
+    p = billing.effective_plan(None)
+    assert p.code == "business"
+    for feat in billing.GATED_FEATURES:
+        assert billing.allows(None, feat) is True
+
+
+def test_no_subscription_downgrades_to_free(control_env):
+    from bizclinik_erp.services import billing
+    # acme exists but has no subscription -> Free entitlements.
+    assert billing.effective_plan("acme").code == "free"
+    assert billing.allows("acme", "crm") is False
+    assert billing.allows("acme", "bank_reconciliation") is False
+    assert billing.user_limit("acme") == 2
+
+
+def test_starter_unlocks_starter_features_only(control_env, monkeypatch):
+    from bizclinik_erp.services import billing, payments
+    monkeypatch.setattr(payments, "get_provider", lambda name=None: FakeProvider())
+    res = billing.start_subscription("acme", "starter", email="a@b.com")
+    billing.confirm_by_reference(res["reference"])
+    assert billing.effective_plan("acme").code == "starter"
+    # Starter features on:
+    for feat in ("bank_reconciliation", "firs_einvoice", "recurring"):
+        assert billing.allows("acme", feat) is True
+    # Business-only features still locked:
+    for feat in ("crm", "multi_currency", "budgets", "api"):
+        assert billing.allows("acme", feat) is False
+    assert billing.user_limit("acme") == 5
+
+
+def test_business_unlocks_everything(control_env, monkeypatch):
+    from bizclinik_erp.services import billing, payments
+    monkeypatch.setattr(payments, "get_provider", lambda name=None: FakeProvider())
+    res = billing.start_subscription("acme", "business", email="a@b.com")
+    billing.confirm_by_reference(res["reference"])
+    assert billing.effective_plan("acme").code == "business"
+    for feat in billing.GATED_FEATURES:
+        assert billing.allows("acme", feat) is True
+    assert billing.user_limit("acme") is None
+    assert billing.can_add_user("acme", 999) is True
+
+
+def test_can_add_user_respects_limit(control_env):
+    from bizclinik_erp.services import billing
+    # No sub -> Free -> max 2 users.
+    assert billing.can_add_user("acme", 0) is True
+    assert billing.can_add_user("acme", 1) is True
+    assert billing.can_add_user("acme", 2) is False
+    assert billing.can_add_user("acme", 5) is False
+
+
+def test_lapsed_subscription_downgrades_to_free(control_env, monkeypatch):
+    from bizclinik_erp.services import billing, payments
+    from bizclinik_erp import tenancy
+    monkeypatch.setattr(payments, "get_provider", lambda name=None: FakeProvider())
+    res = billing.start_subscription("acme", "business", email="a@b.com")
+    billing.confirm_by_reference(res["reference"])
+    assert billing.allows("acme", "crm") is True
+    # Force the period to have ended.
+    from bizclinik_erp.tenancy import Subscription
+    from datetime import datetime, timedelta
+    fac = tenancy._control_factory()
+    with fac() as s:
+        sub = s.query(Subscription).filter_by(tenant_slug="acme").one()
+        sub.current_period_end = datetime.utcnow() - timedelta(days=1)
+        s.commit()
+    # Lapsed -> Free -> premium locks again.
+    assert billing.effective_plan("acme").code == "free"
+    assert billing.allows("acme", "crm") is False

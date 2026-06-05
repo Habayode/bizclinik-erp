@@ -22,6 +22,7 @@ st.set_page_config(page_title="Budgets · BizClinik ERP", layout="wide",
                    page_icon="📐")
 ui.inject_brand()
 auth.require_login()
+from bizclinik_erp import gate as _gate; _gate.require_feature("budgets", "Budgets")
 ui.hero("Budgets", "Plan vs actual by account", badge="BG",
         right_label="Module", right_value="Planning")
 

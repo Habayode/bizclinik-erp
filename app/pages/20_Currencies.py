@@ -22,6 +22,7 @@ st.set_page_config(page_title="Currencies · BizClinik ERP", layout="wide",
                     page_icon="💱")
 ui.inject_brand()
 auth.require_login()
+from bizclinik_erp import gate as _gate; _gate.require_feature("multi_currency", "Multi-currency")
 ui.hero("Currencies", "Foreign currencies + exchange rates (NGN functional)",
          badge="CU", right_label="Module", right_value="Multi-currency")
 

@@ -33,13 +33,24 @@ from .. import tenancy
 # Plans — EDIT THESE. price_ngn is per `interval`; 0 = free (no payment).      #
 # --------------------------------------------------------------------------- #
 
+# Features that require a plan to unlock. Anything NOT in this set is "core" and
+# is available on every plan (sales, purchases, inventory, banking, payroll,
+# tax, reports, GL, statements, settings, fixed assets, month-end).
+GATED_FEATURES = frozenset({
+    "bank_reconciliation", "firs_einvoice", "recurring",
+    "multi_currency", "crm", "budgets", "api",
+})
+
+
 @dataclass(frozen=True)
 class Plan:
     code: str
     name: str
     price_ngn: float
     interval: str = "monthly"          # "monthly" | "yearly"
-    features: list[str] = field(default_factory=list)
+    features: list[str] = field(default_factory=list)   # marketing bullets
+    max_users: Optional[int] = None     # None = unlimited
+    unlocks: frozenset = frozenset()    # which GATED_FEATURES this plan grants
 
     @property
     def is_free(self) -> bool:
@@ -47,14 +58,21 @@ class Plan:
 
 
 PLANS: dict[str, Plan] = {
-    "free": Plan("free", "Free", 0, "monthly",
-                 ["1 business", "Up to 2 users", "Core accounting"]),
-    "starter": Plan("starter", "Starter", 15000, "monthly",
-                    ["1 business", "Up to 5 users", "Invoicing + bank rec",
-                     "FIRS e-invoice drafts"]),
-    "business": Plan("business", "Business", 45000, "monthly",
-                     ["Multi-tenant", "Unlimited users", "Multi-currency",
-                      "API + webhooks", "Priority support"]),
+    "free": Plan(
+        "free", "Free", 0, "monthly",
+        ["1 business", "Up to 2 users", "Core accounting"],
+        max_users=2, unlocks=frozenset()),
+    "starter": Plan(
+        "starter", "Starter", 15000, "monthly",
+        ["Up to 5 users", "Invoicing + bank rec", "Recurring",
+         "FIRS e-invoice drafts"],
+        max_users=5,
+        unlocks=frozenset({"bank_reconciliation", "firs_einvoice", "recurring"})),
+    "business": Plan(
+        "business", "Business", 45000, "monthly",
+        ["Unlimited users", "Multi-currency", "CRM", "Budgets",
+         "API + webhooks", "Priority support"],
+        max_users=None, unlocks=GATED_FEATURES),
 }
 
 _PERIOD_DAYS = {"monthly": 30, "yearly": 365}
@@ -63,11 +81,58 @@ _PERIOD_DAYS = {"monthly": 30, "yearly": 365}
 def list_plans() -> list[dict]:
     return [{"code": p.code, "name": p.name, "price_ngn": p.price_ngn,
              "interval": p.interval, "features": list(p.features),
-             "is_free": p.is_free} for p in PLANS.values()]
+             "is_free": p.is_free, "max_users": p.max_users,
+             "unlocks": sorted(p.unlocks)} for p in PLANS.values()]
 
 
 def get_plan(code: str) -> Optional[Plan]:
     return PLANS.get((code or "").strip().lower())
+
+
+# --------------------------------------------------------------------------- #
+# Entitlements — what a tenant's plan grants                                    #
+# --------------------------------------------------------------------------- #
+
+def effective_plan(tenant_slug: Optional[str]) -> Plan:
+    """The plan whose entitlements apply right now.
+
+    - No tenant (single-tenant / legacy default DB) -> Business (unrestricted),
+      so non-SaaS installs are never gated.
+    - Active subscription -> that plan.
+    - No / lapsed subscription -> Free (graceful downgrade: core stays usable,
+      premium features lock until they (re)subscribe).
+    """
+    if not tenant_slug:
+        return PLANS["business"]
+    sub = current_subscription(tenant_slug)
+    if sub and sub["is_active"]:
+        return get_plan(sub["plan_code"]) or PLANS["free"]
+    return PLANS["free"]
+
+
+def entitlements(tenant_slug: Optional[str]) -> dict:
+    p = effective_plan(tenant_slug)
+    return {"plan": p.code, "max_users": p.max_users,
+            "unlocks": set(p.unlocks),
+            "unrestricted": (not tenant_slug)}
+
+
+def allows(tenant_slug: Optional[str], feature: str) -> bool:
+    """True if ``feature`` is available to the tenant. Core features (anything
+    not in GATED_FEATURES) are always allowed."""
+    if feature not in GATED_FEATURES:
+        return True
+    return feature in effective_plan(tenant_slug).unlocks
+
+
+def user_limit(tenant_slug: Optional[str]) -> Optional[int]:
+    """Max user accounts for the tenant's plan; None = unlimited."""
+    return effective_plan(tenant_slug).max_users
+
+
+def can_add_user(tenant_slug: Optional[str], current_user_count: int) -> bool:
+    lim = user_limit(tenant_slug)
+    return lim is None or current_user_count < lim
 
 
 # --------------------------------------------------------------------------- #

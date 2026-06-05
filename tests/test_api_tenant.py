@@ -30,6 +30,21 @@ def _client():
     return TestClient(app)
 
 
+def _activate_business(slug):
+    """Give a tenant an active Business subscription (the REST API is a
+    Business-tier entitlement, so API tests must subscribe first)."""
+    from datetime import datetime, timedelta
+    from bizclinik_erp import tenancy
+    from bizclinik_erp.services import billing
+    fac = tenancy._control_factory()
+    with fac() as s:
+        billing._upsert_subscription(
+            s, tenant_slug=slug, plan_code="business", status="active",
+            period_start=datetime.utcnow(),
+            period_end=datetime.utcnow() + timedelta(days=30))
+        s.commit()
+
+
 def test_no_key_rejected(api_env):
     c = _client()
     assert c.get("/api/v1/customers").status_code == 401
@@ -49,6 +64,8 @@ def test_per_tenant_key_isolation(api_env):
     # Two tenants with one customer each
     tenancy.create_tenant("alpha", "Alpha Co", admin_password="pw")
     tenancy.create_tenant("beta", "Beta Co", admin_password="pw")
+    _activate_business("alpha")
+    _activate_business("beta")
     tenancy.set_active("alpha")
     with get_session() as s:
         s.add(Customer(code="A1", name="Alpha Customer"))
@@ -81,6 +98,7 @@ def test_create_invoice_isolated_to_tenant(api_env):
     from bizclinik_erp.models import Customer, Product
 
     tenancy.create_tenant("acme", "Acme", admin_password="pw")
+    _activate_business("acme")
     tenancy.set_active("acme")
     with get_session() as s:
         s.add(Customer(code="CUST", name="Acme Buyer"))
@@ -113,3 +131,22 @@ def test_legacy_env_key_uses_default_db(api_env, monkeypatch):
     r = c.get("/api/v1/whoami", headers={"X-API-Key": "legacy-secret"})
     assert r.status_code == 200
     assert r.json()["tenant"] is None
+
+
+def test_api_requires_business_plan(api_env):
+    """A tenant without a Business subscription (Free) is blocked from the API
+    with HTTP 402; activating Business unlocks it."""
+    from bizclinik_erp import tenancy
+    tenancy.create_tenant("freeco", "Free Co", admin_password="pw")
+    tenancy.set_active(None)
+    key = tenancy.create_api_key("freeco", "free key")
+    c = _client()
+
+    # Free tenant -> 402 Payment Required.
+    r = c.get("/api/v1/customers", headers={"X-API-Key": key})
+    assert r.status_code == 402, r.text
+
+    # Activate Business -> now allowed.
+    _activate_business("freeco")
+    r = c.get("/api/v1/customers", headers={"X-API-Key": key})
+    assert r.status_code == 200, r.text

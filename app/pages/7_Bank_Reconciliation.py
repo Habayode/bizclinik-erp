@@ -30,6 +30,7 @@ st.set_page_config(page_title="Bank Reconciliation · BizClinik ERP",
                     layout="wide", page_icon="🔁")
 ui.inject_brand()
 auth.require_login()
+from bizclinik_erp import gate as _gate; _gate.require_feature("bank_reconciliation", "Bank Reconciliation")
 ui.hero("Bank Reconciliation",
         "Import bank statements · tick-and-tie to GL · finalise the period",
         badge="BR", right_label="Module", right_value="Cash matching")

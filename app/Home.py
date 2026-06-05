@@ -42,6 +42,14 @@ init_db()
 ui.inject_brand()
 auth.require_login()
 
+# Show the active tenant's subscription plan in the sidebar.
+try:
+    from bizclinik_erp import gate as _gate
+    if auth.active_tenant():
+        _gate.plan_badge()
+except Exception:
+    pass
+
 
 with get_session() as s:
     company = s.query(Company).first()
