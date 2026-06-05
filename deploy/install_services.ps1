@@ -173,13 +173,19 @@ Remove-NssmService "CloudflaredTunnel"
 # ---- 3. Install BizClinikERP via NSSM -----------------------------------
 
 Write-Step "Installing BizClinikERP service"
+# -u forces unbuffered Python output so NSSM log captures lines immediately.
+# --server.fileWatcherType=none disables Streamlit's watchdog file watcher
+# (it crashes under the SYSTEM service context, killing the process).
+# --server.runOnSave=false matches that intent.
 $streamlitArgs = @(
-    "-m", "streamlit", "run", "app/Home.py",
+    "-u", "-m", "streamlit", "run", "app/Home.py",
     "--server.headless=true",
     "--server.port=$Port",
     "--server.address=127.0.0.1",
     "--server.enableCORS=false",
     "--server.enableXsrfProtection=false",
+    "--server.fileWatcherType=none",
+    "--server.runOnSave=false",
     "--browser.gatherUsageStats=false"
 ) -join " "
 
@@ -190,9 +196,13 @@ $streamlitArgs = @(
 & $nssmExe set BizClinikERP Start SERVICE_AUTO_START | Out-Null
 
 # Inject env vars. NSSM AppEnvironmentExtra takes NAME=VALUE pairs.
+# PYTHONUNBUFFERED=1 belt-and-braces with -u; PYTHONIOENCODING=utf-8 avoids
+# crashes on the Naira sign in log output.
 $envExtra = @(
     "BIZCLINIK_APP_PASSWORD=$Password",
-    "BIZCLINIK_DB_PATH=$dbPath"
+    "BIZCLINIK_DB_PATH=$dbPath",
+    "PYTHONUNBUFFERED=1",
+    "PYTHONIOENCODING=utf-8"
 )
 & $nssmExe set BizClinikERP AppEnvironmentExtra $envExtra | Out-Null
 
