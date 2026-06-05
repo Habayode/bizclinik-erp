@@ -37,6 +37,15 @@ def write_invoice_pdf(
     settings = get_settings()
     company = company or session.query(Company).first()
 
+    # Per-tenant branding (accent colour, logo, payment instructions, …).
+    from ..services.invoice_template import get_or_create as _get_template
+    tpl = _get_template(session)
+    try:
+        accent = colors.HexColor(tpl.accent_color or "#1F3864")
+    except Exception:
+        accent = colors.HexColor("#1F3864")
+    accent_soft = colors.HexColor("#F4F6FB")
+
     out = Path(out_path)
     if out.exists():
         raise FileExistsError(f"Refusing to overwrite: {out}")
@@ -46,7 +55,7 @@ def write_invoice_pdf(
     base = ParagraphStyle("base", parent=styles["Normal"], fontName="Helvetica",
                           fontSize=10, leading=12)
     h1 = ParagraphStyle("h1", parent=base, fontName="Helvetica-Bold",
-                        fontSize=22, leading=26, textColor=colors.HexColor("#1F3864"))
+                        fontSize=22, leading=26, textColor=accent)
     h2 = ParagraphStyle("h2", parent=base, fontName="Helvetica-Bold",
                         fontSize=11, leading=14)
     small = ParagraphStyle("small", parent=base, fontSize=9, leading=11)
@@ -62,6 +71,21 @@ def write_invoice_pdf(
 
     # Header — INVOICE title + company info on left, invoice meta on right.
     company_block = []
+    if tpl.logo:
+        try:
+            import io
+            from reportlab.platypus import Image as _Image
+            img = _Image(io.BytesIO(tpl.logo))
+            # Scale to a max width of 45mm, preserving aspect ratio.
+            max_w = 45 * mm
+            if img.drawWidth > max_w:
+                ratio = max_w / float(img.drawWidth)
+                img.drawWidth = max_w
+                img.drawHeight = img.drawHeight * ratio
+            company_block.append(img)
+            company_block.append(Spacer(1, 2 * mm))
+        except Exception:
+            pass  # bad/unsupported image bytes -> skip the logo, keep the invoice
     if company:
         company_block += [Paragraph(company.name, h2)]
         for line in (company.address, company.email, company.phone,
@@ -111,16 +135,15 @@ def write_invoice_pdf(
     items = Table(rows, colWidths=[10 * mm, 70 * mm, 18 * mm, 25 * mm,
                                     15 * mm, 22 * mm, 30 * mm], repeatRows=1)
     items.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1F3864")),
+        ("BACKGROUND", (0, 0), (-1, 0), accent),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
         ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
         ("FONTSIZE", (0, 0), (-1, -1), 9),
         ("ALIGN", (2, 0), (-1, -1), "RIGHT"),
         ("ALIGN", (0, 0), (1, -1), "LEFT"),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("ROWBACKGROUNDS", (0, 1), (-1, -1),
-         [colors.white, colors.HexColor("#F4F6FB")]),
-        ("LINEBELOW", (0, 0), (-1, 0), 0.5, colors.HexColor("#1F3864")),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, accent_soft]),
+        ("LINEBELOW", (0, 0), (-1, 0), 0.5, accent),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
         ("TOPPADDING", (0, 0), (-1, -1), 4),
     ]))
@@ -139,7 +162,7 @@ def write_invoice_pdf(
         ("ALIGN", (0, 0), (-1, -1), "RIGHT"),
         ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
         ("FONTSIZE", (0, -1), (-1, -1), 11),
-        ("LINEABOVE", (0, -1), (-1, -1), 0.5, colors.HexColor("#1F3864")),
+        ("LINEABOVE", (0, -1), (-1, -1), 0.5, accent),
         ("TOPPADDING", (0, 0), (-1, -1), 3),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
     ]))
@@ -149,6 +172,18 @@ def write_invoice_pdf(
         story.append(Spacer(1, 6 * mm))
         story.append(Paragraph("<b>Notes</b>", h2))
         story.append(Paragraph(inv.notes, base))
+
+    # Per-tenant payment instructions + thank-you note.
+    if tpl.payment_instructions:
+        story.append(Spacer(1, 6 * mm))
+        story.append(Paragraph("<b>Payment Instructions</b>", h2))
+        for ln in str(tpl.payment_instructions).splitlines():
+            story.append(Paragraph(ln or "&nbsp;", small))
+    if tpl.thank_you_note:
+        story.append(Spacer(1, 5 * mm))
+        thanks = ParagraphStyle("thanks", parent=base, fontName="Helvetica-Oblique",
+                                textColor=accent, alignment=1)
+        story.append(Paragraph(tpl.thank_you_note, thanks))
 
     # Footer
     story.append(Spacer(1, 12 * mm))
@@ -162,6 +197,12 @@ def write_invoice_pdf(
         ("ALIGN", (0, 0), (-1, -1), "CENTER"),
     ]))
     story.append(footer)
+
+    if tpl.footer_note:
+        story.append(Spacer(1, 4 * mm))
+        foot = ParagraphStyle("foot", parent=base, fontSize=8, leading=10,
+                              textColor=colors.grey, alignment=1)
+        story.append(Paragraph(tpl.footer_note, foot))
 
     doc.build(story)
     return out

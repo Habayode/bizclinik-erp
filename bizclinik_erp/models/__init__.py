@@ -42,6 +42,7 @@ from .txn import (
 )
 from .budget import Budget, BudgetLine
 from .fx import Currency, ExchangeRate
+from .template import InvoiceTemplate
 
 __all__ = [
     # master
@@ -71,4 +72,6 @@ __all__ = [
     "Budget", "BudgetLine",
     # multi-currency
     "Currency", "ExchangeRate",
+    # per-tenant invoice branding
+    "InvoiceTemplate",
 ]
