@@ -1,0 +1,40 @@
+# systemd unit for the BizClinik ERP Streamlit app.
+# Install to /etc/systemd/system/bizclinik-erp.service
+#
+# Key difference vs Windows: Restart=always means any crash self-heals in
+# RestartSec seconds. No watchdog, no NSSM, no scheduled task hacks.
+
+[Unit]
+Description=BizClinik ERP (Streamlit)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=bizclinik
+Group=bizclinik
+WorkingDirectory=/opt/bizclinik-erp
+Environment=BIZCLINIK_DB_PATH=/opt/bizclinik-erp/data/bizclinik.db
+Environment=PYTHONUNBUFFERED=1
+EnvironmentFile=/opt/bizclinik-erp/.env
+ExecStart=/opt/bizclinik-erp/venv/bin/python -m streamlit run app/Home.py \
+    --server.headless=true \
+    --server.port=8501 \
+    --server.address=127.0.0.1 \
+    --server.enableCORS=false \
+    --server.enableXsrfProtection=false \
+    --server.fileWatcherType=none \
+    --browser.gatherUsageStats=false
+Restart=always
+RestartSec=3
+# Give it a moment on boot before counting failures.
+StartLimitIntervalSec=60
+StartLimitBurst=10
+# Resource guardrails so a runaway never takes the box down.
+MemoryMax=700M
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

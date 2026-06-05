@@ -1,0 +1,21 @@
+# systemd unit for the cloudflared named tunnel.
+# Install to /etc/systemd/system/cloudflared.service
+#
+# Credentials + config live in /etc/cloudflared/ (created by setup.sh).
+
+[Unit]
+Description=Cloudflare Tunnel (BizClinik ERP)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/cloudflared --no-autoupdate --config /etc/cloudflared/config.yml tunnel run
+Restart=always
+RestartSec=3
+StartLimitIntervalSec=60
+StartLimitBurst=10
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
