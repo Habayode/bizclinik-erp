@@ -36,3 +36,7 @@ package-lock.json
 
 # Office lock files
 ~$*
+
+# Never commit any secrets sheet
+*SECRET*
+*secret*.md
