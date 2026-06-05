@@ -43,6 +43,12 @@ from bizclinik_erp.services.sales import LineInput
 
 from . import webhooks
 
+try:
+    from bizclinik_erp.observability import init_sentry
+    init_sentry("api")
+except Exception:
+    pass
+
 app = FastAPI(
     title="BizClinik ERP API",
     version="1.1",

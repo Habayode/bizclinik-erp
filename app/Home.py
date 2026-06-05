@@ -10,6 +10,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+try:
+    from bizclinik_erp.observability import init_sentry
+    init_sentry("streamlit")
+except Exception:
+    pass
+
 import pandas as pd
 import streamlit as st
 from sqlalchemy import select
