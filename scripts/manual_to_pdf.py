@@ -1,14 +1,21 @@
-"""Render docs/USER_MANUAL.md to a branded PDF using markdown + Chromium (Playwright)."""
+"""Render a BizClinik markdown doc to a branded PDF (markdown + Chromium/Playwright).
+
+Usage:
+    python scripts/manual_to_pdf.py                      # User Manual (default)
+    python scripts/manual_to_pdf.py docs/FAQ.md out.pdf  # any markdown -> PDF
+"""
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import markdown
 from playwright.sync_api import sync_playwright
 
-DOCS = Path(__file__).resolve().parent.parent / "docs"
+ROOT = Path(__file__).resolve().parent.parent
+DOCS = ROOT / "docs"
 MD = DOCS / "USER_MANUAL.md"
-OUT = Path(__file__).resolve().parent.parent / "BizClinik_ERP_User_Manual.pdf"
+OUT = ROOT / "BizClinik_ERP_User_Manual.pdf"
 
 CSS = """
 @page { size: A4; margin: 16mm 14mm; }
@@ -37,28 +44,39 @@ hr { border: none; border-top: 1px solid #E5E7EB; margin: 18px 0; }
 """
 
 
-def build() -> None:
+def build(md_path: Path = MD, out_path: Path = OUT) -> None:
     html_body = markdown.markdown(
-        MD.read_text(encoding="utf-8"),
+        md_path.read_text(encoding="utf-8"),
         extensions=["tables", "fenced_code", "toc", "sane_lists"],
     )
     html = (f"<!doctype html><html><head><meta charset='utf-8'>"
             f"<base href='{DOCS.as_uri()}/'><style>{CSS}</style></head>"
             f"<body>{html_body}</body></html>")
-    tmp = DOCS / "_manual_render.html"
+    OUT_local = out_path
+    tmp = DOCS / "_render.html"
     tmp.write_text(html, encoding="utf-8")
     try:
         with sync_playwright() as p:
             b = p.chromium.launch()
             pg = b.new_page()
             pg.goto(tmp.as_uri(), wait_until="networkidle")
-            pg.pdf(path=str(OUT), format="A4", print_background=True,
+            pg.pdf(path=str(OUT_local), format="A4", print_background=True,
                    margin={"top": "16mm", "bottom": "16mm", "left": "14mm", "right": "14mm"})
             b.close()
-        print("wrote", OUT, f"({OUT.stat().st_size // 1024} KB)")
+        print("wrote", OUT_local, f"({OUT_local.stat().st_size // 1024} KB)")
     finally:
         tmp.unlink(missing_ok=True)
 
 
 if __name__ == "__main__":
-    build()
+    if len(sys.argv) >= 2:
+        md = Path(sys.argv[1])
+        if not md.is_absolute():
+            md = ROOT / md
+        out = (Path(sys.argv[2]) if len(sys.argv) >= 3
+               else ROOT / (md.stem + ".pdf"))
+        if not out.is_absolute():
+            out = ROOT / out
+        build(md, out)
+    else:
+        build()
