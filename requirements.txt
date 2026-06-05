@@ -7,3 +7,5 @@ reportlab>=4
 qrcode[pil]>=7
 fastapi>=0.110
 uvicorn>=0.30
+cryptography>=42
+boto3>=1.34

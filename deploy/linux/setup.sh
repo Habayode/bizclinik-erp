@@ -179,14 +179,31 @@ systemctl enable --now cloudflared
 
 # ---- 9. nightly backup timer -------------------------------------------
 step "Installing nightly backup timer"
+# Optional offsite (Cloudflare R2) credentials live in /etc/bizclinik/backup.env
+# (R2_ACCOUNT_ID, R2_BUCKET, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY,
+# BIZCLINIK_BACKUP_PASSPHRASE). The '-' prefix makes the file optional: without
+# it the snapshot still runs locally and just skips the R2 upload.
+mkdir -p /etc/bizclinik
+[ -f /etc/bizclinik/backup.env ] || cat > /etc/bizclinik/backup.env <<'ENVEOF'
+# Cloudflare R2 offsite backup (fill in to enable encrypted offsite copies).
+# R2_ACCOUNT_ID=
+# R2_BUCKET=bizclinik-backups
+# R2_ACCESS_KEY_ID=
+# R2_SECRET_ACCESS_KEY=
+# BIZCLINIK_BACKUP_PASSPHRASE=
+ENVEOF
+chmod 600 /etc/bizclinik/backup.env
+chown bizclinik:bizclinik /etc/bizclinik/backup.env
+
 cat > /etc/systemd/system/bizclinik-backup.service <<EOF
 [Unit]
-Description=BizClinik ERP nightly DB snapshot
+Description=BizClinik ERP nightly DB snapshot (+ encrypted offsite to R2)
 [Service]
 Type=oneshot
 User=bizclinik
 WorkingDirectory=$APP_DIR
 Environment=BIZCLINIK_DB_PATH=$APP_DIR/data/bizclinik.db
+EnvironmentFile=-/etc/bizclinik/backup.env
 ExecStart=$APP_DIR/venv/bin/python scripts/backup.py snapshot
 EOF
 cat > /etc/systemd/system/bizclinik-backup.timer <<EOF
