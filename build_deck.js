@@ -129,7 +129,7 @@ function stepPill(slide, x, y, n, label, descLines) {
   });
 }
 
-const TOTAL = 14;
+const TOTAL = 15;
 const slides = [];
 
 // =========================================================================
@@ -729,7 +729,38 @@ const slides = [];
 }
 
 // =========================================================================
-// 13. ROADMAP
+// 13. PLATFORM TODAY
+// =========================================================================
+{
+  const s = pres.addSlide();
+  s.background = { color: BG };
+  slides.push(s);
+  brandBar(s);
+  sectionTitle(s, "PLATFORM TODAY",
+    "A full SME accounting platform — live.",
+    "Everything below is shipped, tested, and running in production at erp.hagai.online.");
+
+  const caps = [
+    ["GL", "Double-entry ledger", "Audit trail, fiscal period close, void / reverse, fixed-asset depreciation.", NAVY],
+    ["NG", "Nigeria-ready tax", "Graduated PAYE, FIRS e-invoice drafts + QR, WHT certificates.", SUCCESS],
+    ["RC", "Bank reconciliation", "Multi-bank CSV (GTB / Access / Zenith / FBN / Moniepoint) + push-in bank feed, auto-match.", INFO],
+    ["MT", "Multi-tenant SaaS", "Isolated per-tenant databases, per-business subdomains, per-tenant invoice branding.", NAVY],
+    ["FX", "Multi-currency", "Foreign-denominated invoices & bills; realized + unrealized FX revaluation.", WARN],
+    ["$", "Billing & API", "Paystack / Flutterwave / Moniepoint subscriptions; REST API + webhooks.", TEAL],
+  ];
+  const cols = 3, cw = 3.0, chh = 1.25, gx = 0.15;
+  const startX = (W - (cols * cw + (cols - 1) * gx)) / 2;
+  caps.forEach((c, i) => {
+    const col = i % cols, row = Math.floor(i / cols);
+    const x = startX + col * (cw + gx);
+    const y = 2.45 + row * (chh + 0.2);
+    chipCard(s, x, y, cw, chh, c[0], c[1], c[2], c[3]);
+  });
+  pageNumber(s, 13, TOTAL);
+}
+
+// =========================================================================
+// 14. ROADMAP
 // =========================================================================
 {
   const s = pres.addSlide();
@@ -737,14 +768,14 @@ const slides = [];
   slides.push(s);
   brandBar(s);
   sectionTitle(s, "ROADMAP",
-    "What's next.",
-    "Live today on a single tenant. Targeted features below are scoped to land in the next two quarters.");
+    "Shipped — and what's next.",
+    "The original three-tier plan is complete. One foundational item remains, plus go-live inputs.");
 
   const items = [
-    { q: "Q3 2026", t: "Multi-tenant",       d: "Per-business workspaces with isolated SQLite files." },
-    { q: "Q3 2026", t: "Mobile templates",   d: "Responsive layouts for phone-first data entry on the go." },
-    { q: "Q4 2026", t: "Bank reconciliation",d: "Auto-match Moniepoint / GTB statement lines to GL postings." },
-    { q: "Q4 2026", t: "FIRS e-invoice",     d: "Export the JSON the FIRS portal expects, straight from the invoice screen." },
+    { tag: "DELIVERED", t: "Trust the books", d: "Audit trail, period close, void / reverse, real bank reconciliation.", c: SUCCESS },
+    { tag: "DELIVERED", t: "Fit for Nigeria", d: "Graduated PAYE, FIRS e-invoice, WHT, multi-bank statement imports.", c: SUCCESS },
+    { tag: "DELIVERED", t: "Sell as SaaS", d: "Multi-tenant, subdomains, billing, REST API, encrypted offsite backups, CI + uptime.", c: SUCCESS },
+    { tag: "NEXT", t: "Scale & go-live", d: "Postgres for concurrency; billing go-live (provider keys); open-banking auto-feeds.", c: TEAL },
   ];
   items.forEach((it, i) => {
     const x = 0.5 + i * 2.35;
@@ -754,11 +785,11 @@ const slides = [];
       shadow: { type: "outer", color: "1F3864", blur: 6, offset: 2, angle: 90, opacity: 0.05 },
     });
     s.addShape(pres.shapes.RECTANGLE, {
-      x, y: 2.6, w: 2.15, h: 0.06, fill: { color: TEAL }, line: { color: TEAL },
+      x, y: 2.6, w: 2.15, h: 0.06, fill: { color: it.c }, line: { color: it.c },
     });
-    s.addText(it.q, {
+    s.addText(it.tag, {
       x: x + 0.2, y: 2.78, w: 1.85, h: 0.3,
-      fontSize: 10, fontFace: HEAD_FONT, bold: true, color: TEAL,
+      fontSize: 10, fontFace: HEAD_FONT, bold: true, color: it.c,
       charSpacing: 3, margin: 0,
     });
     s.addText(it.t, {
@@ -770,11 +801,11 @@ const slides = [];
       fontSize: 10.5, fontFace: BODY_FONT, color: MUTED, margin: 0,
     });
   });
-  pageNumber(s, 13, TOTAL);
+  pageNumber(s, 14, TOTAL);
 }
 
 // =========================================================================
-// 14. CLOSING
+// 15. CLOSING
 // =========================================================================
 {
   const s = pres.addSlide();
@@ -822,5 +853,5 @@ const slides = [];
 }
 
 // ---- Write ---------------------------------------------------------------
-pres.writeFile({ fileName: "C:/Users/User/Downloads/bizclinik-erp/BizClinik_ERP_Explainer.pptx" })
+pres.writeFile({ fileName: "C:/Users/User/Downloads/bizclinik-erp/BizClinik_ERP_Explainer_2026-06-05.pptx" })
     .then((fn) => console.log("wrote", fn));
