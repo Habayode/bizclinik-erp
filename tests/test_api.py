@@ -109,6 +109,36 @@ def test_bank_feed_requires_key(client):
     assert resp.status_code in (401, 403)
 
 
+def test_billing_plans_endpoint(client):
+    resp = client.get("/api/v1/billing/plans", headers=AUTH)
+    assert resp.status_code == 200
+    codes = {p["code"] for p in resp.json()["plans"]}
+    assert {"free", "starter", "business"} <= codes
+
+
+def test_billing_subscribe_free_for_default(client):
+    # Default-DB API key uses the "default" pseudo-tenant; register it so billing
+    # can attach a subscription, then subscribe to the free plan.
+    from bizclinik_erp import tenancy
+    tenancy.create_tenant("acme-bill", "Acme Billing", admin_password="pw")
+    resp = client.post("/api/v1/billing/subscribe", headers=AUTH, json={
+        "tenant_slug": "acme-bill", "plan_code": "free", "email": "a@b.com"})
+    assert resp.status_code == 201, resp.text
+    body = resp.json()
+    assert body["status"] == "active" and body["free"] is True
+
+    status = client.get("/api/v1/billing/status?tenant_slug=acme-bill", headers=AUTH)
+    assert status.status_code == 200
+    assert status.json()["is_active"] is True
+
+
+def test_billing_webhook_bad_signature_401(client):
+    resp = client.post("/api/v1/billing/webhook/paystack",
+                       content=b'{"event":"x"}',
+                       headers={"x-paystack-signature": "bad"})
+    assert resp.status_code == 401
+
+
 def test_customers_requires_key(client):
     resp = client.get("/api/v1/customers")  # no X-API-Key header
     assert resp.status_code in (401, 403)

@@ -23,7 +23,7 @@ import os
 from datetime import date
 from typing import Iterator, Optional
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Query
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
@@ -398,6 +398,57 @@ async def ingest_bank_statement(payload: BankStatementIn) -> dict:
 
     return {"statement_id": sid, "lines_imported": imported,
             "auto_match": matched, "summary": summary}
+
+
+# ---- billing / subscriptions ------------------------------------------------
+
+
+class SubscribeIn(BaseModel):
+    tenant_slug: str
+    plan_code: str
+    email: str
+    callback_url: Optional[str] = None
+
+
+@app.get("/api/v1/billing/plans", dependencies=[Depends(require_api_key)])
+async def billing_plans() -> dict:
+    from bizclinik_erp.services import billing
+    return {"plans": billing.list_plans()}
+
+
+@app.get("/api/v1/billing/status", dependencies=[Depends(require_api_key)])
+async def billing_status(tenant_slug: str) -> dict:
+    from bizclinik_erp.services import billing
+    sub = billing.current_subscription(tenant_slug)
+    return sub or {"tenant_slug": tenant_slug, "status": "none", "is_active": False}
+
+
+@app.post("/api/v1/billing/subscribe", status_code=201,
+          dependencies=[Depends(require_api_key)])
+async def billing_subscribe(payload: SubscribeIn) -> dict:
+    from bizclinik_erp.services import billing
+    try:
+        return billing.start_subscription(
+            payload.tenant_slug, payload.plan_code, email=payload.email,
+            callback_url=payload.callback_url)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.post("/api/v1/billing/webhook/{provider}")
+async def billing_webhook(provider: str, request: Request) -> dict:
+    """Provider payment webhook (no API key — verified by provider signature)."""
+    from bizclinik_erp.services import billing
+    body = await request.body()
+    h = request.headers
+    signature = (h.get("x-paystack-signature") or h.get("verif-hash")
+                 or h.get("x-moniepoint-signature") or h.get("x-signature") or "")
+    out = billing.handle_webhook(provider, body, signature)
+    if not out.get("verified"):
+        raise HTTPException(status_code=401, detail="Webhook signature invalid")
+    return out
 
 
 # ---- reports ----------------------------------------------------------------

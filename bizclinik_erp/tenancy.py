@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Optional
 
 from sqlalchemy import (
-    Boolean, DateTime, Integer, String, create_engine, select,
+    Boolean, DateTime, Float, Integer, String, create_engine, select,
 )
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
@@ -57,6 +57,33 @@ class ApiKey(ControlBase):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     last_used_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+
+
+class Subscription(ControlBase):
+    """A tenant's SaaS subscription to a BizClinik plan. One row per tenant
+    (latest state). Plan definitions/pricing live in services.billing.PLANS."""
+    __tablename__ = "subscription"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tenant_slug: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
+    plan_code: Mapped[str] = mapped_column(String(32), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), default="pending")  # pending/active/past_due/canceled
+    current_period_start: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    current_period_end: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class BillingCharge(ControlBase):
+    """A single payment attempt for a subscription, keyed by provider reference."""
+    __tablename__ = "billing_charge"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    reference: Mapped[str] = mapped_column(String(80), unique=True, nullable=False, index=True)
+    tenant_slug: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    plan_code: Mapped[str] = mapped_column(String(32), nullable=False)
+    amount_ngn: Mapped[float] = mapped_column(Float, default=0.0)
+    provider: Mapped[str] = mapped_column(String(24), default="")
+    status: Mapped[str] = mapped_column(String(16), default="pending")  # pending/paid/failed
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    paid_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
 
 
 # ---- control engine (cached per resolved control.db path) -----------------
