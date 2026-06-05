@@ -17,8 +17,8 @@ echo "==> Installing requirements"
 "$APP_DIR/venv/bin/pip" install --quiet -r "$APP_DIR/requirements.txt"
 
 echo "==> Idempotent DB migration"
-sudo -u bizclinik BIZCLINIK_DB_PATH="$APP_DIR/data/bizclinik.db" \
-  "$APP_DIR/venv/bin/python" -m bizclinik_erp init
+sudo -u bizclinik env BIZCLINIK_DB_PATH="$APP_DIR/data/bizclinik.db" \
+  sh -c "cd '$APP_DIR' && exec '$APP_DIR/venv/bin/python' -m bizclinik_erp init"
 
 chown -R bizclinik:bizclinik "$APP_DIR"
 

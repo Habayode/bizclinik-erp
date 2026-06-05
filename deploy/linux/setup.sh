@@ -93,9 +93,11 @@ EOF
 chmod 600 "$APP_DIR/.env"
 chown -R bizclinik:bizclinik "$APP_DIR"
 
-sudo -u bizclinik BIZCLINIK_APP_PASSWORD="$APP_PASSWORD" \
+# Must run from $APP_DIR so the bizclinik_erp package is importable
+# (it's not pip-installed, just on the path via cwd).
+sudo -u bizclinik env BIZCLINIK_APP_PASSWORD="$APP_PASSWORD" \
   BIZCLINIK_DB_PATH="$APP_DIR/data/bizclinik.db" \
-  "$APP_DIR/venv/bin/python" -m bizclinik_erp init --admin-password "$APP_PASSWORD"
+  sh -c "cd '$APP_DIR' && exec '$APP_DIR/venv/bin/python' -m bizclinik_erp init --admin-password '$APP_PASSWORD'"
 
 # ---- 7. cloudflared -----------------------------------------------------
 step "Installing cloudflared"
