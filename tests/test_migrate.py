@@ -1,0 +1,75 @@
+"""Additive migration: a DB created before a column was added gets it back."""
+from __future__ import annotations
+
+import os
+import tempfile
+from pathlib import Path
+
+import pytest
+from sqlalchemy import create_engine, text
+
+
+def test_ensure_schema_adds_missing_column(monkeypatch):
+    """Simulate an old DB: create sales_invoice WITHOUT currency_code, then run
+    ensure_schema and confirm the column is added and queryable."""
+    tmp = Path(tempfile.mkdtemp()) / "old.db"
+    monkeypatch.setenv("BIZCLINIK_DB_PATH", str(tmp))
+
+    from bizclinik_erp.config import get_settings
+    from bizclinik_erp.db import get_engine, _session_factory
+    get_settings.cache_clear()
+    get_engine.cache_clear()
+    _session_factory.cache_clear()
+
+    # Hand-build an "old-schema" sales_invoice table WITHOUT the fx columns.
+    eng = create_engine(f"sqlite:///{tmp}", future=True)
+    with eng.begin() as conn:
+        conn.execute(text(
+            "CREATE TABLE sales_invoice ("
+            " id INTEGER PRIMARY KEY,"
+            " number VARCHAR(32),"
+            " invoice_date DATE,"
+            " customer_id INTEGER,"
+            " status VARCHAR(16),"
+            " amount_paid FLOAT"
+            ")"
+        ))
+        conn.execute(text(
+            "INSERT INTO sales_invoice (id, number, invoice_date, customer_id,"
+            " status, amount_paid) VALUES (1, 'INV-OLD', '2026-01-01', 1,"
+            " 'POSTED', 0.0)"
+        ))
+    eng.dispose()
+
+    # Sanity: the column really is missing -> query would fail today.
+    eng2 = create_engine(f"sqlite:///{tmp}", future=True)
+    cols_before = {c[1] for c in eng2.connect().execute(
+        text("PRAGMA table_info(sales_invoice)")).fetchall()}
+    assert "currency_code" not in cols_before
+    eng2.dispose()
+
+    # Run the migrator via init_db (clears cache so it uses this DB).
+    from bizclinik_erp.db import get_engine as ge, init_db
+    ge.cache_clear()
+    init_db()
+
+    # Now the columns exist and default correctly.
+    from bizclinik_erp.db import get_session
+    from bizclinik_erp.models import SalesInvoice
+    with get_session() as s:
+        inv = s.get(SalesInvoice, 1)
+        assert inv is not None
+        assert inv.currency_code == "NGN"   # backfilled default
+        assert inv.fx_rate == 1.0
+
+    ge.cache_clear()
+    _session_factory.cache_clear()
+
+
+def test_idempotent(fresh_db):
+    """ensure_schema on an already-current DB applies nothing new."""
+    from bizclinik_erp.services.migrate import ensure_schema
+    applied = ensure_schema()
+    # No ADD COLUMN statements (everything already present).
+    adds = [a for a in applied if a.startswith("ALTER")]
+    assert adds == []

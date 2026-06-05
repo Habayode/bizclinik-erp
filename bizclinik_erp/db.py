@@ -116,9 +116,14 @@ def get_session() -> Iterator[Session]:
 
 
 def init_db() -> None:
-    """Create all tables on the active DB. Safe to call repeatedly."""
+    """Create all tables on the active DB + add any missing columns. Safe to
+    call repeatedly (idempotent migration for additive schema changes)."""
     from . import models  # noqa: F401  (register models with Base)
     Base.metadata.create_all(get_engine())
+    # Additive migration: ALTER TABLE ADD COLUMN for columns added to models
+    # after a DB was first created (create_all never adds columns).
+    from .services.migrate import ensure_schema
+    ensure_schema(get_engine())
 
 
 def reset_db() -> None:

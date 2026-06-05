@@ -204,6 +204,25 @@ def cmd_api_key_list(_args) -> int:
     return 0
 
 
+def cmd_migrate(_args) -> int:
+    """Run the additive schema migration on the default DB and every tenant DB
+    so older databases gain columns added to the models since they were made."""
+    from . import db as _db
+    from .tenancy import list_tenants
+
+    print("Migrating default DB...")
+    _db.set_active_db_path(None)
+    _db.init_db()
+
+    for t in list_tenants(active_only=False):
+        print(f"Migrating tenant {t['slug']} ({t['db_path']})...")
+        _db.set_active_db_path(t["db_path"])
+        _db.init_db()
+    _db.set_active_db_path(None)
+    print("Migration complete.")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="bizclinik_erp",
                                  description="BizClinik ERP — CLI")
@@ -255,6 +274,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("api-key-list", help="List API keys (hashes not shown)")
 
+    sub.add_parser("migrate", help="Add missing columns to default + all tenant DBs")
+
     return p
 
 
@@ -276,6 +297,7 @@ HANDLERS = {
     "tenant-adopt": cmd_tenant_adopt,
     "api-key-create": cmd_api_key_create,
     "api-key-list": cmd_api_key_list,
+    "migrate": cmd_migrate,
 }
 
 
