@@ -204,6 +204,44 @@ html, body, [class*="css"] {
 /* Hide Streamlit's default footer/menu chrome */
 footer { visibility: hidden; }
 #MainMenu { visibility: hidden; }
+
+/* ---- Responsive / mobile ------------------------------------------------ */
+/* Wide tables never overflow the viewport — scroll horizontally instead. */
+[data-testid="stDataFrame"], [data-testid="stTable"] { overflow-x: auto; }
+
+@media (max-width: 768px) {
+    /* Tighter page gutters so content isn't cramped against the edges. */
+    .block-container, [data-testid="stAppViewContainer"] .main .block-container {
+        padding-left: 0.75rem !important; padding-right: 0.75rem !important;
+        padding-top: 1rem !important;
+    }
+    /* Stack st.columns() vertically instead of squeezing them side-by-side. */
+    [data-testid="stHorizontalBlock"] {
+        flex-direction: column !important; gap: 0.5rem !important;
+    }
+    [data-testid="stHorizontalBlock"] > [data-testid="column"] {
+        width: 100% !important; flex: 1 1 100% !important;
+        min-width: 100% !important;
+    }
+    /* Hero + headings scale down. */
+    h1 { font-size: 1.5rem !important; line-height: 1.25 !important; }
+    h2 { font-size: 1.2rem !important; }
+    .brand-hero { padding: 16px !important; flex-wrap: wrap !important; }
+    .brand-hero h1 { font-size: 1.4rem !important; }
+    .brand-hero .right { display: none !important; }  /* drop the side badge */
+    /* KPI / metric cards full width and comfortable to tap. */
+    [data-testid="stMetric"] { padding: 10px 12px !important; }
+    /* Buttons span the row so they're easy to hit. */
+    .stButton > button, .stDownloadButton > button,
+    .stFormSubmitButton > button { width: 100% !important; }
+    /* Let the sidebar (nav) take most of the screen when opened. */
+    [data-testid="stSidebar"] { min-width: 80vw !important; width: 80vw !important; }
+}
+
+/* Tablet: keep two-up columns but allow wrapping rather than overflow. */
+@media (min-width: 769px) and (max-width: 1024px) {
+    [data-testid="stHorizontalBlock"] { flex-wrap: wrap !important; }
+}
 </style>
 """
 
