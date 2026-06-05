@@ -68,10 +68,44 @@ def list_snapshots(dest_dir: Path) -> list[Path]:
         p for p in dest_dir.iterdir()
         if p.is_file()
         and p.name.startswith(SNAPSHOT_PREFIX)
-        and p.suffix == SNAPSHOT_SUFFIX
+        and p.suffix in (SNAPSHOT_SUFFIX, ".sql")   # .db (sqlite) or .sql (pg_dump)
     ]
     snaps.sort(key=lambda p: p.stat().st_mtime)
     return snaps
+
+
+def _pg_dump(dbname: str, dest_dir: Path) -> Path:
+    """pg_dump a database to dest_dir/bizclinik_{ts}.sql. Uses PG* env."""
+    import os
+    import subprocess
+    dest_dir = Path(dest_dir)
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    ts = datetime.now().strftime(TIMESTAMP_FMT)
+    dest = dest_dir / f"{SNAPSHOT_PREFIX}{ts}.sql"
+    cmd = ["pg_dump", "--no-owner", "--no-acl",
+           "-h", os.environ.get("PGHOST", "127.0.0.1"),
+           "-p", os.environ.get("PGPORT", "5432"),
+           "-U", os.environ.get("PGUSER", "bizclinik"),
+           "-d", dbname, "-f", str(dest)]
+    env = dict(os.environ)  # PGPASSWORD already present
+    subprocess.run(cmd, env=env, check=True, capture_output=True)
+    return dest.resolve()
+
+
+def _pg_targets() -> list[tuple[str, str]]:
+    """(scope, pg_dbname) for the default DB, control plane, and each tenant."""
+    from ..config import get_settings
+    from .. import dbbackend, tenancy
+    settings = get_settings()
+    data_dir = Path(settings.db_path).parent
+    out = [("default", dbbackend.pg_dbname_for(str(settings.db_path))),
+           ("control", dbbackend.pg_dbname_for(str(data_dir / "control.db")))]
+    try:
+        for t in tenancy.list_tenants(active_only=False):
+            out.append((f"tenant-{t['slug']}", dbbackend.pg_dbname_for(t["db_path"])))
+    except Exception:
+        pass
+    return out
 
 
 def prune(
@@ -120,12 +154,27 @@ def snapshot_all(*, dest_root: Optional[Path] = None,
     installs (just snapshots the default DB).
     """
     from ..config import get_settings
-    from .. import tenancy
+    from .. import dbbackend, tenancy
 
     settings = get_settings()
     data_dir = Path(settings.db_path).parent
     dest_root = Path(dest_root) if dest_root else (data_dir / "backups")
+    results: list[dict] = []
 
+    # Postgres backend: pg_dump each database to a .sql snapshot.
+    if dbbackend.is_postgres():
+        for scope, dbname in _pg_targets():
+            folder = dest_root / scope
+            try:
+                snap = _pg_dump(dbname, folder)
+                pruned = prune(folder, retain_days=retain_days, retain_min=retain_min)
+                results.append({"scope": scope, "snapshot": str(snap),
+                                "pruned": len(pruned)})
+            except Exception as exc:
+                results.append({"scope": scope, "error": str(exc)})
+        return results
+
+    # SQLite backend: checkpoint + copy each .db file.
     targets: list[tuple[str, Path]] = [("default", Path(settings.db_path))]
     control = data_dir / "control.db"
     if control.exists():
@@ -138,7 +187,6 @@ def snapshot_all(*, dest_root: Optional[Path] = None,
     except Exception:
         pass  # control plane may not exist in single-tenant installs
 
-    results: list[dict] = []
     for scope, path in targets:
         if not path.exists():
             continue
