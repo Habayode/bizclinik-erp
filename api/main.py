@@ -400,6 +400,34 @@ async def ingest_bank_statement(payload: BankStatementIn) -> dict:
             "auto_match": matched, "summary": summary}
 
 
+# ---- customer statement email ----------------------------------------------
+
+
+class StatementEmailIn(BaseModel):
+    customer_code: str
+    period_start: date
+    period_end: date
+    to_addr: Optional[str] = None
+
+
+@app.post("/api/v1/customers/statement/email",
+          dependencies=[Depends(require_api_key)])
+async def email_customer_statement(payload: StatementEmailIn) -> dict:
+    """Render a customer's statement PDF and email it (to the address on file,
+    or an override). Returns whether it sent and why not, if applicable."""
+    from bizclinik_erp.services.customer_statement import email_statement
+    with get_session() as s:
+        cust = s.execute(
+            select(Customer).where(Customer.code == payload.customer_code)
+        ).scalar_one_or_none()
+        if not cust:
+            raise HTTPException(status_code=404,
+                                detail=f"Customer {payload.customer_code} not found")
+        res = email_statement(s, cust.id, period_start=payload.period_start,
+                              period_end=payload.period_end, to_addr=payload.to_addr)
+    return res
+
+
 # ---- billing / subscriptions ------------------------------------------------
 
 

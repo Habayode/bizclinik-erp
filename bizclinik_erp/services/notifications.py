@@ -344,3 +344,65 @@ def send_digest_email(digest: dict, *, to_addr: str) -> bool:
         return True
     except Exception:
         return False
+
+
+# --------------------------------------------------------------------------- #
+# Generic SMTP send with a file attachment                                     #
+# --------------------------------------------------------------------------- #
+
+def smtp_configured() -> bool:
+    return bool(os.environ.get("SMTP_HOST", "").strip())
+
+
+def send_email_with_attachment(
+    *, to_addr: str, subject: str, body_text: str,
+    attachment_path: "str | None" = None, attachment_name: "str | None" = None,
+    body_html: "str | None" = None,
+) -> bool:
+    """Send an email (optionally with one file attachment) over SMTP.
+
+    Reuses SMTP_HOST/PORT/USER/PASS/FROM. Returns True on success, False if SMTP
+    is not configured or any error occurs (all failures swallowed).
+    """
+    host = os.environ.get("SMTP_HOST", "").strip()
+    if not host or not to_addr:
+        return False
+    try:
+        from email.mime.base import MIMEBase
+        from email import encoders
+        from pathlib import Path
+
+        port = int(os.environ.get("SMTP_PORT", "587") or "587")
+        user = os.environ.get("SMTP_USER", "").strip()
+        password = os.environ.get("SMTP_PASS", "")
+        from_addr = os.environ.get("SMTP_FROM", user or "bizclinik@localhost").strip()
+
+        msg = MIMEMultipart()
+        msg["Subject"] = subject
+        msg["From"] = from_addr
+        msg["To"] = to_addr
+        msg.attach(MIMEText(body_text, "plain", "utf-8"))
+        if body_html:
+            msg.attach(MIMEText(body_html, "html", "utf-8"))
+
+        if attachment_path:
+            p = Path(attachment_path)
+            data = p.read_bytes()
+            part = MIMEBase("application", "octet-stream")
+            part.set_payload(data)
+            encoders.encode_base64(part)
+            part.add_header("Content-Disposition", "attachment",
+                            filename=attachment_name or p.name)
+            msg.attach(part)
+
+        with smtplib.SMTP(host, port, timeout=30) as server:
+            try:
+                server.starttls()
+            except smtplib.SMTPException:
+                pass
+            if user:
+                server.login(user, password)
+            server.sendmail(from_addr, [to_addr], msg.as_string())
+        return True
+    except Exception:
+        return False

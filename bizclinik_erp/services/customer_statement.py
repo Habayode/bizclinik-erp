@@ -154,3 +154,67 @@ def customer_ledger(
             "running_balance": round(running, 2),
         })
     return rows
+
+
+# --------------------------------------------------------------------------- #
+# Email a statement PDF to the customer                                        #
+# --------------------------------------------------------------------------- #
+
+def email_statement(
+    session: Session, customer_id: int, *,
+    period_start: date, period_end: date,
+    to_addr: Optional[str] = None,
+) -> dict:
+    """Render the customer's statement PDF and email it as an attachment.
+
+    Recipient defaults to the customer's email on file. Returns a status dict:
+    ``{"sent": bool, "to": str|None, "reason": str|None}``. Never raises for a
+    missing recipient or unconfigured SMTP — it reports the reason so callers
+    (UI/API) can show a friendly message.
+    """
+    import tempfile
+    from pathlib import Path
+
+    from ..exporters.customer_statement_pdf import write_customer_statement_pdf
+    from . import notifications
+
+    customer = session.get(Customer, customer_id)
+    if not customer:
+        raise ValueError(f"Customer {customer_id} not found.")
+
+    recipient = (to_addr or customer.email or "").strip()
+    if not recipient:
+        return {"sent": False, "to": None,
+                "reason": "No email address on file for this customer."}
+    if not notifications.smtp_configured():
+        return {"sent": False, "to": recipient,
+                "reason": "SMTP is not configured (set SMTP_HOST/USER/PASS/FROM)."}
+
+    outstanding = customer_outstanding(session, customer_id, as_of=period_end)
+    tmp_dir = Path(tempfile.mkdtemp(prefix="bizclinik_soa_"))
+    fname = f"statement_{customer.code}_{period_end.isoformat()}.pdf"
+    pdf_path = tmp_dir / fname
+    write_customer_statement_pdf(
+        session, customer_id, period_start=period_start, period_end=period_end,
+        out_path=pdf_path)
+
+    subject = f"Statement of Account — {period_start.isoformat()} to {period_end.isoformat()}"
+    body = (
+        f"Dear {customer.name},\n\n"
+        f"Please find attached your statement of account for the period "
+        f"{period_start.isoformat()} to {period_end.isoformat()}.\n\n"
+        f"Outstanding balance as at {period_end.isoformat()}: {outstanding:,.2f}\n\n"
+        f"Thank you for your business.\n"
+    )
+    ok = notifications.send_email_with_attachment(
+        to_addr=recipient, subject=subject, body_text=body,
+        attachment_path=str(pdf_path), attachment_name=fname)
+
+    try:
+        pdf_path.unlink(missing_ok=True)
+        tmp_dir.rmdir()
+    except Exception:
+        pass
+
+    return {"sent": ok, "to": recipient,
+            "reason": None if ok else "SMTP send failed (check server logs/credentials)."}

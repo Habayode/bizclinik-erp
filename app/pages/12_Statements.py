@@ -26,6 +26,7 @@ from bizclinik_erp.models import Customer, Supplier
 from bizclinik_erp.services.customer_statement import (
     customer_ledger,
     customer_outstanding,
+    email_statement,
 )
 from bizclinik_erp import auth
 from bizclinik_erp import ui_kit as ui
@@ -177,6 +178,18 @@ with tab_soa:
                         attachment=Path(last_pdf),
                     )
                     (st.success if ok else st.info)(msg)
+
+            st.caption("— or —")
+            if st.button("📧 Email to customer on file", key="soa_send_oneclick",
+                         help="Generates the PDF and emails it to the customer's "
+                              "saved address in one step."):
+                with get_session() as s:
+                    res = email_statement(s, cust_id, period_start=ps,
+                                          period_end=pe, to_addr=to_addr or None)
+                if res["sent"]:
+                    st.success(f"Statement emailed to {res['to']}.")
+                else:
+                    st.info(res["reason"])
 
 
 # ---- WHT certificate tab ---------------------------------------------------
