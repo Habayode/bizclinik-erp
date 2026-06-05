@@ -244,20 +244,42 @@ def _subdomain_from_request() -> Optional[str]:
     return label
 
 
+def _resolve_subdomain_slug() -> Optional[str]:
+    """Map the request host's leftmost label to a registered tenant slug.
+
+    Tries the label as-is, then with a trailing ``-erp`` stripped, so all of
+    these resolve tenant ``acme`` without further config:
+
+      • acme.example.com            (flat, dedicated domain — free TLS)
+      • acme-erp.hagai.online       (one level under hagai.online — free TLS)
+      • acme.erp.hagai.online       (nested — needs paid ACM, but still maps)
+
+    Returns the matching slug, or None if no tenant matches.
+    """
+    from . import tenancy
+    label = _subdomain_from_request()
+    if not label:
+        return None
+    for cand in (label, label[:-4] if label.endswith("-erp") else None):
+        if cand and tenancy.get_tenant(cand):
+            return cand
+    return None
+
+
 def _apply_tenant() -> None:
     """Resolve + activate the tenant for this script run. No-op (legacy single
-    DB) when no tenants are registered. A `<slug>.erp.<zone>` subdomain
-    auto-selects its tenant and skips the picker."""
+    DB) when no tenants are registered. A tenant subdomain auto-selects its
+    tenant and skips the picker (see _resolve_subdomain_slug for the formats)."""
     from . import tenancy
     if not tenancy.has_tenants():
         tenancy.set_active(None)
         return
 
-    # Subdomain auto-routing: <slug>.erp.hagai.online -> that tenant.
+    # Subdomain auto-routing -> that tenant.
     if not st.session_state.get(_TENANT_KEY):
-        sub = _subdomain_from_request()
-        if sub and tenancy.get_tenant(sub):
-            st.session_state[_TENANT_KEY] = sub
+        slug = _resolve_subdomain_slug()
+        if slug:
+            st.session_state[_TENANT_KEY] = slug
 
     sel = st.session_state.get(_TENANT_KEY)
     if not sel:
