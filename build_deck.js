@@ -769,36 +769,39 @@ const slides = [];
   brandBar(s);
   sectionTitle(s, "ROADMAP",
     "Shipped — and what's next.",
-    "The original three-tier plan is complete. One foundational item remains, plus go-live inputs.");
+    "The original three-tier plan is complete. Next up: CRM, scale to Postgres, and billing go-live.");
 
   const items = [
-    { tag: "DELIVERED", t: "Trust the books", d: "Audit trail, period close, void / reverse, real bank reconciliation.", c: SUCCESS },
-    { tag: "DELIVERED", t: "Fit for Nigeria", d: "Graduated PAYE, FIRS e-invoice, WHT, multi-bank statement imports.", c: SUCCESS },
-    { tag: "DELIVERED", t: "Sell as SaaS", d: "Multi-tenant, subdomains, billing, REST API, encrypted offsite backups, CI + uptime.", c: SUCCESS },
-    { tag: "NEXT", t: "Scale & go-live", d: "Postgres for concurrency; billing go-live (provider keys); open-banking auto-feeds.", c: TEAL },
+    { tag: "DELIVERED", t: "Trust the books", d: "Audit trail, period close, void / reverse, bank reconciliation.", c: SUCCESS },
+    { tag: "DELIVERED", t: "Fit for Nigeria", d: "Graduated PAYE, FIRS e-invoice, WHT, multi-bank imports.", c: SUCCESS },
+    { tag: "DELIVERED", t: "Sell as SaaS", d: "Multi-tenant, subdomains, billing, API, offsite backups, CI.", c: SUCCESS },
+    { tag: "NEXT", t: "CRM", d: "Leads, contacts, deal pipeline & follow-up reminders — linked to invoices and statements.", c: TEAL },
+    { tag: "NEXT", t: "Scale & go-live", d: "Postgres for concurrency; billing keys; open-banking auto-feeds.", c: TEAL },
   ];
+  const n = items.length, cw = 1.78, gap = 0.15;
+  const startX = (W - (n * cw + (n - 1) * gap)) / 2;
   items.forEach((it, i) => {
-    const x = 0.5 + i * 2.35;
+    const x = startX + i * (cw + gap);
     s.addShape(pres.shapes.RECTANGLE, {
-      x, y: 2.6, w: 2.15, h: 2.3,
+      x, y: 2.6, w: cw, h: 2.3,
       fill: { color: SURFACE }, line: { color: BORDER, width: 0.5 },
       shadow: { type: "outer", color: "1F3864", blur: 6, offset: 2, angle: 90, opacity: 0.05 },
     });
     s.addShape(pres.shapes.RECTANGLE, {
-      x, y: 2.6, w: 2.15, h: 0.06, fill: { color: it.c }, line: { color: it.c },
+      x, y: 2.6, w: cw, h: 0.06, fill: { color: it.c }, line: { color: it.c },
     });
     s.addText(it.tag, {
-      x: x + 0.2, y: 2.78, w: 1.85, h: 0.3,
-      fontSize: 10, fontFace: HEAD_FONT, bold: true, color: it.c,
-      charSpacing: 3, margin: 0,
+      x: x + 0.16, y: 2.76, w: cw - 0.3, h: 0.3,
+      fontSize: 9.5, fontFace: HEAD_FONT, bold: true, color: it.c,
+      charSpacing: 2, margin: 0,
     });
     s.addText(it.t, {
-      x: x + 0.2, y: 3.05, w: 1.85, h: 0.5,
-      fontSize: 15, fontFace: HEAD_FONT, bold: true, color: INK, margin: 0,
+      x: x + 0.16, y: 3.02, w: cw - 0.3, h: 0.5,
+      fontSize: 14, fontFace: HEAD_FONT, bold: true, color: INK, margin: 0,
     });
     s.addText(it.d, {
-      x: x + 0.2, y: 3.55, w: 1.85, h: 1.25,
-      fontSize: 10.5, fontFace: BODY_FONT, color: MUTED, margin: 0,
+      x: x + 0.16, y: 3.52, w: cw - 0.3, h: 1.3,
+      fontSize: 10, fontFace: BODY_FONT, color: MUTED, margin: 0,
     });
   });
   pageNumber(s, 14, TOTAL);
