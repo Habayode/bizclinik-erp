@@ -217,6 +217,14 @@ $envExtra = @(
 & $nssmExe set BizClinikERP AppRestartDelay 5000 | Out-Null
 & $nssmExe set BizClinikERP AppExit Default Restart | Out-Null
 
+# Fast, hang-free stop. Streamlit ignores Ctrl+C / WM_CLOSE on Windows and
+# NSSM otherwise waits the full timeout, making Stop-Service hang ~90s.
+# AppStopMethodSkip 6 = skip WM_CLOSE(2) + WM_QUIT(4); AppStopMethodConsole 0
+# = don't even attempt Ctrl+C. NSSM goes straight to TerminateProcess.
+& $nssmExe set BizClinikERP AppStopMethodSkip 6 | Out-Null
+& $nssmExe set BizClinikERP AppStopMethodConsole 0 | Out-Null
+& $nssmExe set BizClinikERP AppKillProcessTree 1 | Out-Null
+
 
 # ---- 4. Install CloudflaredTunnel via NSSM ------------------------------
 
@@ -243,6 +251,9 @@ $cfArgs = "--no-autoupdate --config `"$cfgPath`" tunnel run"
 & $nssmExe set CloudflaredTunnel AppRotateBytes 10485760 | Out-Null
 & $nssmExe set CloudflaredTunnel AppRestartDelay 5000 | Out-Null
 & $nssmExe set CloudflaredTunnel AppExit Default Restart | Out-Null
+& $nssmExe set CloudflaredTunnel AppStopMethodSkip 6 | Out-Null
+& $nssmExe set CloudflaredTunnel AppStopMethodConsole 0 | Out-Null
+& $nssmExe set CloudflaredTunnel AppKillProcessTree 1 | Out-Null
 
 
 # ---- 5. Start services and poll health ----------------------------------
