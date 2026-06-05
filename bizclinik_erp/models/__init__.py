@@ -19,6 +19,7 @@ from .fiscal import FiscalPeriod, PeriodStatus
 from .recon import BankStatement, BankStatementLine, StatementStatus
 from .recurring import RecurringFrequency, RecurringKind, RecurringTemplate
 from .users import Role, User, UserSession
+from .einvoice import EInvoiceSubmission, EInvoiceStatus
 from .txn import (
     Bill,
     BillLine,
@@ -39,6 +40,7 @@ from .txn import (
     SalesOrderLine,
     StockMovement,
 )
+from .budget import Budget, BudgetLine
 
 __all__ = [
     # master
@@ -62,4 +64,8 @@ __all__ = [
     "FiscalPeriod", "PeriodStatus",
     # audit
     "AuditLog", "AuditAction",
+    # FIRS e-invoice
+    "EInvoiceSubmission", "EInvoiceStatus",
+    # budgets
+    "Budget", "BudgetLine",
 ]

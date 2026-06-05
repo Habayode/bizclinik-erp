@@ -1,0 +1,36 @@
+# systemd unit for the BizClinik ERP REST API (FastAPI / uvicorn).
+# Install to /etc/systemd/system/bizclinik-api.service
+#
+# This is a SEPARATE service from bizclinik-erp.service (the Streamlit UI). It
+# reuses the same .env and the same SQLite database, but listens on port 8600.
+# Restart=always means any crash self-heals in RestartSec seconds.
+
+[Unit]
+Description=BizClinik ERP REST API (FastAPI/uvicorn)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=bizclinik
+Group=bizclinik
+WorkingDirectory=/opt/bizclinik-erp
+Environment=BIZCLINIK_DB_PATH=/opt/bizclinik-erp/data/bizclinik.db
+Environment=PYTHONUNBUFFERED=1
+EnvironmentFile=/opt/bizclinik-erp/.env
+ExecStart=/opt/bizclinik-erp/venv/bin/python -m uvicorn api.main:app \
+    --host 127.0.0.1 \
+    --port 8600
+Restart=always
+RestartSec=3
+# Give it a moment on boot before counting failures.
+StartLimitIntervalSec=60
+StartLimitBurst=10
+# Resource guardrails so a runaway never takes the box down.
+MemoryMax=400M
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
