@@ -52,6 +52,11 @@ class Company(Base):
     email: Mapped[Optional[str]] = mapped_column(String(255))
     phone: Mapped[Optional[str]] = mapped_column(String(64))
     vat_number: Mapped[Optional[str]] = mapped_column(String(64))
+    # Tax Identification Number (FIRS/JTB) — distinct from the CAC RC number.
+    tin: Mapped[Optional[str]] = mapped_column(String(64))
+    # FIRS-assigned Service ID used as the middle segment of the IRN. Empty
+    # until the business is onboarded to the FIRS MBS e-invoicing platform.
+    firs_service_id: Mapped[Optional[str]] = mapped_column(String(32))
     fiscal_year_start_month: Mapped[int] = mapped_column(Integer, default=1)
 
 

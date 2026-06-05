@@ -38,11 +38,21 @@ with tab_co:
         company = s.query(Company).first()
     with st.form("company"):
         name = st.text_input("Name", value=company.name if company else "")
-        rc = st.text_input("RC number", value=company.rc_number if company else "")
+        c1, c2 = st.columns(2)
+        rc = c1.text_input("RC number", value=company.rc_number if company else "",
+                            help="CAC registration number (Corporate Affairs Commission).")
+        tin = c2.text_input("TIN", value=getattr(company, "tin", "") or "" if company else "",
+                            help="Tax Identification Number (FIRS/JTB). Distinct from the RC number.")
         addr = st.text_area("Address", value=company.address if company else "")
         email = st.text_input("Email", value=company.email if company else "")
         phone = st.text_input("Phone", value=company.phone if company else "")
-        vat = st.text_input("VAT number", value=company.vat_number if company else "")
+        c3, c4 = st.columns(2)
+        vat = c3.text_input("VAT number", value=company.vat_number if company else "")
+        service_id = c4.text_input(
+            "FIRS Service ID",
+            value=getattr(company, "firs_service_id", "") or "" if company else "",
+            help="8-character ID assigned by FIRS at e-invoicing onboarding. "
+                 "Used as the middle segment of the IRN. Leave blank until onboarded.")
         submit = st.form_submit_button("Save", type="primary")
     if submit:
         with get_session() as s:
@@ -52,6 +62,7 @@ with tab_co:
                 s.add(c)
             c.name = name; c.rc_number = rc; c.address = addr
             c.email = email; c.phone = phone; c.vat_number = vat
+            c.tin = tin or None; c.firs_service_id = service_id or None
         st.success("Saved.")
 
 

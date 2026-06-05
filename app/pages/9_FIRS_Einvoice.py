@@ -33,6 +33,13 @@ tab_gen, tab_subs = st.tabs(["🧾 Generate", "📜 Submissions"])
 
 with tab_gen:
     ui.section("Generate e-invoice", "Build a FIRS-style payload from a sales invoice")
+    st.warning(
+        "**Draft only.** This builds a FIRS-style payload for review. It is **not** "
+        "transmitted to the FIRS Merchant Buyer Solution, so the CSID and QR code are "
+        "placeholders with no legal validity until FIRS countersigns. Set your TIN and "
+        "FIRS Service ID under **Settings → Company** for a correct IRN.",
+        icon="⚠️",
+    )
     with get_session() as s:
         invoices = list(
             s.execute(
@@ -53,7 +60,8 @@ with tab_gen:
                 irn = submission.irn
                 qr_payload = submission.qr_payload or ""
 
-            st.success(f"Generated e-invoice — IRN {irn}")
+            st.success(f"Generated draft e-invoice — IRN {irn}")
+            st.caption("📄 Draft payload — CSID/QR are placeholders (not FIRS-cleared).")
             st.json(payload)
 
             st.download_button(
