@@ -18,14 +18,23 @@ def _patch_host(monkeypatch, host):
 
 
 @pytest.mark.parametrize("host,expected", [
+    # nested layout (current hagai.online free-TLS scheme)
     ("wendysrack.erp.hagai.online", "wendysrack"),
     ("acme.erp.hagai.online", "acme"),
     ("ACME.ERP.HAGAI.ONLINE", "acme"),          # case-insensitive
     ("acme.erp.hagai.online:8501", "acme"),      # port stripped
-    ("erp.hagai.online", None),                   # bare apex -> picker
-    ("hagai.online", None),
+    ("acme.erp.hagai.online.", "acme"),          # trailing dot tolerated
+    # flat layout (future dedicated domain, one level -> free Universal SSL)
+    ("acme.bizclinik.app", "acme"),
+    ("wendysrack.example.com", "wendysrack"),
+    # reserved / infra labels -> picker, never a tenant
+    ("erp.hagai.online", None),
+    ("api.hagai.online", None),
+    ("www.bizclinik.app", None),
+    # apex / non-host -> picker
+    ("hagai.online", None),                       # 2 labels = apex
     ("localhost", None),
-    ("foo.bar.hagai.online", None),               # second label not 'erp'
+    ("165.227.224.154", None),                    # bare IPv4
 ])
 def test_subdomain_extraction(monkeypatch, host, expected):
     _patch_host(monkeypatch, host)

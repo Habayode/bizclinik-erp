@@ -204,23 +204,44 @@ def _tenant_picker() -> None:
     st.stop()
 
 
-def _subdomain_from_request() -> Optional[str]:
-    """Return the tenant slug encoded in the request host, if any.
+# Leftmost labels that are infrastructure, never a tenant slug.
+_RESERVED_SUBDOMAINS = {"www", "erp", "api", "app", "admin", "mail",
+                        "ftp", "cdn", "static", "ns1", "ns2"}
 
-    `wendysrack.erp.hagai.online` -> 'wendysrack'. Plain `erp.hagai.online`
-    (3 labels) returns None so the picker is used.
+
+def _subdomain_from_request() -> Optional[str]:
+    """Return the candidate tenant slug encoded in the request host, if any.
+
+    Domain-agnostic: the *leftmost* DNS label is treated as the slug, unless it
+    is a reserved infrastructure label. The caller still validates the slug
+    against the tenant registry, so a non-tenant label simply falls through to
+    the picker. This means both layouts resolve with no code change:
+
+      • nested (current free TLS):   wendysrack.erp.hagai.online -> 'wendysrack'
+      • flat (dedicated domain):     acme.bizclinik.app          -> 'acme'
+
+    Returns None for apex hosts (``zone.tld``), ``localhost``, bare IPs, and
+    reserved labels (``erp``/``api``/``www``/...).
     """
     try:
         headers = st.context.headers  # Streamlit >= 1.37
         host = (headers.get("host") or headers.get("Host") or "")
     except Exception:
         return None
-    host = host.split(":")[0].strip().lower()
+    host = host.split(":")[0].strip().lower().rstrip(".")
+    if not host:
+        return None
+    # Bare IPv4 address -> no subdomain.
+    if host.replace(".", "").isdigit():
+        return None
     parts = host.split(".")
-    # <slug>.erp.<zone...>  => >= 4 labels with second label 'erp'
-    if len(parts) >= 4 and parts[1] == "erp":
-        return parts[0]
-    return None
+    # Need at least <label>.<zone>.<tld> (3 labels) for a real subdomain.
+    if len(parts) < 3:
+        return None
+    label = parts[0]
+    if label in _RESERVED_SUBDOMAINS:
+        return None
+    return label
 
 
 def _apply_tenant() -> None:
