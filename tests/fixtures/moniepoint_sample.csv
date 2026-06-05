@@ -1,0 +1,6 @@
+Date,Description,Reference,Debit,Credit,Balance
+2026-04-03,Transfer from HPL Ltd,TRF/AAA1,,50000.00,1050000.00
+2026-04-10,Transfer from HPL Ltd,TRF/BBB2,,75000.00,1125000.00
+2026-04-17,Transfer from HPL Ltd,TRF/CCC3,,100000.00,1225000.00
+2026-04-20,Monthly maintenance charge,CHG/0420,500.00,,1224500.00
+2026-04-28,SMS alert fees,CHG/0428,250.00,,1224250.00

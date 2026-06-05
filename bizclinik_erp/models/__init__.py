@@ -13,6 +13,12 @@ from .master import (
     TaxCode,
     Warehouse,
 )
+from .assets import AssetStatus, DepreciationMethod, FixedAsset
+from .audit import AuditAction, AuditLog
+from .fiscal import FiscalPeriod, PeriodStatus
+from .recon import BankStatement, BankStatementLine, StatementStatus
+from .recurring import RecurringFrequency, RecurringKind, RecurringTemplate
+from .users import Role, User, UserSession
 from .txn import (
     Bill,
     BillLine,
@@ -44,4 +50,16 @@ __all__ = [
     "SalesInvoice", "SalesInvoiceLine", "Receipt",
     "PurchaseOrder", "PurchaseOrderLine", "Bill", "BillLine", "Payment",
     "StockMovement", "PayrollRun", "PayrollPayslip",
+    # fixed assets
+    "FixedAsset", "DepreciationMethod", "AssetStatus",
+    # reconciliation
+    "BankStatement", "BankStatementLine", "StatementStatus",
+    # recurring transactions
+    "RecurringTemplate", "RecurringKind", "RecurringFrequency",
+    # users + roles
+    "User", "UserSession", "Role",
+    # fiscal periods
+    "FiscalPeriod", "PeriodStatus",
+    # audit
+    "AuditLog", "AuditAction",
 ]

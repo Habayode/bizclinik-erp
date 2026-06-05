@@ -54,12 +54,12 @@ def _confirm(prompt: str) -> bool:
     return input(f"{prompt} [type YES to confirm]: ").strip() == "YES"
 
 
-def cmd_init(_args) -> int:
-    init_db()
-    from .services.seed import seed_defaults
-    with get_session() as s:
-        seed_defaults(s)
+def cmd_init(args) -> int:
+    from .services.bootstrap import bootstrap
+    pw = getattr(args, "admin_password", None)
+    result = bootstrap(admin_password=pw)
     print(f"Initialised {get_settings().db_path}")
+    print(f"Admin user: {result['admin_username']}")
     return 0
 
 
@@ -168,7 +168,8 @@ def build_parser() -> argparse.ArgumentParser:
                                  description="BizClinik ERP — CLI")
     sub = p.add_subparsers(dest="command", required=True)
 
-    sub.add_parser("init", help="Init DB + seed defaults")
+    p_init = sub.add_parser("init", help="Init DB + seed defaults + bootstrap admin")
+    p_init.add_argument("--admin-password", help="Optional admin password (defaults to env BIZCLINIK_APP_PASSWORD)")
 
     p_reset = sub.add_parser("reset", help="DROP + recreate all tables")
     p_reset.add_argument("--yes", action="store_true", help="Skip confirmation prompt")

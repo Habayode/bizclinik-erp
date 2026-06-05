@@ -50,8 +50,15 @@ def post_journal(
     source_kind: Optional[str] = None,
     source_id: Optional[int] = None,
     entry_no: Optional[str] = None,
+    allow_closed_period: bool = False,
+    user_id: Optional[int] = None,
 ) -> JournalEntry:
-    """Create + post a balanced JournalEntry. Raises if DR != CR."""
+    """Create + post a balanced JournalEntry. Raises if DR != CR.
+
+    Refuses to post into a CLOSED or LOCKED fiscal period unless
+    `allow_closed_period=True` (ADMIN override only). LOCKED is never
+    overridable. See `services.fiscal.check_open`.
+    """
     line_list = list(lines)
     if not line_list:
         raise ValueError("Refusing to post an empty journal entry.")
@@ -65,6 +72,18 @@ def post_journal(
         )
     if total_dr <= 0:
         raise ValueError("Refusing to post a zero-value journal entry.")
+
+    # Period-close enforcement. Import lazily so legacy code that imports
+    # ledger before the fiscal model is registered (e.g. fresh-test setup)
+    # still works.
+    try:
+        from .fiscal import check_open
+        check_open(session, entry_date, allow_override=allow_closed_period)
+    except ImportError:
+        pass
+    except Exception:
+        # Re-raise PeriodClosedError so callers see the specific error.
+        raise
 
     entry = JournalEntry(
         entry_no=entry_no or next_number(session, "JE", entry_date),

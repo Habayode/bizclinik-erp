@@ -149,7 +149,20 @@ def seed_warehouses_and_bank(session: Session) -> None:
         ))
 
 
+def seed_disposal_account(session: Session) -> None:
+    """Seed the Gain/Loss on Asset Disposal income account (code 4900).
+
+    Used by services.assets.dispose_asset() as the balancer when an asset is
+    retired. Sits under the existing 4000 Income parent so the P&L picks it up.
+    """
+    _get_or_create_account(
+        session, "4900", "Gain/Loss on Asset Disposal",
+        AccountType.INCOME, "4000", True,
+    )
+
+
 def seed_defaults(session: Session) -> None:
     seed_chart_of_accounts(session)
     seed_tax_codes(session)
+    seed_disposal_account(session)
     seed_warehouses_and_bank(session)
