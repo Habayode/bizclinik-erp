@@ -76,29 +76,63 @@ $cloudflaredLog = Join-Path $LogDir "cloudflared.log"
 
 # ---- 1. NSSM ------------------------------------------------------------
 
-Write-Step "Ensuring NSSM is installed at $NssmDir"
+Write-Step "Ensuring NSSM is installed"
 $nssmExe = Join-Path $NssmDir "nssm.exe"
-if (-not (Test-Path $nssmExe)) {
-    $tmpZip = Join-Path $env:TEMP "nssm-2.24.zip"
-    $tmpExtract = Join-Path $env:TEMP "nssm-2.24"
-    if (Test-Path $tmpExtract) { Remove-Item -Recurse -Force $tmpExtract }
-    Write-Host "  Downloading NSSM..."
-    Invoke-WebRequest -Uri "https://nssm.cc/release/nssm-2.24.zip" -OutFile $tmpZip -UseBasicParsing
-    Write-Host "  Extracting..."
-    Expand-Archive -Path $tmpZip -DestinationPath $env:TEMP -Force
-    New-Item -ItemType Directory -Force -Path $NssmDir | Out-Null
-    # Use the 64-bit binary if present, else 32-bit.
-    $src64 = Join-Path $tmpExtract "win64\nssm.exe"
-    $src32 = Join-Path $tmpExtract "win32\nssm.exe"
-    if (Test-Path $src64) {
-        Copy-Item $src64 $nssmExe -Force
-    } elseif (Test-Path $src32) {
-        Copy-Item $src32 $nssmExe -Force
-    } else {
-        throw "Could not find nssm.exe in extracted archive at $tmpExtract"
+
+# Prefer NSSM already on PATH (e.g. installed via Chocolatey)
+$pathNssm = (Get-Command nssm -ErrorAction SilentlyContinue).Source
+if ($pathNssm) {
+    $nssmExe = $pathNssm
+    Write-Host "  Using existing NSSM at $nssmExe"
+} elseif (-not (Test-Path $nssmExe)) {
+    # Fallback chain: Chocolatey -> nssm.cc -> GitHub mirror
+    $installed = $false
+    if (Get-Command choco -ErrorAction SilentlyContinue) {
+        Write-Host "  Installing NSSM via Chocolatey..."
+        & choco install nssm -y --no-progress | Out-Null
+        $pathNssm = (Get-Command nssm -ErrorAction SilentlyContinue).Source
+        if ($pathNssm) {
+            $nssmExe = $pathNssm
+            $installed = $true
+        }
     }
-    Remove-Item -Recurse -Force $tmpExtract -ErrorAction SilentlyContinue
-    Remove-Item -Force $tmpZip -ErrorAction SilentlyContinue
+    if (-not $installed) {
+        $tmpZip = Join-Path $env:TEMP "nssm-2.24.zip"
+        $tmpExtract = Join-Path $env:TEMP "nssm-2.24"
+        if (Test-Path $tmpExtract) { Remove-Item -Recurse -Force $tmpExtract }
+        $urls = @(
+            "https://nssm.cc/release/nssm-2.24.zip",
+            "https://github.com/kirillkovalenko/nssm/releases/download/v2.24/nssm-2.24.zip"
+        )
+        $downloaded = $false
+        foreach ($u in $urls) {
+            try {
+                Write-Host "  Trying $u"
+                Invoke-WebRequest -Uri $u -OutFile $tmpZip -UseBasicParsing -TimeoutSec 30
+                $downloaded = $true
+                break
+            } catch {
+                Write-Host "    failed: $($_.Exception.Message)"
+            }
+        }
+        if (-not $downloaded) {
+            throw "Could not download NSSM from any source. Install manually: 'choco install nssm -y' then re-run."
+        }
+        Write-Host "  Extracting..."
+        Expand-Archive -Path $tmpZip -DestinationPath $env:TEMP -Force
+        New-Item -ItemType Directory -Force -Path $NssmDir | Out-Null
+        $src64 = Join-Path $tmpExtract "win64\nssm.exe"
+        $src32 = Join-Path $tmpExtract "win32\nssm.exe"
+        if (Test-Path $src64) {
+            Copy-Item $src64 $nssmExe -Force
+        } elseif (Test-Path $src32) {
+            Copy-Item $src32 $nssmExe -Force
+        } else {
+            throw "Could not find nssm.exe in extracted archive at $tmpExtract"
+        }
+        Remove-Item -Recurse -Force $tmpExtract -ErrorAction SilentlyContinue
+        Remove-Item -Force $tmpZip -ErrorAction SilentlyContinue
+    }
 }
 Write-Host "  NSSM: $nssmExe"
 
