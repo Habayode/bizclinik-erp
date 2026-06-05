@@ -6,6 +6,7 @@ mode against the default database.
 """
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -17,6 +18,18 @@ import streamlit as st
 from bizclinik_erp import tenancy
 from bizclinik_erp import auth
 from bizclinik_erp import ui_kit as ui
+
+
+# Canonical per-tenant login URL. One level under the apex
+# (acme-erp.hagai.online) so it's covered by the free *.hagai.online TLS cert;
+# the app auto-selects the tenant from the host. Override the template when you
+# move to a dedicated domain (e.g. "https://{slug}.bizclinik.app").
+_TENANT_URL_TEMPLATE = os.environ.get(
+    "BIZCLINIK_TENANT_URL_TEMPLATE", "https://{slug}-erp.hagai.online")
+
+
+def _login_url(slug: str) -> str:
+    return _TENANT_URL_TEMPLATE.format(slug=slug)
 
 
 st.set_page_config(page_title="Tenants · BizClinik ERP", layout="wide",
@@ -41,11 +54,19 @@ if cur:
     st.caption(f"You are currently working in tenant: **{cur}**")
 
 st.subheader("Registered tenants")
-rows = [{"slug": t["slug"], "name": t["name"], "active": t["is_active"],
-         "created": str(t.get("created_at") or "")[:19]}
+rows = [{"slug": t["slug"], "name": t["name"], "login url": _login_url(t["slug"]),
+         "active": t["is_active"], "created": str(t.get("created_at") or "")[:19]}
         for t in tenancy.list_tenants(active_only=False)]
 if rows:
-    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+    st.dataframe(
+        pd.DataFrame(rows), hide_index=True, width="stretch",
+        column_config={"login url": st.column_config.LinkColumn("login url")},
+    )
+    st.caption(
+        "Each business signs in at its own **login url** — the link auto-selects "
+        "that tenant (no business picker). Wiring a new tenant's subdomain on the "
+        "server is one command: `deploy/linux/add-tenant-subdomain.sh <slug>`."
+    )
 else:
     st.caption("No tenants yet — single-tenant mode.")
 
@@ -66,9 +87,14 @@ if submit:
         try:
             t = tenancy.create_tenant(slug, name, admin_password=admin_pw)
             st.success(
-                f"Created tenant **{t['name']}** ({t['slug']}). Its admin login "
-                f"is username `admin` with the password you set. Sign out and "
-                f"pick this business at the login screen to enter it."
+                f"Created tenant **{t['name']}** ({t['slug']}). Admin login is "
+                f"username `admin` with the password you set."
+            )
+            st.markdown(f"**Login URL:** {_login_url(t['slug'])}")
+            st.caption(
+                "To activate that subdomain on the server, run "
+                f"`deploy/linux/add-tenant-subdomain.sh {t['slug']}` once. "
+                "Until then, sign in via the business picker at the main URL."
             )
         except ValueError as e:
             st.error(str(e))
