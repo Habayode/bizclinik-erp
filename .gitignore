@@ -29,3 +29,10 @@ Thumbs.db
 # Local test scripts not needed in deploy
 smoke_test.py
 import_test.py
+
+# Node (deck build tooling — not part of the app)
+node_modules/
+package-lock.json
+
+# Office lock files
+~$*
