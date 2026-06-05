@@ -741,19 +741,23 @@ const slides = [];
     "Everything below is shipped, tested, and running in production at erp.hagai.online.");
 
   const caps = [
-    ["GL", "Double-entry ledger", "Audit trail, fiscal period close, void / reverse, fixed-asset depreciation.", NAVY],
+    ["GL", "Double-entry ledger", "Audit trail, period close, void / reverse, fixed-asset depreciation.", NAVY],
     ["NG", "Nigeria-ready tax", "Graduated PAYE, FIRS e-invoice drafts + QR, WHT certificates.", SUCCESS],
-    ["RC", "Bank reconciliation", "Multi-bank CSV (GTB / Access / Zenith / FBN / Moniepoint) + push-in bank feed, auto-match.", INFO],
-    ["MT", "Multi-tenant SaaS", "Isolated per-tenant databases, per-business subdomains, per-tenant invoice branding.", NAVY],
-    ["FX", "Multi-currency", "Foreign-denominated invoices & bills; realized + unrealized FX revaluation.", WARN],
-    ["$", "Billing & API", "Paystack / Flutterwave / Moniepoint subscriptions; REST API + webhooks.", TEAL],
+    ["RC", "Bank reconciliation", "Multi-bank CSV + push-in bank feed, auto-matched to the GL.", INFO],
+    ["MT", "Multi-tenant SaaS", "Isolated per-tenant DBs, subdomains, per-tenant invoice branding.", NAVY],
+    ["FX", "Multi-currency", "Foreign invoices & bills; realized + unrealized FX revaluation.", WARN],
+    ["$", "Billing & API", "Paystack / Flutterwave / Moniepoint subscriptions; REST + webhooks.", TEAL],
+    ["CR", "CRM", "Leads, deal pipeline & follow-ups — convert straight to customers.", INFO],
   ];
-  const cols = 3, cw = 3.0, chh = 1.25, gx = 0.15;
-  const startX = (W - (cols * cw + (cols - 1) * gx)) / 2;
+  const cols = 4, cw = 2.25, chh = 1.2, gx = 0.12, vgap = 0.22;
   caps.forEach((c, i) => {
-    const col = i % cols, row = Math.floor(i / cols);
-    const x = startX + col * (cw + gx);
-    const y = 2.45 + row * (chh + 0.2);
+    const row = Math.floor(i / cols);
+    const inRow = Math.min(cols, caps.length - row * cols);
+    const col = i % cols;
+    const rowW = inRow * cw + (inRow - 1) * gx;
+    const rowStartX = (W - rowW) / 2;
+    const x = rowStartX + col * (cw + gx);
+    const y = 2.4 + row * (chh + vgap);
     chipCard(s, x, y, cw, chh, c[0], c[1], c[2], c[3]);
   });
   pageNumber(s, 13, TOTAL);
@@ -769,13 +773,13 @@ const slides = [];
   brandBar(s);
   sectionTitle(s, "ROADMAP",
     "Shipped — and what's next.",
-    "The original three-tier plan is complete. Next up: CRM, scale to Postgres, and billing go-live.");
+    "The three-tier plan plus CRM is delivered. Next: scale to Postgres and billing go-live.");
 
   const items = [
     { tag: "DELIVERED", t: "Trust the books", d: "Audit trail, period close, void / reverse, bank reconciliation.", c: SUCCESS },
     { tag: "DELIVERED", t: "Fit for Nigeria", d: "Graduated PAYE, FIRS e-invoice, WHT, multi-bank imports.", c: SUCCESS },
     { tag: "DELIVERED", t: "Sell as SaaS", d: "Multi-tenant, subdomains, billing, API, offsite backups, CI.", c: SUCCESS },
-    { tag: "NEXT", t: "CRM", d: "Leads, contacts, deal pipeline & follow-up reminders — linked to invoices and statements.", c: TEAL },
+    { tag: "DELIVERED", t: "CRM", d: "Leads, deal pipeline & follow-ups — convert straight to customers and invoices.", c: SUCCESS },
     { tag: "NEXT", t: "Scale & go-live", d: "Postgres for concurrency; billing keys; open-banking auto-feeds.", c: TEAL },
   ];
   const n = items.length, cw = 1.78, gap = 0.15;
