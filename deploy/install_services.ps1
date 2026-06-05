@@ -81,9 +81,18 @@ $nssmExe = Join-Path $NssmDir "nssm.exe"
 
 # Prefer NSSM already on PATH (e.g. installed via Chocolatey)
 $pathNssm = (Get-Command nssm -ErrorAction SilentlyContinue).Source
+
+# Next, look for the bundled copy in deploy\bin\nssm.exe (shipped with the repo
+# so we don't depend on nssm.cc being up).
+$bundledNssm = Join-Path $PSScriptRoot "bin\nssm.exe"
+
 if ($pathNssm) {
     $nssmExe = $pathNssm
     Write-Host "  Using existing NSSM at $nssmExe"
+} elseif (Test-Path $bundledNssm) {
+    New-Item -ItemType Directory -Force -Path $NssmDir | Out-Null
+    Copy-Item -Force $bundledNssm $nssmExe
+    Write-Host "  Installed bundled NSSM to $nssmExe"
 } elseif (-not (Test-Path $nssmExe)) {
     # Fallback chain: Chocolatey -> nssm.cc -> GitHub mirror
     $installed = $false
