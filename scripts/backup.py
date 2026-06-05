@@ -33,15 +33,17 @@ def _dest_dir() -> Path:
 
 
 def cmd_snapshot(_args: argparse.Namespace) -> int:
-    settings = get_settings()
-    dest = _dest_dir()
-    path = backup_service.snapshot(settings.db_path, dest)
-    print(f"Snapshot written: {path}")
-    pruned = backup_service.prune(dest)
-    if pruned:
-        print(f"Pruned {len(pruned)} old snapshots:")
-        for p in pruned:
-            print(f"  - {p}")
+    # Snapshot the default DB + control plane + every tenant DB, each into its
+    # own subfolder under backups/. In single-tenant installs this is just the
+    # default DB.
+    results = backup_service.snapshot_all(dest_root=_dest_dir())
+    for r in results:
+        if "error" in r:
+            print(f"  [{r['scope']}] ERROR: {r['error']}")
+        else:
+            print(f"  [{r['scope']}] {r['snapshot']}"
+                  + (f"  (pruned {r['pruned']})" if r.get("pruned") else ""))
+    print(f"Backed up {len([r for r in results if 'error' not in r])} database(s).")
     return 0
 
 

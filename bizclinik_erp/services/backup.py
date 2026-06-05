@@ -22,6 +22,7 @@ import sqlite3
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Optional
 
 
 SNAPSHOT_PREFIX = "bizclinik_"
@@ -107,6 +108,49 @@ def prune(
         except OSError as exc:
             print(f"warn: could not delete {p}: {exc}", file=sys.stderr)
     return deleted
+
+
+def snapshot_all(*, dest_root: Optional[Path] = None,
+                 retain_days: int = 30, retain_min: int = 7) -> list[dict]:
+    """Snapshot every database in a multi-tenant install: the default DB, the
+    control plane, and each tenant DB — each into its own subfolder under
+    ``dest_root`` (default: <data>/backups). Prunes each folder afterwards.
+
+    Returns a list of {scope, snapshot, pruned} dicts. Safe in single-tenant
+    installs (just snapshots the default DB).
+    """
+    from ..config import get_settings
+    from .. import tenancy
+
+    settings = get_settings()
+    data_dir = Path(settings.db_path).parent
+    dest_root = Path(dest_root) if dest_root else (data_dir / "backups")
+
+    targets: list[tuple[str, Path]] = [("default", Path(settings.db_path))]
+    control = data_dir / "control.db"
+    if control.exists():
+        targets.append(("control", control))
+    try:
+        for t in tenancy.list_tenants(active_only=False):
+            p = Path(t["db_path"])
+            if p.exists():
+                targets.append((f"tenant-{t['slug']}", p))
+    except Exception:
+        pass  # control plane may not exist in single-tenant installs
+
+    results: list[dict] = []
+    for scope, path in targets:
+        if not path.exists():
+            continue
+        folder = dest_root / scope
+        try:
+            snap = snapshot(path, folder)
+            pruned = prune(folder, retain_days=retain_days, retain_min=retain_min)
+            results.append({"scope": scope, "snapshot": str(snap),
+                            "pruned": len(pruned)})
+        except Exception as exc:  # pragma: no cover - defensive per-DB
+            results.append({"scope": scope, "error": str(exc)})
+    return results
 
 
 def restore(snapshot_path: Path, db_path: Path) -> Path:

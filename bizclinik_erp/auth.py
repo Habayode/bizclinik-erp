@@ -204,13 +204,40 @@ def _tenant_picker() -> None:
     st.stop()
 
 
+def _subdomain_from_request() -> Optional[str]:
+    """Return the tenant slug encoded in the request host, if any.
+
+    `wendysrack.erp.hagai.online` -> 'wendysrack'. Plain `erp.hagai.online`
+    (3 labels) returns None so the picker is used.
+    """
+    try:
+        headers = st.context.headers  # Streamlit >= 1.37
+        host = (headers.get("host") or headers.get("Host") or "")
+    except Exception:
+        return None
+    host = host.split(":")[0].strip().lower()
+    parts = host.split(".")
+    # <slug>.erp.<zone...>  => >= 4 labels with second label 'erp'
+    if len(parts) >= 4 and parts[1] == "erp":
+        return parts[0]
+    return None
+
+
 def _apply_tenant() -> None:
     """Resolve + activate the tenant for this script run. No-op (legacy single
-    DB) when no tenants are registered."""
+    DB) when no tenants are registered. A `<slug>.erp.<zone>` subdomain
+    auto-selects its tenant and skips the picker."""
     from . import tenancy
     if not tenancy.has_tenants():
         tenancy.set_active(None)
         return
+
+    # Subdomain auto-routing: <slug>.erp.hagai.online -> that tenant.
+    if not st.session_state.get(_TENANT_KEY):
+        sub = _subdomain_from_request()
+        if sub and tenancy.get_tenant(sub):
+            st.session_state[_TENANT_KEY] = sub
+
     sel = st.session_state.get(_TENANT_KEY)
     if not sel:
         _tenant_picker()  # st.stop() inside

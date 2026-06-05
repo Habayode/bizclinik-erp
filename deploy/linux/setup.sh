@@ -148,20 +148,29 @@ credentials-file: /etc/cloudflared/$TUNNEL_ID.json
 ingress:
   - hostname: $SUBDOMAIN
     service: http://localhost:$PORT
+  - hostname: "*.$SUBDOMAIN"
+    service: http://localhost:$PORT
   - service: http_status:404
 EOF
 
-# CNAME upsert
+# CNAME upsert -- apex (erp.hagai.online) + wildcard (*.erp.hagai.online) so
+# every per-tenant subdomain routes to the same tunnel/app.
 TARGET="$TUNNEL_ID.cfargotunnel.com"
-EXISTING="$(curl -fsSL "${auth[@]}" "$API/zones/$ZONE_ID/dns_records?type=CNAME&name=$SUBDOMAIN" | jq -r '.result[0].id')"
-BODY="$(jq -nc --arg r "$RECORD" --arg c "$TARGET" '{type:"CNAME", name:$r, content:$c, proxied:true, ttl:1}')"
-if [[ -n "$EXISTING" && "$EXISTING" != "null" ]]; then
-  curl -fsSL "${auth[@]}" -X PUT "$API/zones/$ZONE_ID/dns_records/$EXISTING" --data "$BODY" >/dev/null
-  echo "  CNAME updated -> $TARGET"
-else
-  curl -fsSL "${auth[@]}" -X POST "$API/zones/$ZONE_ID/dns_records" --data "$BODY" >/dev/null
-  echo "  CNAME created -> $TARGET"
-fi
+upsert_cname () {
+  local fqdn="$1" rec="$2"
+  local existing body
+  existing="$(curl -fsSL "${auth[@]}" "$API/zones/$ZONE_ID/dns_records?type=CNAME&name=$fqdn" | jq -r '.result[0].id')"
+  body="$(jq -nc --arg r "$rec" --arg c "$TARGET" '{type:"CNAME", name:$r, content:$c, proxied:true, ttl:1}')"
+  if [[ -n "$existing" && "$existing" != "null" ]]; then
+    curl -fsSL "${auth[@]}" -X PUT "$API/zones/$ZONE_ID/dns_records/$existing" --data "$body" >/dev/null
+    echo "  CNAME updated  $fqdn -> $TARGET"
+  else
+    curl -fsSL "${auth[@]}" -X POST "$API/zones/$ZONE_ID/dns_records" --data "$body" >/dev/null
+    echo "  CNAME created  $fqdn -> $TARGET"
+  fi
+}
+upsert_cname "$SUBDOMAIN" "$RECORD"
+upsert_cname "*.$SUBDOMAIN" "*.$RECORD"
 
 # ---- 8. systemd services ------------------------------------------------
 step "Installing systemd services"
