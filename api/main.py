@@ -479,6 +479,62 @@ async def billing_webhook(provider: str, request: Request) -> dict:
     return out
 
 
+# ---- CRM --------------------------------------------------------------------
+
+
+class LeadIn(BaseModel):
+    name: str
+    company: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    source: Optional[str] = None
+    notes: Optional[str] = None
+
+
+@app.get("/api/v1/crm/pipeline", dependencies=[Depends(require_api_key)])
+async def crm_pipeline() -> dict:
+    from bizclinik_erp.services import crm
+    with get_session() as s:
+        return crm.pipeline_summary(s)
+
+
+@app.get("/api/v1/crm/leads", dependencies=[Depends(require_api_key)])
+async def crm_list_leads() -> dict:
+    from bizclinik_erp.services import crm
+    with get_session() as s:
+        leads = crm.list_leads(s)
+        return {"leads": [{"id": l.id, "name": l.name, "company": l.company,
+                           "email": l.email, "status": l.status.value,
+                           "customer_id": l.customer_id} for l in leads]}
+
+
+@app.post("/api/v1/crm/leads", status_code=201,
+          dependencies=[Depends(require_api_key)])
+async def crm_create_lead(payload: LeadIn) -> dict:
+    from bizclinik_erp.services import crm
+    with get_session() as s:
+        try:
+            lead = crm.create_lead(s, name=payload.name, company=payload.company,
+                                   email=payload.email, phone=payload.phone,
+                                   source=payload.source, notes=payload.notes)
+            return {"id": lead.id, "status": lead.status.value}
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/v1/crm/leads/{lead_id}/convert",
+          dependencies=[Depends(require_api_key)])
+async def crm_convert_lead(lead_id: int, create_deal: bool = False,
+                           deal_amount: float = 0.0) -> dict:
+    from bizclinik_erp.services import crm
+    with get_session() as s:
+        try:
+            return crm.convert_lead(s, lead_id, create_deal=create_deal,
+                                    deal_amount=deal_amount)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
 # ---- reports ----------------------------------------------------------------
 
 

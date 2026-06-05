@@ -139,6 +139,33 @@ def test_billing_webhook_bad_signature_401(client):
     assert resp.status_code == 401
 
 
+def test_crm_lead_create_convert_and_pipeline(client):
+    # Create a lead via API.
+    r = client.post("/api/v1/crm/leads", headers=AUTH, json={
+        "name": "Jane", "company": "Acme Ltd", "email": "j@acme.com"})
+    assert r.status_code == 201, r.text
+    lead_id = r.json()["id"]
+
+    # It shows in the list.
+    lst = client.get("/api/v1/crm/leads", headers=AUTH)
+    assert any(l["id"] == lead_id for l in lst.json()["leads"])
+
+    # Convert it (with a deal).
+    conv = client.post(f"/api/v1/crm/leads/{lead_id}/convert"
+                       "?create_deal=true&deal_amount=120000", headers=AUTH)
+    assert conv.status_code == 200, conv.text
+    assert conv.json()["customer_id"] and conv.json()["deal_id"]
+
+    # Pipeline summary reflects the new (qualified) deal.
+    pipe = client.get("/api/v1/crm/pipeline", headers=AUTH)
+    assert pipe.status_code == 200
+    assert pipe.json()["open_count"] >= 1
+
+
+def test_crm_requires_key(client):
+    assert client.get("/api/v1/crm/pipeline").status_code in (401, 403)
+
+
 def test_customers_requires_key(client):
     resp = client.get("/api/v1/customers")  # no X-API-Key header
     assert resp.status_code in (401, 403)

@@ -43,6 +43,14 @@ from .txn import (
 from .budget import Budget, BudgetLine
 from .fx import Currency, ExchangeRate
 from .template import InvoiceTemplate
+from .crm import (
+    Activity,
+    ActivityKind,
+    Deal,
+    DealStage,
+    Lead,
+    LeadStatus,
+)
 
 __all__ = [
     # master
@@ -74,4 +82,6 @@ __all__ = [
     "Currency", "ExchangeRate",
     # per-tenant invoice branding
     "InvoiceTemplate",
+    # CRM
+    "Lead", "LeadStatus", "Deal", "DealStage", "Activity", "ActivityKind",
 ]
