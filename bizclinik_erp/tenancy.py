@@ -12,7 +12,11 @@ app.
 """
 from __future__ import annotations
 
+import hashlib
 import re
+import secrets
+import shutil
+import sqlite3
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -39,6 +43,20 @@ class Tenant(ControlBase):
     db_path: Mapped[str] = mapped_column(String(512), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class ApiKey(ControlBase):
+    """A REST-API key, optionally bound to a tenant. tenant_slug NULL means the
+    key operates against the default/legacy DB. Only the SHA-256 hash is
+    stored; the plaintext is shown once at creation."""
+    __tablename__ = "api_key"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    key_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
+    tenant_slug: Mapped[Optional[str]] = mapped_column(String(64), index=True)
+    label: Mapped[str] = mapped_column(String(128), default="")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    last_used_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
 
 
 # ---- control engine (cached per resolved control.db path) -----------------
@@ -160,3 +178,113 @@ def set_active(slug: Optional[str]) -> None:
         return
     t = get_tenant(slug)
     _db.set_active_db_path(t["db_path"] if t else None)
+
+
+# ---- API keys -------------------------------------------------------------
+
+
+def _hash_key(plaintext: str) -> str:
+    return hashlib.sha256(plaintext.encode("utf-8")).hexdigest()
+
+
+def create_api_key(tenant_slug: Optional[str], label: str = "") -> str:
+    """Create an API key bound to a tenant (or None = default DB). Returns the
+    plaintext key ONCE — only its hash is stored."""
+    if tenant_slug:
+        tenant_slug = tenant_slug.strip().lower()
+        if not get_tenant(tenant_slug):
+            raise ValueError(f"Tenant {tenant_slug!r} not found.")
+    plaintext = "bzk_" + secrets.token_urlsafe(32)
+    fac = _control_factory()
+    with fac() as s:
+        s.add(ApiKey(key_hash=_hash_key(plaintext), tenant_slug=tenant_slug,
+                     label=label or ""))
+        s.commit()
+    return plaintext
+
+
+def resolve_api_key(plaintext: str) -> Optional[dict]:
+    """Look up an active API key by its plaintext. Returns
+    {tenant_slug, label} or None. Updates last_used_at."""
+    if not plaintext:
+        return None
+    h = _hash_key(plaintext)
+    fac = _control_factory()
+    with fac() as s:
+        k = s.execute(
+            select(ApiKey).where(ApiKey.key_hash == h,
+                                  ApiKey.is_active == True)  # noqa: E712
+        ).scalar_one_or_none()
+        if not k:
+            return None
+        k.last_used_at = datetime.utcnow()
+        s.commit()
+        return {"tenant_slug": k.tenant_slug, "label": k.label}
+
+
+def list_api_keys() -> list[dict]:
+    fac = _control_factory()
+    with fac() as s:
+        return [{"id": k.id, "tenant_slug": k.tenant_slug, "label": k.label,
+                 "is_active": k.is_active,
+                 "created_at": str(k.created_at)[:19],
+                 "last_used_at": str(k.last_used_at)[:19] if k.last_used_at else ""}
+                for k in s.execute(select(ApiKey).order_by(ApiKey.id)).scalars()]
+
+
+def revoke_api_key(key_id: int) -> None:
+    fac = _control_factory()
+    with fac() as s:
+        k = s.get(ApiKey, key_id)
+        if k:
+            k.is_active = False
+            s.commit()
+
+
+# ---- adopt an existing DB as a tenant -------------------------------------
+
+
+def adopt_db_as_tenant(slug: str, name: str, source_db_path: str) -> dict:
+    """Register a tenant whose database is a COPY of an existing DB. Used to
+    migrate the original single-tenant books into a named tenant without
+    losing anything. The source DB is left untouched."""
+    slug = (slug or "").strip().lower()
+    if not _SLUG_RE.match(slug):
+        raise ValueError("Invalid slug (lowercase letters/digits/hyphens, 2-41).")
+    src = Path(source_db_path)
+    if not src.exists():
+        raise ValueError(f"Source DB not found: {source_db_path}")
+
+    dest = Path(tenant_db_path(slug))
+    fac = _control_factory()
+    with fac() as s:
+        if s.execute(select(Tenant).where(Tenant.slug == slug)).scalar_one_or_none():
+            raise ValueError(f"Tenant {slug!r} already exists.")
+
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    # Checkpoint the source WAL into the main file, then copy via the sqlite
+    # backup API so we get a clean, consistent snapshot.
+    src_conn = sqlite3.connect(str(src))
+    try:
+        src_conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    except sqlite3.Error:
+        pass
+    dst_conn = sqlite3.connect(str(dest))
+    try:
+        src_conn.backup(dst_conn)
+    finally:
+        dst_conn.close()
+        src_conn.close()
+
+    with fac() as s:
+        s.add(Tenant(slug=slug, name=name.strip(), db_path=str(dest)))
+        s.commit()
+
+    # Ensure schema is current on the adopted DB (idempotent migration).
+    token = _db._active_db_path.set(str(dest))
+    try:
+        _db.init_db()
+    finally:
+        _db._active_db_path.reset(token)
+
+    return {"slug": slug, "name": name.strip(), "db_path": str(dest)}

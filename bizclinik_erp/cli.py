@@ -179,6 +179,31 @@ def cmd_tenant_list(_args) -> int:
     return 0
 
 
+def cmd_tenant_adopt(args) -> int:
+    """Register a tenant whose DB is a copy of an existing database (migrate
+    the original single-tenant books into a named tenant)."""
+    from .tenancy import adopt_db_as_tenant
+    source = args.source or str(get_settings().db_path)
+    t = adopt_db_as_tenant(args.slug, args.name, source)
+    print(f"Adopted {source} -> tenant {t['slug']} at {t['db_path']}")
+    return 0
+
+
+def cmd_api_key_create(args) -> int:
+    from .tenancy import create_api_key
+    key = create_api_key(args.tenant or None, args.label or "")
+    print(key)
+    print(f"# scope: {args.tenant or 'DEFAULT DB'} — store this now, it is not shown again",
+          file=sys.stderr)
+    return 0
+
+
+def cmd_api_key_list(_args) -> int:
+    from .tenancy import list_api_keys
+    _dump(list_api_keys())
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="bizclinik_erp",
                                  description="BizClinik ERP — CLI")
@@ -219,6 +244,17 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("tenant-list", help="List registered tenants")
 
+    p_ta = sub.add_parser("tenant-adopt", help="Adopt an existing DB as a tenant")
+    p_ta.add_argument("slug")
+    p_ta.add_argument("name")
+    p_ta.add_argument("--source", help="Source DB path (default: BIZCLINIK_DB_PATH)")
+
+    p_ak = sub.add_parser("api-key-create", help="Create a REST API key")
+    p_ak.add_argument("--tenant", help="Tenant slug (omit for default-DB key)")
+    p_ak.add_argument("--label", help="Human label")
+
+    sub.add_parser("api-key-list", help="List API keys (hashes not shown)")
+
     return p
 
 
@@ -237,6 +273,9 @@ HANDLERS = {
     "list-accounts": cmd_list_accounts,
     "tenant-create": cmd_tenant_create,
     "tenant-list": cmd_tenant_list,
+    "tenant-adopt": cmd_tenant_adopt,
+    "api-key-create": cmd_api_key_create,
+    "api-key-list": cmd_api_key_list,
 }
 
 

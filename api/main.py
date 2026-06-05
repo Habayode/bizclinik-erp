@@ -5,9 +5,12 @@ services and SQLite system-of-record via ``bizclinik_erp.db.get_session`` —
 there is no second source of truth. Runs on its own port (8600) as its own
 systemd service (deploy/linux/bizclinik-api.service).
 
-Auth: every request under ``/api`` must present a valid ``X-API-Key`` header,
-checked against the env var ``BIZCLINIK_API_KEY``. If that var is unset the API
-refuses *all* authenticated requests with 503 — fail closed, never open.
+Auth: every request under ``/api`` must present a valid ``X-API-Key`` header.
+Keys are resolved in this order:
+  1. The legacy env var ``BIZCLINIK_API_KEY`` -> the default/legacy database.
+  2. A per-tenant key created in the control plane -> that tenant's database.
+A matching key sets the active database for the duration of the request, so
+every endpoint reads/writes the correct tenant in isolation. No match -> 401.
 
 All DB access goes through ``with get_session() as s:`` so commits/rollbacks
 follow the same transactional discipline as the rest of the codebase. Service
@@ -15,14 +18,17 @@ follow the same transactional discipline as the rest of the codebase. Service
 """
 from __future__ import annotations
 
+import hmac
 import os
 from datetime import date
-from typing import Optional
+from typing import Iterator, Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
+from bizclinik_erp import db as _db
+from bizclinik_erp import tenancy
 from bizclinik_erp.db import get_session
 from bizclinik_erp.models import (
     Customer,
@@ -39,25 +45,54 @@ from . import webhooks
 
 app = FastAPI(
     title="BizClinik ERP API",
-    version="1.0",
-    description="REST + webhooks layer over the BizClinik ERP services.",
+    version="1.1",
+    description="REST + webhooks layer over the BizClinik ERP services "
+                "(per-tenant API keys).",
 )
 
 
-# ---- auth -------------------------------------------------------------------
+# ---- auth (tenant-aware) ----------------------------------------------------
 
 
-def require_api_key(x_api_key: Optional[str] = Header(default=None)) -> None:
-    """FastAPI dependency enforcing the X-API-Key header.
+async def require_api_key(x_api_key: Optional[str] = Header(default=None)):
+    """Async generator dependency: authenticate the key, bind the request to
+    the right tenant database, and reset the binding afterwards.
 
-    - If ``BIZCLINIK_API_KEY`` is unset -> 503 (API not configured, fail closed).
-    - If the header is missing or wrong -> 401.
+    Async (and the endpoints are async) so the dependency + endpoint share one
+    asyncio task context — that's what makes the active-DB contextvar
+    propagate correctly. Yields {"tenant": <slug|None>}.
     """
-    configured = os.environ.get("BIZCLINIK_API_KEY")
-    if not configured:
-        raise HTTPException(status_code=503, detail="API key not configured")
-    if not x_api_key or x_api_key != configured:
+    if not x_api_key:
+        raise HTTPException(status_code=401, detail="Missing API key")
+
+    tenant_slug: Optional[str] = None
+    matched = False
+
+    env_key = os.environ.get("BIZCLINIK_API_KEY")
+    if env_key and hmac.compare_digest(x_api_key, env_key):
+        matched = True
+        tenant_slug = None  # legacy / default DB
+    else:
+        res = tenancy.resolve_api_key(x_api_key)
+        if res:
+            matched = True
+            tenant_slug = res.get("tenant_slug")
+
+    if not matched:
         raise HTTPException(status_code=401, detail="Invalid or missing API key")
+
+    db_path = None
+    if tenant_slug:
+        t = tenancy.get_tenant(tenant_slug)
+        if not t or not t["is_active"]:
+            raise HTTPException(status_code=403, detail="Tenant inactive")
+        db_path = t["db_path"]
+
+    token = _db._active_db_path.set(db_path)
+    try:
+        yield {"tenant": tenant_slug}
+    finally:
+        _db._active_db_path.reset(token)
 
 
 # ---- request / response schemas --------------------------------------------
@@ -175,11 +210,17 @@ def health() -> dict:
     return {"status": "ok"}
 
 
+@app.get("/api/v1/whoami")
+async def whoami(ctx: dict = Depends(require_api_key)) -> dict:
+    """Returns which tenant the presented key is bound to (None = default)."""
+    return {"tenant": ctx.get("tenant")}
+
+
 # ---- master data ------------------------------------------------------------
 
 
 @app.get("/api/v1/customers", dependencies=[Depends(require_api_key)])
-def list_customers() -> list[CustomerOut]:
+async def list_customers() -> list[CustomerOut]:
     with get_session() as s:
         rows = s.execute(select(Customer).order_by(Customer.code)).scalars().all()
         return [
@@ -192,7 +233,7 @@ def list_customers() -> list[CustomerOut]:
 
 
 @app.get("/api/v1/products", dependencies=[Depends(require_api_key)])
-def list_products() -> list[ProductOut]:
+async def list_products() -> list[ProductOut]:
     with get_session() as s:
         rows = s.execute(select(Product).order_by(Product.sku)).scalars().all()
         return [
@@ -209,7 +250,7 @@ def list_products() -> list[ProductOut]:
 
 
 @app.get("/api/v1/invoices", dependencies=[Depends(require_api_key)])
-def list_invoices() -> list[InvoiceSummaryOut]:
+async def list_invoices() -> list[InvoiceSummaryOut]:
     with get_session() as s:
         rows = s.execute(
             select(SalesInvoice).order_by(SalesInvoice.id)
@@ -218,7 +259,7 @@ def list_invoices() -> list[InvoiceSummaryOut]:
 
 
 @app.get("/api/v1/invoices/{number}", dependencies=[Depends(require_api_key)])
-def get_invoice(number: str) -> InvoiceDetailOut:
+async def get_invoice(number: str) -> InvoiceDetailOut:
     with get_session() as s:
         inv = s.execute(
             select(SalesInvoice).where(SalesInvoice.number == number)
@@ -230,7 +271,7 @@ def get_invoice(number: str) -> InvoiceDetailOut:
 
 @app.post("/api/v1/invoices", status_code=201,
           dependencies=[Depends(require_api_key)])
-def create_invoice(payload: InvoiceCreateIn) -> InvoiceDetailOut:
+async def create_invoice(payload: InvoiceCreateIn) -> InvoiceDetailOut:
     with get_session() as s:
         customer = s.execute(
             select(Customer).where(Customer.code == payload.customer_code)
@@ -288,7 +329,7 @@ def create_invoice(payload: InvoiceCreateIn) -> InvoiceDetailOut:
 
 
 @app.get("/api/v1/reports/trial-balance", dependencies=[Depends(require_api_key)])
-def report_trial_balance(as_of: Optional[date] = None) -> dict:
+async def report_trial_balance(as_of: Optional[date] = None) -> dict:
     with get_session() as s:
         rows = trial_balance(s, as_of=as_of)
     total_debit = round(sum(r["debit"] for r in rows), 2)
@@ -303,7 +344,7 @@ def report_trial_balance(as_of: Optional[date] = None) -> dict:
 
 
 @app.get("/api/v1/reports/pnl", dependencies=[Depends(require_api_key)])
-def report_pnl(
+async def report_pnl(
     from_: date = Query(..., alias="from"),
     to: date = Query(...),
 ) -> dict:
@@ -315,7 +356,7 @@ def report_pnl(
 
 
 @app.get("/api/v1/reports/balance-sheet", dependencies=[Depends(require_api_key)])
-def report_balance_sheet(as_of: date = Query(...)) -> dict:
+async def report_balance_sheet(as_of: date = Query(...)) -> dict:
     with get_session() as s:
         try:
             return reports_svc.balance_sheet(s, as_of=as_of)

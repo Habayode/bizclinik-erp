@@ -74,4 +74,41 @@ if submit:
             st.error(str(e))
 
 
+st.divider()
+st.subheader("REST API keys")
+st.caption("A key scoped to a tenant lets external systems read/write only that "
+            "tenant's books via https://api.hagai.online. The key is shown once.")
+
+key_rows = [{"id": k["id"], "tenant": k["tenant_slug"] or "(default DB)",
+             "label": k["label"], "active": k["is_active"],
+             "created": k["created_at"], "last_used": k["last_used_at"]}
+            for k in tenancy.list_api_keys()]
+if key_rows:
+    st.dataframe(pd.DataFrame(key_rows), hide_index=True, width="stretch")
+
+with st.form("new_key"):
+    tenants_for_key = ["(default DB)"] + [t["slug"] for t in tenancy.list_tenants()]
+    c1, c2 = st.columns(2)
+    key_tenant = c1.selectbox("Scope (tenant)", tenants_for_key)
+    key_label = c2.text_input("Label", placeholder="e.g. POS integration")
+    submit_key = st.form_submit_button("Generate API key", type="primary")
+if submit_key:
+    slug_arg = None if key_tenant == "(default DB)" else key_tenant
+    try:
+        plaintext = tenancy.create_api_key(slug_arg, key_label or "")
+        st.success("API key created — copy it now, it won't be shown again:")
+        st.code(plaintext, language="text")
+        st.caption(f"Use header  X-API-Key: {plaintext[:12]}…  against "
+                   f"https://api.hagai.online")
+    except ValueError as e:
+        st.error(str(e))
+
+if key_rows:
+    with st.expander("Revoke a key"):
+        rid = st.number_input("Key id to revoke", min_value=1, step=1)
+        if st.button("Revoke", type="secondary"):
+            tenancy.revoke_api_key(int(rid))
+            st.warning(f"Revoked key #{int(rid)}")
+
+
 auth.render_logout_in_sidebar()
