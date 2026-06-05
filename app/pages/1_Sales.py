@@ -101,11 +101,20 @@ with tab_inv:
     if not cust_opts:
         st.info("No customers yet — add one on the Settings page or import data first.")
     else:
+        with get_session() as s:
+            from bizclinik_erp.models import Currency
+            from sqlalchemy import select as _sel
+            cur_codes = [c.code for c in s.execute(
+                _sel(Currency).where(Currency.is_active == True)  # noqa: E712
+                .order_by(Currency.is_base.desc(), Currency.code)).scalars()]
         with st.form("new_invoice"):
             sel_cust = st.selectbox("Customer", list(cust_opts.keys()))
-            c1, c2 = st.columns(2)
+            c1, c2, c3 = st.columns(3)
             inv_date = c1.date_input("Invoice date", value=date.today())
             due = c2.date_input("Due date", value=date.today() + timedelta(days=30))
+            sel_cur = c3.selectbox("Currency", cur_codes or ["NGN"],
+                                    help="Foreign-currency invoices post to the "
+                                         "ledger in NGN at the latest rate.")
             seed = [{"product_id": p["id"], "description": p["name"], "qty": 1,
                      "unit_price": p["price"], "tax_rate": 0.075}
                     for p in prods[:3]] or [{"product_id": None, "description": "",
@@ -141,12 +150,20 @@ with tab_inv:
             if not lines:
                 st.error("Add at least one line.")
             else:
-                with get_session() as s:
-                    inv = sales_svc.issue_invoice(
-                        s, customer_id=cust_opts[sel_cust], invoice_date=inv_date,
-                        due_date=due, lines=lines, notes=notes or None,
-                    )
-                    st.success(f"Issued {inv.number} — total ₦{inv.grand_total:,.2f}")
+                try:
+                    with get_session() as s:
+                        inv = sales_svc.issue_invoice(
+                            s, customer_id=cust_opts[sel_cust], invoice_date=inv_date,
+                            due_date=due, lines=lines, notes=notes or None,
+                            currency_code=sel_cur,
+                        )
+                        cur = inv.currency_code
+                        st.success(f"Issued {inv.number} — total {cur} "
+                                   f"{inv.grand_total:,.2f}"
+                                   + (f" (₦{inv.grand_total * inv.fx_rate:,.2f})"
+                                      if cur != "NGN" else ""))
+                except ValueError as e:
+                    st.error(str(e))
 
 
 # ----- Quotations tab -------------------------------------------------------

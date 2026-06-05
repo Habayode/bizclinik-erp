@@ -161,8 +161,32 @@ def seed_disposal_account(session: Session) -> None:
     )
 
 
+def seed_fx(session: Session) -> None:
+    """Seed the base currency (NGN) + common foreign currencies, and the
+    Foreign Exchange Gain/Loss account (code 4300, under Income)."""
+    from ..models import Currency
+
+    presets = [
+        ("NGN", "Nigerian Naira", "₦", True),
+        ("USD", "US Dollar", "$", False),
+        ("GBP", "Pound Sterling", "£", False),
+        ("EUR", "Euro", "€", False),
+    ]
+    for code, name, symbol, is_base in presets:
+        existing = session.get(Currency, code)
+        if not existing:
+            session.add(Currency(code=code, name=name, symbol=symbol, is_base=is_base))
+
+    # FX gain/loss account — gains credit it (income), losses debit it.
+    _get_or_create_account(
+        session, "4300", "Foreign Exchange Gain/Loss",
+        AccountType.INCOME, "4000", True,
+    )
+
+
 def seed_defaults(session: Session) -> None:
     seed_chart_of_accounts(session)
     seed_tax_codes(session)
     seed_disposal_account(session)
+    seed_fx(session)
     seed_warehouses_and_bank(session)

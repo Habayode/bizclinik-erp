@@ -191,6 +191,11 @@ class SalesInvoice(Base):
     amount_paid: Mapped[float] = mapped_column(Float, default=0.0)
     je_id: Mapped[Optional[int]] = mapped_column(ForeignKey("journal_entry.id"))
     cogs_je_id: Mapped[Optional[int]] = mapped_column(ForeignKey("journal_entry.id"))
+    # Multi-currency: document is denominated in `currency_code`; `fx_rate` is
+    # NGN per 1 unit captured at issue. NGN docs use NGN / 1.0 (the default),
+    # so existing rows and reports are unaffected.
+    currency_code: Mapped[str] = mapped_column(String(3), default="NGN")
+    fx_rate: Mapped[float] = mapped_column(Float, default=1.0)
 
     customer = relationship("Customer")
     lines: Mapped[list["SalesInvoiceLine"]] = relationship(
@@ -307,6 +312,9 @@ class Bill(Base):
     status: Mapped[DocStatus] = mapped_column(Enum(DocStatus), default=DocStatus.DRAFT)
     amount_paid: Mapped[float] = mapped_column(Float, default=0.0)
     je_id: Mapped[Optional[int]] = mapped_column(ForeignKey("journal_entry.id"))
+    # Multi-currency: see SalesInvoice. NGN / 1.0 by default.
+    currency_code: Mapped[str] = mapped_column(String(3), default="NGN")
+    fx_rate: Mapped[float] = mapped_column(Float, default=1.0)
 
     supplier = relationship("Supplier")
     lines: Mapped[list["BillLine"]] = relationship(

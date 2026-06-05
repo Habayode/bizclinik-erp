@@ -144,23 +144,39 @@ def issue_invoice(
     due_date: Optional[date] = None,
     sales_order_id: Optional[int] = None,
     notes: Optional[str] = None,
+    currency_code: str = "NGN",
+    fx_rate: Optional[float] = None,
 ) -> SalesInvoice:
     """Issue a sales invoice and post BOTH the revenue JE and the COGS JE.
 
-    Revenue JE (per invoice):
-        DR Accounts Receivable     gross
-            CR Sales                subtotal
-            CR Output VAT           tax_total
+    Multi-currency: the invoice may be denominated in `currency_code`. Line
+    amounts are in that currency; the GL is posted in NGN at `fx_rate` (NGN
+    per 1 unit, captured at issue — looked up if not supplied). COGS/inventory
+    stay in NGN because product cost is held in NGN.
 
-    COGS JE (per invoice — sums all stockable lines):
+    Revenue JE (per invoice, in NGN):
+        DR Accounts Receivable     gross × fx
+            CR Sales                subtotal × fx
+            CR Output VAT           tax_total × fx
+
+    COGS JE (per invoice — sums all stockable lines, already NGN):
         DR COGS                    sum(qty × avg_cost)
             CR Inventory           sum(qty × avg_cost)
     Plus a StockMovement per stockable line decrementing on-hand.
     """
+    from . import fx as fx_svc
+
     accts = _resolve_accounts(session)
     customer = session.get(Customer, customer_id)
     if not customer:
         raise ValueError(f"Customer {customer_id} not found.")
+
+    currency_code = (currency_code or "NGN").upper()
+    rate = fx_svc.resolve_rate(session, currency_code, fx_rate=fx_rate,
+                                as_of=invoice_date)
+
+    def _ngn(amount: float) -> float:
+        return round(amount * rate, 2)
 
     invoice = SalesInvoice(
         number=next_number(session, "INV", invoice_date),
@@ -170,6 +186,8 @@ def issue_invoice(
         sales_order_id=sales_order_id,
         notes=notes,
         status=DocStatus.DRAFT,
+        currency_code=currency_code,
+        fx_rate=rate,
     )
     for l in lines:
         unit_cost = 0.0
@@ -185,10 +203,10 @@ def issue_invoice(
     session.add(invoice)
     session.flush()
 
-    # Revenue JE.
+    # Revenue JE — amounts converted to NGN at the captured rate.
     ar_account_id = (customer.receivable_account_id or accts["AR"].id)
     rev_lines: list[JELine] = [JELine(
-        account_id=ar_account_id, debit=invoice.grand_total,
+        account_id=ar_account_id, debit=_ngn(invoice.grand_total),
         memo=f"AR — {customer.name}", customer_id=customer.id,
     )]
     # Group revenue lines by product income_account if set, else default.
@@ -202,11 +220,11 @@ def issue_invoice(
         rev_by_acct[income_acct] = rev_by_acct.get(income_acct, 0.0) + line.subtotal
     for acct_id, amt in rev_by_acct.items():
         if amt:
-            rev_lines.append(JELine(account_id=acct_id, credit=amt,
+            rev_lines.append(JELine(account_id=acct_id, credit=_ngn(amt),
                                     memo=f"Revenue — invoice {invoice.number}"))
     if invoice.tax_total:
         rev_lines.append(JELine(account_id=accts["VAT_OUT"].id,
-                                credit=invoice.tax_total,
+                                credit=_ngn(invoice.tax_total),
                                 memo=f"Output VAT — invoice {invoice.number}"))
     rev_je = post_journal(
         session, invoice_date,
@@ -274,8 +292,19 @@ def record_receipt(
     amount: float, bank_account_id: int,
     invoice_id: Optional[int] = None,
     method: str = "BANK", reference: Optional[str] = None,
+    settlement_fx_rate: Optional[float] = None,
 ) -> Receipt:
-    """Record cash in from a customer. Posts DR Bank / CR AR."""
+    """Record cash in from a customer. Posts DR Bank / CR AR (+ realized FX).
+
+    For an NGN invoice `amount` is NGN and there is no FX. For a foreign
+    invoice, `amount` is in the INVOICE's currency (the portion being
+    settled); `settlement_fx_rate` (NGN per unit at settlement; defaults to
+    the invoice's issue rate) determines the NGN that hits the bank. The
+    difference between NGN received and the AR cleared at the issue rate is
+    booked to Foreign Exchange Gain/Loss.
+    """
+    from . import fx as fx_svc
+
     customer = session.get(Customer, customer_id)
     if not customer:
         raise ValueError(f"Customer {customer_id} not found.")
@@ -286,13 +315,21 @@ def record_receipt(
     accts = _resolve_accounts(session)
     ar_account_id = customer.receivable_account_id or accts["AR"].id
 
+    invoice = session.get(SalesInvoice, invoice_id) if invoice_id else None
+    issue_rate = invoice.fx_rate if invoice else 1.0
+    settle_rate = settlement_fx_rate if settlement_fx_rate is not None else issue_rate
+
+    ngn_to_bank = round(amount * settle_rate, 2)      # cash actually received
+    ar_cleared = round(amount * issue_rate, 2)        # AR booked at issue rate
+    fx_diff = round(ngn_to_bank - ar_cleared, 2)      # +gain / -loss
+
     receipt = Receipt(
         number=next_number(session, "RCT", receipt_date),
         receipt_date=receipt_date,
         customer_id=customer_id,
         invoice_id=invoice_id,
         bank_account_id=bank_account_id,
-        amount=round(amount, 2),
+        amount=ngn_to_bank,
         method=method,
         reference=reference,
         status=DocStatus.DRAFT,
@@ -300,28 +337,35 @@ def record_receipt(
     session.add(receipt)
     session.flush()
 
+    je_lines = [
+        JELine(account_id=bank.gl_account_id, debit=ngn_to_bank,
+               memo=f"Receipt from {customer.name}"),
+        JELine(account_id=ar_account_id, credit=ar_cleared,
+               memo=f"AR settled — {customer.name}", customer_id=customer.id),
+    ]
+    if abs(fx_diff) >= 0.01:
+        fx_acct = fx_svc.fx_gainloss_account_id(session)
+        if fx_diff > 0:  # received more NGN than booked → gain (credit income)
+            je_lines.append(JELine(account_id=fx_acct, credit=fx_diff,
+                                    memo="Realized FX gain"))
+        else:            # received less → loss (debit income account)
+            je_lines.append(JELine(account_id=fx_acct, debit=-fx_diff,
+                                    memo="Realized FX loss"))
+
     je = post_journal(
         session, receipt_date,
         f"Receipt {receipt.number} from {customer.name}",
-        [
-            JELine(account_id=bank.gl_account_id, debit=receipt.amount,
-                   memo=f"Receipt from {customer.name}"),
-            JELine(account_id=ar_account_id, credit=receipt.amount,
-                   memo=f"AR settled — {customer.name}", customer_id=customer.id),
-        ],
-        source_kind="RECEIPT", source_id=receipt.id,
+        je_lines, source_kind="RECEIPT", source_id=receipt.id,
     )
     receipt.je_id = je.id
     receipt.status = DocStatus.POSTED
 
-    # Update invoice paid status if linked.
-    if invoice_id:
-        invoice = session.get(SalesInvoice, invoice_id)
-        if invoice:
-            invoice.amount_paid = round(invoice.amount_paid + receipt.amount, 2)
-            if invoice.amount_paid + 0.01 >= invoice.grand_total:
-                invoice.status = DocStatus.PAID
-            elif invoice.amount_paid > 0:
-                invoice.status = DocStatus.PARTIAL
+    # Invoice amount_paid is tracked in the invoice's own currency.
+    if invoice:
+        invoice.amount_paid = round(invoice.amount_paid + amount, 2)
+        if invoice.amount_paid + 0.01 >= invoice.grand_total:
+            invoice.status = DocStatus.PAID
+        elif invoice.amount_paid > 0:
+            invoice.status = DocStatus.PARTIAL
     session.flush()
     return receipt

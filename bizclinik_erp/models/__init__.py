@@ -41,6 +41,7 @@ from .txn import (
     StockMovement,
 )
 from .budget import Budget, BudgetLine
+from .fx import Currency, ExchangeRate
 
 __all__ = [
     # master
@@ -68,4 +69,6 @@ __all__ = [
     "EInvoiceSubmission", "EInvoiceStatus",
     # budgets
     "Budget", "BudgetLine",
+    # multi-currency
+    "Currency", "ExchangeRate",
 ]

@@ -80,11 +80,20 @@ with tab_bill:
     if not sup_opts:
         st.info("No suppliers yet.")
     else:
+        with get_session() as s:
+            from bizclinik_erp.models import Currency
+            from sqlalchemy import select as _sel
+            cur_codes = [c.code for c in s.execute(
+                _sel(Currency).where(Currency.is_active == True)  # noqa: E712
+                .order_by(Currency.is_base.desc(), Currency.code)).scalars()]
         with st.form("new_bill"):
             sel_sup = st.selectbox("Supplier", list(sup_opts.keys()))
-            c1, c2 = st.columns(2)
+            c1, c2, c3 = st.columns(3)
             bdate = c1.date_input("Bill date", value=date.today())
             due = c2.date_input("Due date", value=date.today() + timedelta(days=30))
+            sel_cur = c3.selectbox("Currency", cur_codes or ["NGN"],
+                                    help="Foreign bills post to the ledger in NGN "
+                                         "at the latest rate; stock valued in NGN.")
             line_type = st.radio("Line type", ["Inventory (stockable)", "Expense"],
                                   horizontal=True)
             seed = []
@@ -117,12 +126,20 @@ with tab_bill:
             if not lines:
                 st.error("Add at least one line.")
             else:
-                with get_session() as s:
-                    bill = p_svc.receive_bill(
-                        s, supplier_id=sup_opts[sel_sup], bill_date=bdate,
-                        due_date=due, lines=lines, notes=notes or None,
-                    )
-                    st.success(f"Bill {bill.number} posted — total ₦{bill.grand_total:,.2f}")
+                try:
+                    with get_session() as s:
+                        bill = p_svc.receive_bill(
+                            s, supplier_id=sup_opts[sel_sup], bill_date=bdate,
+                            due_date=due, lines=lines, notes=notes or None,
+                            currency_code=sel_cur,
+                        )
+                        cur = bill.currency_code
+                        st.success(f"Bill {bill.number} posted — total {cur} "
+                                   f"{bill.grand_total:,.2f}"
+                                   + (f" (₦{bill.grand_total * bill.fx_rate:,.2f})"
+                                      if cur != "NGN" else ""))
+                except ValueError as e:
+                    st.error(str(e))
 
 
 with tab_po:
