@@ -104,3 +104,99 @@ def fx_gainloss_account_id(session: Session) -> int:
     if not acct:
         raise RuntimeError("FX Gain/Loss account (4300) missing — seed defaults.")
     return acct.id
+
+
+# --------------------------------------------------------------------------- #
+# Unrealized FX revaluation (period-end)                                       #
+# --------------------------------------------------------------------------- #
+
+def unrealized_fx_revaluation(session: Session, *, as_of: Optional[date] = None) -> dict:
+    """Mark open foreign-currency receivables and payables to the period-end rate.
+
+    For every open (not fully settled) foreign-denominated sales invoice and
+    bill, compare the NGN value booked at the document's issue rate against the
+    NGN value at the ``as_of`` rate. The difference is an *unrealized* FX
+    gain/loss — it has not been cashed in yet, so this is a report (no journal
+    entry is posted; period-end revaluation entries are typically reversing and
+    are left to the accountant to book/reverse).
+
+    Sign convention (impact on profit):
+      • Receivable (asset):  gain when NGN weakens (rate up)  -> +outstanding*(cur-book)
+      • Payable (liability): loss when NGN weakens (rate up)  -> -outstanding*(cur-book)
+
+    Returns::
+        {
+          "as_of": date|None,
+          "receivables": [ {doc..., outstanding_fc, booked_rate, current_rate,
+                            booked_ngn, current_ngn, unrealized} , ... ],
+          "payables":    [ ... ],
+          "net_unrealized": float,   # +gain / -loss to P&L
+          "skipped": [ {scope, ref, reason} ]   # e.g. no rate on file
+        }
+    """
+    from ..models import Bill, SalesInvoice
+    from ..models.txn import DocStatus
+
+    open_states = {DocStatus.POSTED, DocStatus.PARTIAL}
+
+    receivables: list[dict] = []
+    payables: list[dict] = []
+    skipped: list[dict] = []
+
+    def _line(scope, doc, outstanding_fc, booked_rate, current_rate, sign):
+        booked_ngn = round(outstanding_fc * booked_rate, 2)
+        current_ngn = round(outstanding_fc * current_rate, 2)
+        unrealized = round(sign * (current_ngn - booked_ngn), 2)
+        return {
+            "scope": scope,
+            "ref": doc.number,
+            "currency": doc.currency_code,
+            "outstanding_fc": round(outstanding_fc, 2),
+            "booked_rate": round(booked_rate, 6),
+            "current_rate": round(current_rate, 6),
+            "booked_ngn": booked_ngn,
+            "current_ngn": current_ngn,
+            "unrealized": unrealized,
+        }
+
+    # Receivables (sales invoices) — asset, sign +1.
+    for inv in session.execute(select(SalesInvoice)).scalars():
+        if (inv.currency_code or BASE_CURRENCY).upper() == BASE_CURRENCY:
+            continue
+        if inv.status not in open_states:
+            continue
+        outstanding = round(inv.grand_total - (inv.amount_paid or 0.0), 2)
+        if outstanding <= 0:
+            continue
+        try:
+            cur = get_rate(session, inv.currency_code, as_of=as_of)
+        except ValueError as exc:
+            skipped.append({"scope": "receivable", "ref": inv.number, "reason": str(exc)})
+            continue
+        receivables.append(_line("receivable", inv, outstanding, inv.fx_rate or 1.0, cur, +1))
+
+    # Payables (bills) — liability, sign -1.
+    for bill in session.execute(select(Bill)).scalars():
+        if (bill.currency_code or BASE_CURRENCY).upper() == BASE_CURRENCY:
+            continue
+        if bill.status not in open_states:
+            continue
+        outstanding = round(bill.grand_total - (bill.amount_paid or 0.0), 2)
+        if outstanding <= 0:
+            continue
+        try:
+            cur = get_rate(session, bill.currency_code, as_of=as_of)
+        except ValueError as exc:
+            skipped.append({"scope": "payable", "ref": bill.number, "reason": str(exc)})
+            continue
+        payables.append(_line("payable", bill, outstanding, bill.fx_rate or 1.0, cur, -1))
+
+    net = round(sum(r["unrealized"] for r in receivables)
+                + sum(p["unrealized"] for p in payables), 2)
+    return {
+        "as_of": as_of,
+        "receivables": receivables,
+        "payables": payables,
+        "net_unrealized": net,
+        "skipped": skipped,
+    }

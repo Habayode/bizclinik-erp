@@ -99,4 +99,26 @@ with tab_rates:
                 st.success(f"Set {cur} = ₦{rate:,.4f} on {rdate}")
 
 
+st.divider()
+st.subheader("Unrealized FX revaluation")
+st.caption("Marks open foreign-currency invoices & bills to the rate as of a "
+           "date. Report only — review with your accountant before booking a "
+           "period-end revaluation entry.")
+rev_date = st.date_input("Revalue as of", value=date.today(), key="fx_reval_date")
+if st.button("Run revaluation", type="primary"):
+    with get_session() as s:
+        rep = fx_svc.unrealized_fx_revaluation(s, as_of=rev_date)
+    net = rep["net_unrealized"]
+    st.metric("Net unrealized FX (P&L impact)", f"₦{net:,.2f}",
+              delta=("gain" if net > 0 else "loss" if net < 0 else "flat"))
+    rows = rep["receivables"] + rep["payables"]
+    if rows:
+        st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+    else:
+        st.info("No open foreign-currency receivables or payables to revalue.")
+    if rep["skipped"]:
+        st.warning("Skipped (no rate on file): "
+                   + ", ".join(x["ref"] for x in rep["skipped"]))
+
+
 auth.render_logout_in_sidebar()
