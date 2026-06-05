@@ -1,4 +1,4 @@
-"""Case-study seed: GreenLeaf Stores Ltd — a full month (June 2026) across every module.
+"""Case-study seed: GreenLeaf Stores Ltd — a full month (May 2026) across every module.
 
 Posts onboarding + a realistic month of transactions for a Lagos retail + delivery
 SME, then runs every report. Returns a structured dict so the user manual can quote
@@ -109,7 +109,7 @@ def seed_demo() -> dict:
     # ---- 3. Opening capital (owner injects funds) ---------------------------
     from bizclinik_erp.services.ledger import post_journal, JELine
     with get_session() as s:
-        post_journal(s, date(2026, 6, 1), "Owner capital injection", [
+        post_journal(s, date(2026, 5, 1), "Owner capital injection", [
             JELine(account_id=_bank(s, "BANK1").gl_account_id, debit=5_000_000, memo="Capital"),
             JELine(account_id=equity_id, credit=5_000_000, memo="Capital"),
         ], source_kind="CAPITAL")
@@ -117,122 +117,122 @@ def seed_demo() -> dict:
     # ---- 4. Purchases: stock in + equipment + rent --------------------------
     bills = {}
     with get_session() as s:
-        b1 = purchase.receive_bill(s, supplier_id=ids["S001"], bill_date=date(2026, 6, 2),
+        b1 = purchase.receive_bill(s, supplier_id=ids["S001"], bill_date=date(2026, 5, 2),
             lines=[POL(product_id=ids["RICE50"], description="Rice 50kg x40", qty=40, unit_cost=38000, tax_rate=0.075),
                    POL(product_id=ids["OIL25"], description="Veg Oil 25L x30", qty=30, unit_cost=28000, tax_rate=0.075)],
-            due_date=date(2026, 6, 30))
-        b2 = purchase.receive_bill(s, supplier_id=ids["S002"], bill_date=date(2026, 6, 3),
+            due_date=date(2026, 5, 30))
+        b2 = purchase.receive_bill(s, supplier_id=ids["S002"], bill_date=date(2026, 5, 3),
             lines=[POL(product_id=ids["CARTON"], description="Cartons x500", qty=500, unit_cost=1200, tax_rate=0.075)],
-            due_date=date(2026, 6, 25))
+            due_date=date(2026, 5, 25))
         # Equipment purchase -> Fixed asset account 1210 (non-stock line)
-        b3 = purchase.receive_bill(s, supplier_id=ids["S002"], bill_date=date(2026, 6, 3),
+        b3 = purchase.receive_bill(s, supplier_id=ids["S002"], bill_date=date(2026, 5, 3),
             lines=[POL(product_id=None, description="Cold-room freezer", qty=1, unit_cost=1_800_000, tax_rate=0.0,
                        expense_account_id=_acct(s, "1210").id)])
         # Rent (expense)
-        b4 = purchase.receive_bill(s, supplier_id=ids["S003"], bill_date=date(2026, 6, 1),
-            lines=[POL(product_id=None, description="Shop rent — June", qty=1, unit_cost=350000, tax_rate=0.0,
-                       expense_account_id=rent_acct)], due_date=date(2026, 6, 5))
+        b4 = purchase.receive_bill(s, supplier_id=ids["S003"], bill_date=date(2026, 5, 1),
+            lines=[POL(product_id=None, description="Shop rent — May", qty=1, unit_cost=350000, tax_rate=0.0,
+                       expense_account_id=rent_acct)], due_date=date(2026, 5, 5))
         bills = {"stock1": b1.id, "stock2": b2.id, "equip": b3.id, "rent": b4.id}
 
     # ---- 5. Register the fixed asset + pay rent/supplier ---------------------
     with get_session() as s:
         assets.add_asset(s, code="FA-001", name="Cold-room Freezer", category="Equipment",
-            acquired_date=date(2026, 6, 3), cost=1_800_000, useful_life_months=60,
+            acquired_date=date(2026, 5, 3), cost=1_800_000, useful_life_months=60,
             gl_asset_account_id=_acct(s, "1210").id,
             gl_accum_dep_account_id=_acct(s, "1290").id,
             gl_dep_expense_account_id=_acct(s, "6600").id, salvage_value=300_000)
     with get_session() as s:
-        purchase.record_payment(s, supplier_id=ids["S003"], payment_date=date(2026, 6, 4),
+        purchase.record_payment(s, supplier_id=ids["S003"], payment_date=date(2026, 5, 4),
                                 amount=350000, bank_account_id=bank1, bill_id=bills["rent"])
-        purchase.record_payment(s, supplier_id=ids["S001"], payment_date=date(2026, 6, 20),
+        purchase.record_payment(s, supplier_id=ids["S001"], payment_date=date(2026, 5, 20),
                                 amount=2_000_000, bank_account_id=bank1, bill_id=bills["stock1"])
 
     # ---- 6. Sales: NGN invoices + 1 USD export ------------------------------
     fx.set_rate_present = True
     with get_session() as s:
-        fx.set_rate(s, "USD", date(2026, 6, 1), 1550.0)
+        fx.set_rate(s, "USD", date(2026, 5, 1), 1550.0)
     inv = {}
     with get_session() as s:
-        inv["i1"] = sales.issue_invoice(s, customer_id=ids["C001"], invoice_date=date(2026, 6, 6),
-            due_date=date(2026, 6, 20),
+        inv["i1"] = sales.issue_invoice(s, customer_id=ids["C001"], invoice_date=date(2026, 5, 6),
+            due_date=date(2026, 5, 20),
             lines=[PS(product_id=ids["RICE50"], description="Rice 50kg x10", qty=10, unit_price=45000, tax_rate=0.075),
                    PS(product_id=ids["DELIV"], description="Delivery", qty=1, unit_price=5000, tax_rate=0.075)]).id
-        inv["i2"] = sales.issue_invoice(s, customer_id=ids["C002"], invoice_date=date(2026, 6, 10),
-            due_date=date(2026, 6, 24),
+        inv["i2"] = sales.issue_invoice(s, customer_id=ids["C002"], invoice_date=date(2026, 5, 10),
+            due_date=date(2026, 5, 24),
             lines=[PS(product_id=ids["OIL25"], description="Veg Oil 25L x8", qty=8, unit_price=33000, tax_rate=0.075)]).id
-        inv["i3"] = sales.issue_invoice(s, customer_id=ids["C003"], invoice_date=date(2026, 6, 15),
+        inv["i3"] = sales.issue_invoice(s, customer_id=ids["C003"], invoice_date=date(2026, 5, 15),
             lines=[PS(product_id=ids["RICE50"], description="Rice 50kg x2", qty=2, unit_price=45000, tax_rate=0.075),
                    PS(product_id=ids["CARTON"], description="Cartons x20", qty=20, unit_price=1800, tax_rate=0.075)]).id
         # USD export
-        inv["i4"] = sales.issue_invoice(s, customer_id=ids["C004"], invoice_date=date(2026, 6, 18),
-            currency_code="USD", due_date=date(2026, 7, 18),
+        inv["i4"] = sales.issue_invoice(s, customer_id=ids["C004"], invoice_date=date(2026, 5, 18),
+            currency_code="USD", due_date=date(2026, 6, 18),
             lines=[PS(product_id=ids["OIL25"], description="Veg Oil export x10", qty=10, unit_price=25, tax_rate=0.0)]).id
 
     # ---- 7. Receipts --------------------------------------------------------
     with get_session() as s:
-        sales.record_receipt(s, customer_id=ids["C001"], receipt_date=date(2026, 6, 19),
+        sales.record_receipt(s, customer_id=ids["C001"], receipt_date=date(2026, 5, 19),
                              amount=inv_total(s, inv["i1"]), bank_account_id=bank1, invoice_id=inv["i1"])
-        sales.record_receipt(s, customer_id=ids["C002"], receipt_date=date(2026, 6, 22),
+        sales.record_receipt(s, customer_id=ids["C002"], receipt_date=date(2026, 5, 22),
                              amount=inv_total(s, inv["i2"]), bank_account_id=bank1, invoice_id=inv["i2"])
 
     # ---- 8. Marketing expense bill + bank charge ----------------------------
     with get_session() as s:
-        purchase.receive_bill(s, supplier_id=ids["S002"], bill_date=date(2026, 6, 12),
+        purchase.receive_bill(s, supplier_id=ids["S002"], bill_date=date(2026, 5, 12),
             lines=[POL(product_id=None, description="Radio advert", qty=1, unit_cost=120000, tax_rate=0.0,
                        expense_account_id=mkt_acct)])
-        banking.post_bank_charge(s, bank_account_id=bank1, on=date(2026, 6, 30), amount=2500,
+        banking.post_bank_charge(s, bank_account_id=bank1, on=date(2026, 5, 30), amount=2500,
                                  memo="Account maintenance")
 
     # ---- 9. Payroll (June) --------------------------------------------------
     with get_session() as s:
-        payroll.run_payroll(s, period_start=date(2026, 6, 1), period_end=date(2026, 6, 30),
-            pay_date=date(2026, 6, 28), bank_account_id=bank1,
+        payroll.run_payroll(s, period_start=date(2026, 5, 1), period_end=date(2026, 5, 30),
+            pay_date=date(2026, 5, 28), bank_account_id=bank1,
             inputs=[SLIP(employee_id=ids["E001"]), SLIP(employee_id=ids["E002"]), SLIP(employee_id=ids["E003"])])
 
     # ---- 10. Depreciation (month-end) --------------------------------------
     with get_session() as s:
-        assets.run_depreciation(s, as_of=date(2026, 6, 30))
+        assets.run_depreciation(s, as_of=date(2026, 5, 30))
 
     # ---- 11. Bank reconciliation -------------------------------------------
     with get_session() as s:
-        stmt = recon.create_statement(s, bank_account_id=bank1, period_start=date(2026, 6, 1),
-            period_end=date(2026, 6, 30), opening_balance=0, closing_balance=0, source_file="GTBank-June.csv")
+        stmt = recon.create_statement(s, bank_account_id=bank1, period_start=date(2026, 5, 1),
+            period_end=date(2026, 5, 30), opening_balance=0, closing_balance=0, source_file="GTBank-June.csv")
         recon.import_statement_lines(s, stmt.id, [
-            {"txn_date": date(2026, 6, 1), "description": "Capital", "amount": 5_000_000, "reference": "CAP"},
-            {"txn_date": date(2026, 6, 4), "description": "Rent paid", "amount": -350000, "reference": "RENT"},
-            {"txn_date": date(2026, 6, 19), "description": "Sunrise receipt", "amount": inv_total_ro(s, inv["i1"]), "reference": "RCP1"},
-            {"txn_date": date(2026, 6, 30), "description": "Bank charge", "amount": -2500, "reference": "CHG"},
+            {"txn_date": date(2026, 5, 1), "description": "Capital", "amount": 5_000_000, "reference": "CAP"},
+            {"txn_date": date(2026, 5, 4), "description": "Rent paid", "amount": -350000, "reference": "RENT"},
+            {"txn_date": date(2026, 5, 19), "description": "Sunrise receipt", "amount": inv_total_ro(s, inv["i1"]), "reference": "RCP1"},
+            {"txn_date": date(2026, 5, 30), "description": "Bank charge", "amount": -2500, "reference": "CHG"},
         ])
         recon.auto_match(s, stmt.id)
         recon_summary = recon.reconciliation_summary(s, stmt.id)
 
     # ---- 12. Unrealized FX, recurring, budget, accrual, CRM, FIRS -----------
     with get_session() as s:
-        fx.set_rate(s, "USD", date(2026, 6, 30), 1600.0)
-        fx_rev = fx.unrealized_fx_revaluation(s, as_of=date(2026, 6, 30))
+        fx.set_rate(s, "USD", date(2026, 5, 30), 1600.0)
+        fx_rev = fx.unrealized_fx_revaluation(s, as_of=date(2026, 5, 30))
     with get_session() as s:
         recurring.create_template(s, kind=RecurringKind.INVOICE, code="REC-RENT-INV",
             name="Monthly retainer — Sunrise", frequency=RecurringFrequency.MONTHLY,
-            next_run_date=date(2026, 7, 1),
+            next_run_date=date(2026, 6, 1),
             payload={"customer_id": ids["C001"], "line_description": "Monthly supply retainer",
                      "qty": 1, "unit_price": 150000, "tax_rate": 0.075})
     with get_session() as s:
         bud = budget.create_budget(s, name="FY2026 Operating Budget", year=2026)
-        budget.set_budget_line(s, bud.id, _acct(s, "6100").id, 6, 600000)   # salaries
-        budget.set_budget_line(s, bud.id, _acct(s, "6200").id, 6, 350000)   # rent
-        budget.set_budget_line(s, bud.id, _acct(s, "6400").id, 6, 100000)   # marketing
+        budget.set_budget_line(s, bud.id, _acct(s, "6100").id, 5, 600000)   # salaries
+        budget.set_budget_line(s, bud.id, _acct(s, "6200").id, 5, 350000)   # rent
+        budget.set_budget_line(s, bud.id, _acct(s, "6400").id, 5, 100000)   # marketing
         bva = budget.budget_vs_actual(s, budget_id=bud.id,
-                                      period_start=date(2026, 6, 1), period_end=date(2026, 6, 30))
+                                      period_start=date(2026, 5, 1), period_end=date(2026, 5, 30))
     with get_session() as s:
-        closing.accrue_expense(s, on=date(2026, 6, 30), amount=45000,
+        closing.accrue_expense(s, on=date(2026, 5, 30), amount=45000,
                                expense_account_id=_acct(s, "6200").id, memo="June utilities (estimated)")
-        checklist = closing.close_checklist(s, year=2026, month=6)
+        checklist = closing.close_checklist(s, year=2026, month=5)
     with get_session() as s:
         l1 = crm.create_lead(s, name="Tunde Bakare", company="TB Mega Foods", email="tunde@tbmega.ng", source="referral")
         crm.convert_lead(s, l1.id, create_deal=True, deal_amount=900000)
         crm.create_lead(s, name="Ada Eze", company="Eze Catering", source="web")
         crm.create_deal(s, title="Eze Catering — supply contract", amount=450000, stage=DealStage.PROPOSAL)
-        crm.log_activity(s, subject="Call Tunde re: contract", kind=ActivityKind.CALL, due_date=date(2026, 7, 2))
+        crm.log_activity(s, subject="Call Tunde re: contract", kind=ActivityKind.CALL, due_date=date(2026, 6, 2))
         crm_pipe = crm.pipeline_summary(s)
     with get_session() as s:
         firs_sub = firs.generate_for_invoice(s, inv["i1"])
@@ -241,19 +241,19 @@ def seed_demo() -> dict:
     # ---- 13. Reports --------------------------------------------------------
     with get_session() as s:
         tb = trial_balance(s)
-        pnl = reports.profit_and_loss(s, period_start=date(2026, 6, 1), period_end=date(2026, 6, 30))
-        bs = reports.balance_sheet(s, as_of=date(2026, 6, 30))
-        cf = reports.cash_flow(s, period_start=date(2026, 6, 1), period_end=date(2026, 6, 30))
-        ar = reports.ar_aging(s, as_of=date(2026, 6, 30))
-        ap = reports.ap_aging(s, as_of=date(2026, 6, 30))
-        vat = tax.vat_return(s, period_start=date(2026, 6, 1), period_end=date(2026, 6, 30))
-        wht = tax.wht_position(s, period_start=date(2026, 6, 1), period_end=date(2026, 6, 30))
+        pnl = reports.profit_and_loss(s, period_start=date(2026, 5, 1), period_end=date(2026, 5, 30))
+        bs = reports.balance_sheet(s, as_of=date(2026, 5, 30))
+        cf = reports.cash_flow(s, period_start=date(2026, 5, 1), period_end=date(2026, 5, 30))
+        ar = reports.ar_aging(s, as_of=date(2026, 5, 30))
+        ap = reports.ap_aging(s, as_of=date(2026, 5, 30))
+        vat = tax.vat_return(s, period_start=date(2026, 5, 1), period_end=date(2026, 5, 30))
+        wht = tax.wht_position(s, period_start=date(2026, 5, 1), period_end=date(2026, 5, 30))
         tb_dr = round(sum(r["debit"] for r in tb), 2)
         tb_cr = round(sum(r["credit"] for r in tb), 2)
 
     return {
         "company": "GreenLeaf Stores Ltd",
-        "period": "June 2026",
+        "period": "May 2026",
         "trial_balance": {"debit": tb_dr, "credit": tb_cr, "balanced": abs(tb_dr - tb_cr) < 0.01, "lines": len(tb)},
         "profit_and_loss": pnl,
         "balance_sheet": bs,

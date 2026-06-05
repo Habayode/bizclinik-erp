@@ -40,3 +40,8 @@ package-lock.json
 # Never commit any secrets sheet
 *SECRET*
 *secret*.md
+
+# Demo/manual local artefacts
+data/greenleaf_report.json
+data/seed_err.txt
+data/streamlit.log
