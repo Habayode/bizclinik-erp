@@ -204,6 +204,29 @@ def cmd_api_key_list(_args) -> int:
     return 0
 
 
+def cmd_pg_migrate(_args) -> int:
+    """Migrate all SQLite books to PostgreSQL (database-per-tenant).
+
+    Requires BIZCLINIK_DB_BACKEND=postgres + PG* env. Provisions databases,
+    copies every table, resets sequences, and verifies row counts. SQLite files
+    are left untouched as rollback.
+    """
+    from .services import pg_migrate
+    result = pg_migrate.migrate_all(provision=True)
+    if result["created"]:
+        print("Created databases:", ", ".join(result["created"]))
+    for db in result["databases"]:
+        total = sum(db["tables"].values())
+        status = "OK" if db["ok"] else "MISMATCH"
+        print(f"  [{db['label']:>22}] -> {db['target']:<24} "
+              f"{total:>5} rows  {status}")
+        for m in db.get("mismatches", []):
+            print(f"      ! {m}")
+    print("Overall:",
+          "OK - counts verified" if result["ok"] else "FAILED - see mismatches")
+    return 0 if result["ok"] else 1
+
+
 def cmd_migrate(_args) -> int:
     """Run the additive schema migration on the default DB and every tenant DB
     so older databases gain columns added to the models since they were made."""
@@ -275,6 +298,8 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("api-key-list", help="List API keys (hashes not shown)")
 
     sub.add_parser("migrate", help="Add missing columns to default + all tenant DBs")
+    sub.add_parser("pg-migrate",
+                   help="Copy all SQLite books to PostgreSQL (BIZCLINIK_DB_BACKEND=postgres)")
 
     return p
 
@@ -298,6 +323,7 @@ HANDLERS = {
     "api-key-create": cmd_api_key_create,
     "api-key-list": cmd_api_key_list,
     "migrate": cmd_migrate,
+    "pg-migrate": cmd_pg_migrate,
 }
 
 

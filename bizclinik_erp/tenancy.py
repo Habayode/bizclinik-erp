@@ -97,11 +97,16 @@ def _control_db_path() -> Path:
 
 
 def _control_factory():
+    from .dbbackend import is_sqlite, make_url
     path = str(_control_db_path())
     fac = _control_factories.get(path)
     if fac is None:
-        Path(path).parent.mkdir(parents=True, exist_ok=True)
-        eng = create_engine(f"sqlite:///{path}", future=True)
+        url = make_url(path)
+        if is_sqlite():
+            Path(path).parent.mkdir(parents=True, exist_ok=True)
+            eng = create_engine(url, future=True)
+        else:
+            eng = create_engine(url, future=True, pool_pre_ping=True)
         ControlBase.metadata.create_all(eng)
         _control_engines[path] = eng
         fac = sessionmaker(bind=eng, expire_on_commit=False, future=True)

@@ -29,6 +29,9 @@ class Base(DeclarativeBase):
 
 @event.listens_for(Engine, "connect")
 def _sqlite_pragmas(dbapi_conn, _conn_record):
+    # Only meaningful for SQLite — skip silently for Postgres connections.
+    if dbapi_conn.__class__.__module__.split(".")[0] not in ("sqlite3", "pysqlite2"):
+        return
     cur = dbapi_conn.cursor()
     cur.execute("PRAGMA foreign_keys=ON")
     cur.execute("PRAGMA journal_mode=WAL")
@@ -78,11 +81,17 @@ def _clear_caches() -> None:
 
 
 def get_engine() -> Engine:
+    from .dbbackend import is_sqlite, make_url
     path = _resolve_db_path()
     eng = _engines.get(path)
     if eng is None:
-        Path(path).parent.mkdir(parents=True, exist_ok=True)
-        eng = create_engine(f"sqlite:///{path}", future=True)
+        url = make_url(path)
+        if is_sqlite():
+            Path(path).parent.mkdir(parents=True, exist_ok=True)
+            eng = create_engine(url, future=True)
+        else:
+            # Postgres: keep connections healthy across idle periods.
+            eng = create_engine(url, future=True, pool_pre_ping=True)
         _engines[path] = eng
     return eng
 
