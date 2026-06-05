@@ -39,10 +39,74 @@ def _seed_customer_and_product():
         ))
 
 
+def _seed_bank_account() -> int:
+    """Return a usable bank account id — reuse a seeded one, else create one."""
+    from sqlalchemy import select
+    from bizclinik_erp.db import get_session
+    from bizclinik_erp.models import Account, BankAccount
+    with get_session() as s:
+        existing = s.execute(select(BankAccount)).scalars().first()
+        if existing:
+            return existing.id
+        acct = s.execute(select(Account).where(Account.is_postable == True)  # noqa: E712
+                         ).scalars().first()
+        ba = BankAccount(code="BANKFEED_TEST", name="Main Current",
+                         bank="GTBank", gl_account_id=acct.id)
+        s.add(ba)
+        s.flush()
+        return ba.id
+
+
 def test_health_no_auth(client):
     resp = client.get("/health")
     assert resp.status_code == 200
     assert resp.json() == {"status": "ok"}
+
+
+def test_bank_feed_ingest_lines(client):
+    bank_id = _seed_bank_account()
+    payload = {
+        "bank_account_id": bank_id,
+        "period_start": date(2026, 5, 1).isoformat(),
+        "period_end": date(2026, 5, 31).isoformat(),
+        "opening_balance": 0.0,
+        "closing_balance": 4500.0,
+        "source": "mono-aggregator",
+        "lines": [
+            {"txn_date": date(2026, 5, 2).isoformat(), "description": "Inflow",
+             "amount": 5000.0, "reference": "R1"},
+            {"txn_date": date(2026, 5, 5).isoformat(), "description": "Charge",
+             "amount": -500.0, "reference": "R2"},
+        ],
+    }
+    resp = client.post("/api/v1/bank/statements", json=payload, headers=AUTH)
+    assert resp.status_code == 201, resp.text
+    body = resp.json()
+    assert body["lines_imported"] == 2
+    assert body["statement_id"] > 0
+    assert "summary" in body
+
+
+def test_bank_feed_ingest_csv(client):
+    bank_id = _seed_bank_account()
+    csv = ("Trans Date,Narration,Debit,Credit\n"
+           "02/05/2026,POS,1000,\n"
+           "04/05/2026,Transfer in,,7500\n")
+    payload = {
+        "bank_account_id": bank_id,
+        "period_start": date(2026, 5, 1).isoformat(),
+        "period_end": date(2026, 5, 31).isoformat(),
+        "closing_balance": 6500.0,
+        "csv": csv,
+    }
+    resp = client.post("/api/v1/bank/statements", json=payload, headers=AUTH)
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["lines_imported"] == 2
+
+
+def test_bank_feed_requires_key(client):
+    resp = client.post("/api/v1/bank/statements", json={})
+    assert resp.status_code in (401, 403)
 
 
 def test_customers_requires_key(client):

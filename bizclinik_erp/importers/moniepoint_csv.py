@@ -22,29 +22,49 @@ _HEADER_ALIASES: dict[str, str] = {
     "date": "txn_date",
     "transaction date": "txn_date",
     "txn date": "txn_date",
-    "value date": "txn_date",
+    "trans date": "txn_date",       # GTBank
+    "tran date": "txn_date",        # FBN / FirstBank
+    "value date": "txn_date",       # Access / Zenith
+    "effective date": "txn_date",   # Zenith
     "posting date": "txn_date",
+    "booking date": "txn_date",
     "description": "description",
-    "narration": "description",
+    "narration": "description",     # Access / GTBank
     "details": "description",
+    "transaction details": "description",
+    "particulars": "description",   # Zenith
     "remarks": "description",
+    "memo": "description",
     "reference": "reference",
     "ref": "reference",
     "ref no": "reference",
     "reference number": "reference",
     "transaction reference": "reference",
+    "transaction id": "reference",
+    "instrument no": "reference",   # FBN
+    "cheque no": "reference",
     "debit": "debit",
     "amount debited": "debit",
+    "debit amount": "debit",
     "withdrawal": "debit",
     "withdrawals": "debit",
+    "withdrawal amt": "debit",
     "money out": "debit",
+    "dr": "debit",
     "credit": "credit",
     "amount credited": "credit",
+    "credit amount": "credit",
     "deposit": "credit",
     "deposits": "credit",
+    "deposit amt": "credit",
     "money in": "credit",
+    "cr": "credit",
+    "amount": "amount",             # single signed-amount column
+    "transaction amount": "amount",
     "balance": "balance",
     "running balance": "balance",
+    "available balance": "balance",
+    "ledger balance": "balance",
 }
 
 # Date formats we'll try, in order of preference.

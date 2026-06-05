@@ -331,6 +331,75 @@ async def create_invoice(payload: InvoiceCreateIn) -> InvoiceDetailOut:
     return InvoiceDetailOut(**detail)
 
 
+# ---- bank feed (bank/aggregator -> ERP) -------------------------------------
+
+
+class BankStatementLineIn(BaseModel):
+    txn_date: date
+    description: str = ""
+    amount: float = Field(..., description="Signed: +credit / -debit")
+    reference: Optional[str] = None
+
+
+class BankStatementIn(BaseModel):
+    bank_account_id: int
+    period_start: date
+    period_end: date
+    opening_balance: float = 0.0
+    closing_balance: float = 0.0
+    source: str = "bank-feed"
+    auto_match: bool = True
+    lines: list[BankStatementLineIn] = Field(default_factory=list)
+    csv: Optional[str] = Field(
+        default=None,
+        description="Raw CSV from the bank, parsed server-side. Alternative to 'lines'.",
+    )
+
+
+@app.post("/api/v1/bank/statements", status_code=201,
+          dependencies=[Depends(require_api_key)])
+async def ingest_bank_statement(payload: BankStatementIn) -> dict:
+    """Link a bank statement straight into reconciliation from the bank side.
+
+    A bank, an open-banking aggregator (Mono/Okra), or a Moniepoint export can
+    POST a statement here: either structured ``lines`` or a raw ``csv`` blob
+    (parsed by the bank-agnostic parser). We create the statement, import the
+    lines, optionally auto-match against the GL, and return a reconciliation
+    summary. This is the inbound counterpart to manual CSV upload in the UI.
+    """
+    from bizclinik_erp.services import recon
+    from bizclinik_erp.importers.bank_statement import parse_bank_statement
+
+    if payload.csv:
+        rows = parse_bank_statement(payload.csv)
+    else:
+        rows = [{"txn_date": ln.txn_date, "description": ln.description,
+                 "amount": ln.amount, "reference": ln.reference}
+                for ln in payload.lines]
+    if not rows:
+        raise HTTPException(status_code=400,
+                            detail="Provide a non-empty 'lines' array or a 'csv' blob.")
+
+    with get_session() as s:
+        try:
+            stmt = recon.create_statement(
+                s, bank_account_id=payload.bank_account_id,
+                period_start=payload.period_start, period_end=payload.period_end,
+                opening_balance=payload.opening_balance,
+                closing_balance=payload.closing_balance,
+                source_file=payload.source,
+            )
+            imported = recon.import_statement_lines(s, stmt.id, rows)
+            matched = recon.auto_match(s, stmt.id) if payload.auto_match else {}
+            summary = recon.reconciliation_summary(s, stmt.id)
+            sid = stmt.id
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return {"statement_id": sid, "lines_imported": imported,
+            "auto_match": matched, "summary": summary}
+
+
 # ---- reports ----------------------------------------------------------------
 
 
