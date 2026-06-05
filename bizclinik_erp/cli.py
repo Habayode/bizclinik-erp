@@ -163,6 +163,22 @@ def cmd_list_accounts(_args) -> int:
     return 0
 
 
+def cmd_tenant_create(args) -> int:
+    from .tenancy import create_tenant
+    import os
+    pw = args.admin_password or os.environ.get("BIZCLINIK_APP_PASSWORD") or "admin"
+    t = create_tenant(args.slug, args.name, admin_password=pw)
+    print(f"Created tenant {t['slug']} -> {t['db_path']}")
+    print("Admin login: username 'admin'")
+    return 0
+
+
+def cmd_tenant_list(_args) -> int:
+    from .tenancy import list_tenants
+    _dump(list_tenants(active_only=False))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="bizclinik_erp",
                                  description="BizClinik ERP — CLI")
@@ -196,6 +212,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_pdf.add_argument("invoice_id")
     p_pdf.add_argument("out")
 
+    p_tc = sub.add_parser("tenant-create", help="Register + bootstrap a tenant")
+    p_tc.add_argument("slug")
+    p_tc.add_argument("name")
+    p_tc.add_argument("--admin-password", help="Tenant admin password (default env / 'admin')")
+
+    sub.add_parser("tenant-list", help="List registered tenants")
+
     return p
 
 
@@ -212,6 +235,8 @@ HANDLERS = {
     "vat-return": cmd_vat_return,
     "invoice-pdf": cmd_invoice_pdf,
     "list-accounts": cmd_list_accounts,
+    "tenant-create": cmd_tenant_create,
+    "tenant-list": cmd_tenant_list,
 }
 
 

@@ -177,14 +177,60 @@ def _legacy_password_screen() -> None:
 # ---- public API -----------------------------------------------------------
 
 
-def require_login() -> None:
-    """Top of every page. Renders lock screen + st.stop() until signed in.
+_TENANT_KEY = "_bizclinik_tenant"
 
-    Two modes, transparent to the page:
-      • If any User row exists → username + password form.
-      • Otherwise if BIZCLINIK_APP_PASSWORD is set → legacy single-password.
+
+def active_tenant() -> Optional[str]:
+    return st.session_state.get(_TENANT_KEY)
+
+
+def _tenant_picker() -> None:
+    """Render the business/tenant chooser before login. st.stop()s until one
+    is selected. Only shown when >= 1 tenant is registered."""
+    from . import tenancy
+    _render_brand_card()
+    col_l, col_c, col_r = st.columns([1, 2, 1])
+    with col_c:
+        st.markdown("#### Choose a business")
+        tenants = tenancy.list_tenants()
+        labels = {f"{t['name']}  ·  {t['slug']}": t["slug"] for t in tenants}
+        sel = st.selectbox("Business", list(labels.keys()))
+        if st.button("Continue", type="primary", use_container_width=True):
+            st.session_state[_TENANT_KEY] = labels[sel]
+            # New tenant => drop any prior login state.
+            for k in (_USER_KEY, _USERNAME_KEY, _ROLE_KEY, _TOKEN_KEY, _LEGACY_KEY):
+                st.session_state.pop(k, None)
+            st.rerun()
+    st.stop()
+
+
+def _apply_tenant() -> None:
+    """Resolve + activate the tenant for this script run. No-op (legacy single
+    DB) when no tenants are registered."""
+    from . import tenancy
+    if not tenancy.has_tenants():
+        tenancy.set_active(None)
+        return
+    sel = st.session_state.get(_TENANT_KEY)
+    if not sel:
+        _tenant_picker()  # st.stop() inside
+        return
+    tenancy.set_active(sel)
+
+
+def require_login() -> None:
+    """Top of every page. Picks a tenant (if multi-tenant), then renders the
+    lock screen + st.stop() until signed in.
+
+    Modes, transparent to the page:
+      • Multi-tenant (>= 1 tenant registered) → tenant picker, then per-tenant
+        username + password.
+      • Single-tenant with users → username + password.
+      • Single-tenant, BIZCLINIK_APP_PASSWORD set → legacy single-password.
       • Otherwise (dev) → no-op.
     """
+    _apply_tenant()
+
     if _any_users_configured():
         if st.session_state.get(_USER_KEY):
             return
@@ -222,6 +268,6 @@ def render_logout_in_sidebar() -> None:
                 except Exception:
                     pass
             for k in (_LEGACY_KEY, _USER_KEY, _USERNAME_KEY, _ROLE_KEY,
-                       _TOKEN_KEY, _FAIL_KEY):
+                       _TOKEN_KEY, _FAIL_KEY, _TENANT_KEY):
                 st.session_state.pop(k, None)
             st.rerun()

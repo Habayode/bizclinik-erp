@@ -1,13 +1,20 @@
-"""SQLAlchemy 2.0 engine + session factory.
+"""SQLAlchemy 2.0 engine + session factory — tenant-aware.
 
-Single SQLite database, WAL mode, foreign keys enforced. The engine is
-created lazily and cached so test runs can override BIZCLINIK_DB_PATH.
+Each call to get_session()/get_engine() resolves the active database from a
+contextvar set per request (Streamlit script run / API request). When no
+tenant is active the legacy single database at BIZCLINIK_DB_PATH is used, so
+the original single-tenant deployment keeps working unchanged.
+
+Engines + session factories are cached per resolved DB path. `cache_clear`
+attributes are preserved on get_engine / _session_factory so the test
+fixtures (which call `.cache_clear()`) keep working after the refactor.
 """
 from __future__ import annotations
 
+import contextvars
 from contextlib import contextmanager
-from functools import lru_cache
-from typing import Iterator
+from pathlib import Path
+from typing import Iterator, Optional
 
 from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine
@@ -17,7 +24,7 @@ from .config import get_settings
 
 
 class Base(DeclarativeBase):
-    """Single declarative base for all ORM models."""
+    """Single declarative base for all per-tenant ORM models."""
 
 
 @event.listens_for(Engine, "connect")
@@ -29,25 +36,74 @@ def _sqlite_pragmas(dbapi_conn, _conn_record):
     cur.close()
 
 
-@lru_cache(maxsize=1)
+# ---- active-tenant context ------------------------------------------------
+
+# Holds the active database file path for the current execution context.
+# None  -> use the legacy BIZCLINIK_DB_PATH (single-tenant / default).
+_active_db_path: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
+    "bizclinik_active_db_path", default=None
+)
+
+
+def set_active_db_path(path: Optional[str]) -> None:
+    """Set (or clear with None) the active database for this context."""
+    _active_db_path.set(str(path) if path else None)
+
+
+def get_active_db_path() -> Optional[str]:
+    return _active_db_path.get()
+
+
+def _resolve_db_path() -> str:
+    active = _active_db_path.get()
+    if active:
+        return active
+    return str(get_settings().db_path)
+
+
+# ---- per-path engine + factory caches -------------------------------------
+
+_engines: dict[str, Engine] = {}
+_factories: dict[str, "sessionmaker[Session]"] = {}
+
+
+def _clear_caches() -> None:
+    for eng in _engines.values():
+        try:
+            eng.dispose()
+        except Exception:
+            pass
+    _engines.clear()
+    _factories.clear()
+
+
 def get_engine() -> Engine:
-    settings = get_settings()
-    return create_engine(settings.db_url, future=True)
+    path = _resolve_db_path()
+    eng = _engines.get(path)
+    if eng is None:
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        eng = create_engine(f"sqlite:///{path}", future=True)
+        _engines[path] = eng
+    return eng
 
 
-@lru_cache(maxsize=1)
-def _session_factory() -> sessionmaker[Session]:
-    return sessionmaker(bind=get_engine(), expire_on_commit=False, future=True)
+def _session_factory() -> "sessionmaker[Session]":
+    path = _resolve_db_path()
+    fac = _factories.get(path)
+    if fac is None:
+        fac = sessionmaker(bind=get_engine(), expire_on_commit=False, future=True)
+        _factories[path] = fac
+    return fac
+
+
+# Preserve the lru_cache-style interface the test fixtures rely on.
+get_engine.cache_clear = _clear_caches          # type: ignore[attr-defined]
+_session_factory.cache_clear = _clear_caches    # type: ignore[attr-defined]
 
 
 @contextmanager
 def get_session() -> Iterator[Session]:
-    """Context manager that yields a session and commits on success.
-
-    Usage:
-        with get_session() as s:
-            s.add(Customer(name="Foo"))
-    """
+    """Yield a session bound to the active tenant DB; commit on success."""
     session = _session_factory()()
     try:
         yield session
@@ -60,14 +116,13 @@ def get_session() -> Iterator[Session]:
 
 
 def init_db() -> None:
-    """Create all tables that aren't there yet. Safe to call repeatedly."""
-    # Import here so the model modules register with Base before create_all.
-    from . import models  # noqa: F401
+    """Create all tables on the active DB. Safe to call repeatedly."""
+    from . import models  # noqa: F401  (register models with Base)
     Base.metadata.create_all(get_engine())
 
 
 def reset_db() -> None:
-    """DROP every table, then recreate. Destructive — use only for fresh setup."""
+    """DROP + recreate all tables on the active DB. Destructive."""
     from . import models  # noqa: F401
     Base.metadata.drop_all(get_engine())
     Base.metadata.create_all(get_engine())
