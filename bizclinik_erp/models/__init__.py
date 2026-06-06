@@ -51,6 +51,16 @@ from .crm import (
     Lead,
     LeadStatus,
 )
+from .hr import (
+    ApplicationStage,
+    Candidate,
+    JobApplication,
+    JobOpening,
+    LeaveRequest,
+    LeaveStatus,
+    LeaveType,
+    OpeningStatus,
+)
 
 __all__ = [
     # master
@@ -84,4 +94,7 @@ __all__ = [
     "InvoiceTemplate",
     # CRM
     "Lead", "LeadStatus", "Deal", "DealStage", "Activity", "ActivityKind",
+    # HR — recruitment + leave
+    "JobOpening", "OpeningStatus", "Candidate", "JobApplication",
+    "ApplicationStage", "LeaveRequest", "LeaveType", "LeaveStatus",
 ]

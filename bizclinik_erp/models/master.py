@@ -195,3 +195,8 @@ class Employee(Base):
     pension_employer_rate: Mapped[float] = mapped_column(Float, default=0.10)
     hire_date: Mapped[Optional[datetime]] = mapped_column(DateTime)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # HR fields (added with the HR module).
+    department: Mapped[Optional[str]] = mapped_column(String(120))
+    job_title: Mapped[Optional[str]] = mapped_column(String(120))
+    employment_type: Mapped[Optional[str]] = mapped_column(String(40))  # full-time, contract…
+    annual_leave_days: Mapped[float] = mapped_column(Float, default=20.0)
