@@ -96,3 +96,33 @@ def test_create_tenant_uses_ensure_database_hook():
     assert "is_postgres()" in src
     assert "ensure_database" in src
     assert "pg_dbname_for" in src
+
+
+def test_migrate_cli_covers_default_and_tenants(monkeypatch, tmp_path):
+    """`bizclinik_erp migrate` must run init_db on the default DB AND every
+    tenant DB (this is what update.sh relies on to apply new tables/columns to
+    all tenants, not just the legacy default)."""
+    monkeypatch.setenv("BIZCLINIK_DB_PATH", str(tmp_path / "legacy.db"))
+    from sqlalchemy import inspect
+    from bizclinik_erp.config import get_settings
+    from bizclinik_erp.db import get_engine, _session_factory
+    from bizclinik_erp import tenancy, db as _db
+
+    def _rc():
+        get_settings.cache_clear(); get_engine.cache_clear(); _session_factory.cache_clear()
+
+    _rc(); tenancy._reset_control_cache()
+    from bizclinik_erp.services.bootstrap import bootstrap
+    bootstrap(admin_password="x")
+    tenancy.create_tenant("acme", "Acme Ltd", admin_password="pw")
+
+    # Run the CLI command and confirm it succeeds.
+    from bizclinik_erp.cli import cmd_migrate
+    assert cmd_migrate(None) == 0
+
+    # The tenant DB carries the HR tables (proves the tenant was migrated).
+    _db.set_active_db_path(tenancy.get_tenant("acme")["db_path"]); _rc()
+    names = set(inspect(get_engine()).get_table_names())
+    assert {"hr_job_opening", "hr_candidate", "hr_leave_request"} <= names
+
+    _db.set_active_db_path(None); _rc(); tenancy._reset_control_cache()
