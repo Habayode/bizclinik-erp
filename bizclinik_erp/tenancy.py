@@ -180,6 +180,14 @@ def create_tenant(slug: str, name: str, *, admin_password: str) -> dict:
         s.add(Tenant(slug=slug, name=name.strip(), db_path=path))
         s.commit()
 
+    # On Postgres, the per-tenant database must be created explicitly before we
+    # can bootstrap its schema (SQLite auto-creates its file, so this is a no-op
+    # there).
+    from . import dbbackend
+    if dbbackend.is_postgres():
+        from .services.pg_migrate import ensure_database
+        ensure_database(dbbackend.pg_dbname_for(path))
+
     # Bootstrap the tenant DB inside its own active-path context.
     token = _db._active_db_path.set(path)
     try:

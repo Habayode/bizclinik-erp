@@ -73,3 +73,26 @@ def test_idempotent(fresh_db):
     # No ADD COLUMN statements (everything already present).
     adds = [a for a in applied if a.startswith("ALTER")]
     assert adds == []
+
+
+def test_ensure_database_noop_on_sqlite():
+    """ensure_database is a no-op (returns False) when not on Postgres."""
+    from bizclinik_erp.services.pg_migrate import ensure_database
+    from bizclinik_erp import dbbackend
+    assert dbbackend.is_postgres() is False
+    assert ensure_database("bizclinik_t_whatever") is False
+
+
+def test_create_tenant_uses_ensure_database_hook():
+    """Regression: create_tenant must provision the per-tenant Postgres DB.
+
+    The live Postgres CREATE DATABASE path is exercised in production
+    provisioning; here we assert the wiring exists so it can't silently
+    regress — create_tenant references ensure_database + pg_dbname_for guarded
+    by is_postgres()."""
+    import inspect
+    from bizclinik_erp import tenancy
+    src = inspect.getsource(tenancy.create_tenant)
+    assert "is_postgres()" in src
+    assert "ensure_database" in src
+    assert "pg_dbname_for" in src

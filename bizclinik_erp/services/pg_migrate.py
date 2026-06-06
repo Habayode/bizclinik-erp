@@ -80,6 +80,31 @@ def provision_databases() -> list[str]:
     return created
 
 
+def ensure_database(dbname: str) -> bool:
+    """CREATE DATABASE ``dbname`` if it doesn't already exist.
+
+    Returns True if it was created, False if it already existed or the backend
+    is not Postgres (SQLite auto-creates its file, so nothing to do). Used when
+    a new tenant is registered at runtime so its per-tenant Postgres database
+    exists before we bootstrap its schema.
+    """
+    if not dbbackend.is_postgres():
+        return False
+    admin = create_engine(dbbackend.pg_admin_url(), isolation_level="AUTOCOMMIT",
+                          future=True)
+    try:
+        with admin.connect() as c:
+            exists = c.execute(
+                text("SELECT 1 FROM pg_database WHERE datname = :n"),
+                {"n": dbname}).scalar()
+            if exists:
+                return False
+            c.execute(text(f'CREATE DATABASE "{dbname}"'))
+            return True
+    finally:
+        admin.dispose()
+
+
 def _reset_sequences(dst_engine, metadata) -> None:
     """After bulk insert with explicit ids, advance each table's id sequence."""
     with dst_engine.begin() as conn:
