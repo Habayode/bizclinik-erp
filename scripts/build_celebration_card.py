@@ -1,27 +1,28 @@
-"""Render the BizClinik ERP celebration card (PNG + PDF).
+"""Render a BizClinik ERP card (PNG + PDF) — brand: dark navy + teal, rounded
+panels. Footer attributes the build to HAG_Ai (provider). No public ERP URL.
 
-Brand: dark navy canvas, bright teal accent, rounded panels. Footer attributes
-the build to HAG_Ai (provider) for BizClinik (client). No public ERP URL.
+Two presets:
+  expanded  — milestone card highlighting recent additions (NEW badges).
+  fresh     — clean product introduction, full capabilities, no new/old framing.
 
 Usage:
-    python scripts/build_celebration_card.py [out_basename]
-Outputs <out_basename>.png and <out_basename>.pdf next to the repo root.
+  python scripts/build_celebration_card.py [--variant expanded|fresh]
+                                           [--name BRAND] [--out BASENAME]
+The brand word is rendered white + " ERP" in teal. --name lets you set the
+product brand at render time without changing any code (defaults to BizClinik).
 """
 from __future__ import annotations
 
-import sys
+import argparse
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parent.parent
-OUT_BASE = ROOT / (sys.argv[1] if len(sys.argv) > 1
-                   else "BizClinik_ERP_Celebration_Card_v3")
 
 W, H = 1200, 1660
 MARGIN = 88
 
-# ---- palette ---------------------------------------------------------------
 BG_TOP = (10, 14, 26)
 BG_BOT = (12, 20, 46)
 WHITE = (245, 248, 252)
@@ -40,27 +41,26 @@ def font(name: str, size: int) -> ImageFont.FreeTypeFont:
     return ImageFont.truetype(f"{FONTS}/{name}", size)
 
 
-f_black = lambda s: font("seguibl.ttf", s)      # heavy
+f_black = lambda s: font("seguibl.ttf", s)
 f_bold = lambda s: font("segoeuib.ttf", s)
-f_semi = lambda s: font("segoeuisl.ttf", s)     # semilight
 f_reg = lambda s: font("segoeui.ttf", s)
 f_light = lambda s: font("segoeuil.ttf", s)
 
 
-def vgradient(w: int, h: int, top, bot) -> Image.Image:
+def vgradient(w, h, top, bot):
     base = Image.new("RGB", (w, h), top)
     px = base.load()
     for y in range(h):
         t = y / max(1, h - 1)
-        r = int(top[0] + (bot[0] - top[0]) * t)
-        g = int(top[1] + (bot[1] - top[1]) * t)
-        b = int(top[2] + (bot[2] - top[2]) * t)
+        px_row = (int(top[0] + (bot[0] - top[0]) * t),
+                  int(top[1] + (bot[1] - top[1]) * t),
+                  int(top[2] + (bot[2] - top[2]) * t))
         for x in range(w):
-            px[x, y] = (r, g, b)
+            px[x, y] = px_row
     return base
 
 
-def text_w(d: ImageDraw.ImageDraw, s: str, fnt) -> int:
+def tw(d, s, fnt):
     return d.textbbox((0, 0), s, font=fnt)[2]
 
 
@@ -68,7 +68,7 @@ def spaced(d, xy, s, fnt, fill, tracking=6):
     x, y = xy
     for ch in s:
         d.text((x, y), ch, font=fnt, fill=fill)
-        x += text_w(d, ch, fnt) + tracking
+        x += tw(d, ch, fnt) + tracking
     return x
 
 
@@ -76,11 +76,10 @@ def wrap(d, s, fnt, max_w):
     words, lines, cur = s.split(), [], ""
     for w in words:
         trial = (cur + " " + w).strip()
-        if text_w(d, trial, fnt) <= max_w:
+        if tw(d, trial, fnt) <= max_w:
             cur = trial
         else:
-            lines.append(cur)
-            cur = w
+            lines.append(cur); cur = w
     if cur:
         lines.append(cur)
     return lines
@@ -92,23 +91,20 @@ def card(d, x, y, w, h, title, sub, badge=None):
     pad = 26
     d.text((x + pad, y + 24), title, font=f_bold(34), fill=TEAL)
     if badge:
-        bx = x + pad + text_w(d, title, f_bold(34)) + 16
-        bw = text_w(d, badge, f_bold(18)) + 24
+        bx = x + pad + tw(d, title, f_bold(34)) + 16
+        bw = tw(d, badge, f_bold(18)) + 24
         d.rounded_rectangle([bx, y + 30, bx + bw, y + 58], radius=14,
                             fill=(20, 60, 54))
         d.text((bx + 12, y + 33), badge, font=f_bold(18), fill=TEAL)
-    # subtitle (wrap to card width)
     sy = y + 74
     for ln in wrap(d, sub, f_reg(23), w - 2 * pad):
         d.text((x + pad, sy), ln, font=f_reg(23), fill=MUTED)
         sy += 30
 
 
-def build():
+def render(out_base: Path, *, brand, eyebrow, subtitle, paragraph, cards,
+           pill, footer_right):
     img = vgradient(W, H, BG_TOP, BG_BOT)
-    d = ImageDraw.Draw(img)
-
-    # subtle corner glows
     glow = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     gd = ImageDraw.Draw(glow)
     gd.ellipse([W - 380, -180, W + 120, 320], fill=(43, 226, 198, 22))
@@ -117,92 +113,120 @@ def build():
     d = ImageDraw.Draw(img)
 
     y = 96
-    # accent dots row
     for i, c in enumerate((TEAL, MAGENTA, ORANGE, TEAL)):
         cx = MARGIN + i * 34
         r = 9 if i != 3 else 6
         d.ellipse([cx, y, cx + r * 2, y + r * 2], fill=c)
 
-    # eyebrow
-    y = 168
-    spaced(d, (MARGIN, y), "HUGE SUCCESS  ·  EXPANDED", f_bold(22), TEAL, 5)
+    spaced(d, (MARGIN, 168), eyebrow, f_bold(22), TEAL, 5)
 
-    # title
-    y = 206
-    t1, t2 = "BizClinik ", "ERP"
-    tf = f_black(118)
-    d.text((MARGIN - 4, y), t1, font=tf, fill=WHITE)
-    d.text((MARGIN - 4 + text_w(d, t1, tf), y), t2, font=tf, fill=TEAL)
+    # title (auto-fit to width)
+    t1, t2 = brand + " ", "ERP"
+    size = 118
+    while size > 70:
+        tf = f_black(size)
+        if tw(d, t1 + t2, tf) <= W - 2 * MARGIN:
+            break
+        size -= 4
+    tf = f_black(size)
+    ty = 206 + (118 - size)  # keep baseline roughly stable
+    d.text((MARGIN - 4, ty), t1, font=tf, fill=WHITE)
+    d.text((MARGIN - 4 + tw(d, t1, tf), ty), t2, font=tf, fill=TEAL)
 
-    # subtitle line
-    y = 348
-    d.text((MARGIN, y), "now with HR & subscription plans.",
-           font=f_light(46), fill=PARA)
+    d.text((MARGIN, 348), subtitle, font=f_light(46), fill=PARA)
+    d.rounded_rectangle([MARGIN, 424, MARGIN + 96, 431], radius=3, fill=TEAL)
 
-    # teal underline
-    y = 424
-    d.rounded_rectangle([MARGIN, y, MARGIN + 96, y + 7], radius=3, fill=TEAL)
-
-    # paragraph
     y = 458
-    para = ("A full double-entry accounting platform — multi-business and "
-            "Nigeria-ready — reorganised into a grouped workspace: Finance & "
-            "Accounting, CRM, a complete HR suite, and System. Plan-based access "
-            "(Free · Starter · Business) gates premium features per tenant. Live "
-            "on PostgreSQL with encrypted off-site backups.")
-    for ln in wrap(d, para, f_reg(28), W - 2 * MARGIN):
+    for ln in wrap(d, paragraph, f_reg(28), W - 2 * MARGIN):
         d.text((MARGIN, y), ln, font=f_reg(28), fill=PARA)
         y += 40
 
-    # stat cards — 3 rows x 2
-    cards = [
-        ("Grouped workspace", "Finance · CRM · HR · System", None),
-        ("HR suite", "Employees · Recruitment · Leave · Payroll", "NEW"),
-        ("Plan tiers", "Free · Starter · Business · feature-gated", "NEW"),
-        ("169 tests", "Green on CI · books always balance", None),
-        ("PostgreSQL 16", "Database-per-tenant · auto tenant migrations", None),
-        ("Encrypted backups", "Nightly · off-site · disaster-ready", None),
-    ]
     gap = 28
     cw = (W - 2 * MARGIN - gap) // 2
     ch = 150
     y0 = y + 26
     for i, (t, s, b) in enumerate(cards):
         col, row = i % 2, i // 2
-        cx = MARGIN + col * (cw + gap)
-        cy = y0 + row * (ch + gap)
-        card(d, cx, cy, cw, ch, t, s, badge=b)
+        card(d, MARGIN + col * (cw + gap), y0 + row * (ch + gap), cw, ch, t, s, b)
 
-    # live pill (checkmark drawn as strokes — avoids font glyph gaps)
-    py = y0 + 3 * (ch + gap) + 8
-    label = "LIVE IN PRODUCTION"
+    rows = (len(cards) + 1) // 2
+    py = y0 + rows * (ch + gap) + 8
     pf = f_bold(26)
-    lw = text_w(d, label, pf)
+    lw = tw(d, pill, pf)
     pw = lw + 56 + 40
     d.rounded_rectangle([MARGIN, py, MARGIN + pw, py + 56], radius=28,
                         outline=TEAL, width=2)
-    d.text((MARGIN + 28, py + 12), label, font=pf, fill=TEAL)
+    d.text((MARGIN + 28, py + 12), pill, font=pf, fill=TEAL)
     ckx, cky = MARGIN + 28 + lw + 18, py + 28
     d.line([(ckx, cky), (ckx + 8, cky + 9)], fill=TEAL, width=4)
     d.line([(ckx + 8, cky + 9), (ckx + 22, cky - 10)], fill=TEAL, width=4)
 
-    # footer
     fy = H - 96
     d.text((MARGIN, fy), "HAG", font=f_black(46), fill=WHITE)
-    hw = text_w(d, "HAG", f_black(46))
+    hw = tw(d, "HAG", f_black(46))
     d.text((MARGIN + hw, fy), "_Ai", font=f_black(46), fill=TEAL)
-
-    foot = "Built & operated by HAG_Ai for BizClinik  ·  Lagos · 2026"
     ff = f_reg(22)
-    d.text((W - MARGIN - text_w(d, foot, ff), fy + 18), foot, font=ff, fill=MUTED)
+    d.text((W - MARGIN - tw(d, footer_right, ff), fy + 18), footer_right,
+           font=ff, fill=MUTED)
 
-    png = OUT_BASE.with_suffix(".png")
-    pdf = OUT_BASE.with_suffix(".pdf")
+    png, pdf = out_base.with_suffix(".png"), out_base.with_suffix(".pdf")
     img.save(png, "PNG")
     img.convert("RGB").save(pdf, "PDF", resolution=150.0)
     print("wrote", png, f"({png.stat().st_size // 1024} KB)")
     print("wrote", pdf, f"({pdf.stat().st_size // 1024} KB)")
 
 
+PRESETS = {
+    "expanded": dict(
+        eyebrow="HUGE SUCCESS  ·  EXPANDED",
+        subtitle="now with HR & subscription plans.",
+        paragraph=("A full double-entry accounting platform — multi-business "
+                   "and Nigeria-ready — reorganised into a grouped workspace: "
+                   "Finance & Accounting, CRM, a complete HR suite, and System. "
+                   "Plan-based access (Free · Starter · Business) gates premium "
+                   "features per tenant. Live on PostgreSQL with encrypted "
+                   "off-site backups."),
+        cards=[
+            ("Grouped workspace", "Finance · CRM · HR · System", None),
+            ("HR suite", "Employees · Recruitment · Leave · Payroll", "NEW"),
+            ("Plan tiers", "Free · Starter · Business · feature-gated", "NEW"),
+            ("169 tests", "Green on CI · books always balance", None),
+            ("PostgreSQL 16", "Database-per-tenant · auto tenant migrations", None),
+            ("Encrypted backups", "Nightly · off-site · disaster-ready", None),
+        ],
+        pill="LIVE IN PRODUCTION",
+        footer_right="Built & operated by HAG_Ai for BizClinik  ·  Lagos · 2026",
+    ),
+    "fresh": dict(
+        eyebrow="NIGERIA-READY  ·  DOUBLE-ENTRY ERP",
+        subtitle="Run your whole business in one place.",
+        paragraph=("A complete accounting and business-management platform for "
+                   "Nigerian SMEs. Keep proper double-entry books on every "
+                   "transaction, manage operations and people, and see the full "
+                   "picture in real time — across multiple businesses, on plans "
+                   "that scale with you."),
+        cards=[
+            ("Finance & Accounting", "Sales · purchases · inventory · banking · GL", None),
+            ("Tax & compliance", "VAT · graduated PAYE · WHT · FIRS e-invoice", None),
+            ("People & HR", "Employees · recruitment · leave · payroll", None),
+            ("CRM", "Leads · pipeline · follow-ups", None),
+            ("Reports & insight", "P&L · balance sheet · budgets · statements", None),
+            ("Secure & multi-tenant", "PostgreSQL · per-tenant · encrypted backups", None),
+        ],
+        pill="LIVE IN PRODUCTION",
+        footer_right="Built & operated by HAG_Ai  ·  Lagos · 2026",
+    ),
+}
+
+
 if __name__ == "__main__":
-    build()
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--variant", choices=list(PRESETS), default="expanded")
+    ap.add_argument("--name", default="BizClinik", help="Product brand word")
+    ap.add_argument("--out", default=None, help="Output basename (no extension)")
+    a = ap.parse_args()
+    preset = PRESETS[a.variant]
+    out = Path(a.out) if a.out else ROOT / f"BizClinik_ERP_Celebration_Card_{a.variant}"
+    if not out.is_absolute():
+        out = ROOT / out
+    render(out, brand=a.name, **preset)
