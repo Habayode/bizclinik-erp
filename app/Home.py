@@ -89,6 +89,7 @@ NAV = {
         _page("pages/16_Data.py", "Data", "🗄️"),
         _page("pages/21_Tenants.py", "Tenants", "🏢"),
         _page("pages/22_Billing.py", "Billing", "💳"),
+        _page("pages/27_User_Manual.py", "User Manual", "📖"),
     ],
 }
 
