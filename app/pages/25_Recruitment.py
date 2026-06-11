@@ -47,15 +47,19 @@ with tab_open:
                   "location": o.location or "", "type": o.employment_type or "",
                   "headcount": o.headcount, "status": o.status.value} for o in ops]
     if orows:
-        st.dataframe(pd.DataFrame(orows), hide_index=True, width="stretch")
-        cc1, cc2 = st.columns(2)
-        op_id = cc1.number_input("Opening id", min_value=1, step=1, key="op_id")
-        new_status = cc2.selectbox("Set status", [s.value for s in OpeningStatus],
-                                   key="op_status")
-        if st.button("Update status", key="op_btn"):
-            with get_session() as s:
-                hr.set_opening_status(s, int(op_id), OpeningStatus(new_status))
-            st.success(f"Opening {int(op_id)} → {new_status}"); st.rerun()
+        sel_o = ui.pick_row(pd.DataFrame(orows), key="op_pick")
+        if sel_o is not None:
+            cc1, cc2 = st.columns(2)
+            new_status = cc1.selectbox("Set status", [s.value for s in OpeningStatus],
+                                       key="op_status")
+            if cc2.button(f"Update “{sel_o['title']}”", key="op_btn"):
+                with get_session() as s:
+                    hr.set_opening_status(s, int(sel_o["id"]),
+                                          OpeningStatus(new_status))
+                ui.flash(f"Opening “{sel_o['title']}” → {new_status}")
+                st.rerun()
+        else:
+            st.caption("Select an opening to change its status.")
     else:
         st.caption("No openings yet — create one below.")
 
@@ -76,7 +80,7 @@ with tab_open:
                                       location=loc or None, employment_type=etype,
                                       headcount=int(hc), description=desc or None,
                                       owner_user_id=uid)
-                st.success("Opening created."); st.rerun()
+                ui.flash("Opening created."); st.rerun()
 
 
 # --------------------------------------------------------------------------- #
@@ -100,7 +104,7 @@ with tab_cand:
                     hr.add_candidate(s, name=name, email=email or None,
                                      phone=phone or None, source=source or None,
                                      resume_url=resume or None)
-                st.success("Candidate added."); st.rerun()
+                ui.flash("Candidate added."); st.rerun()
 
     st.divider()
     with get_session() as s:
@@ -108,21 +112,24 @@ with tab_cand:
         crows = [{"id": c.id, "name": c.name, "email": c.email or "",
                   "phone": c.phone or "", "source": c.source or ""} for c in cands]
     if crows:
-        st.dataframe(pd.DataFrame(crows), hide_index=True, width="stretch")
+        sel_c = ui.pick_row(pd.DataFrame(crows), key="cand_pick")
         st.markdown("##### File an application")
         with get_session() as s:
             ops = hr.list_openings(s, open_only=True)
-            op_opts = {f"{o.title} (id {o.id})": o.id for o in ops}
-        if op_opts:
-            ac1, ac2 = st.columns(2)
-            cand_id = ac1.number_input("Candidate id", min_value=1, step=1, key="ap_cand")
-            op_label = ac2.selectbox("Opening", list(op_opts.keys()), key="ap_open")
-            if st.button("Apply to opening", key="ap_btn"):
-                with get_session() as s:
-                    hr.apply(s, opening_id=op_opts[op_label], candidate_id=int(cand_id))
-                st.success("Application filed."); st.rerun()
-        else:
+            op_opts = {o.title: o.id for o in ops}
+        if not op_opts:
             st.caption("No open openings to apply to — open one first.")
+        elif sel_c is None:
+            st.caption("Select a candidate in the table to file an application.")
+        else:
+            ac1, ac2 = st.columns(2)
+            op_label = ac1.selectbox("Opening", list(op_opts.keys()), key="ap_open")
+            if ac2.button(f"Apply {sel_c['name']} → {op_label}", key="ap_btn"):
+                with get_session() as s:
+                    hr.apply(s, opening_id=op_opts[op_label],
+                             candidate_id=int(sel_c["id"]))
+                ui.flash(f"{sel_c['name']} applied to “{op_label}”.")
+                st.rerun()
     else:
         st.caption("No candidates yet.")
 
@@ -141,35 +148,46 @@ with tab_pipe:
                   "applied": a.applied_date,
                   "hired_emp_id": a.employee_id or ""} for a in apps]
     if arows:
-        st.dataframe(pd.DataFrame(arows), hide_index=True, width="stretch")
-        st.markdown("##### Move a stage")
-        mc1, mc2 = st.columns(2)
-        app_id = mc1.number_input("Application id", min_value=1, step=1, key="mv_app")
-        stage = mc2.selectbox("Stage", [s.value for s in ApplicationStage], key="mv_stage")
-        if st.button("Update stage", key="mv_app_btn"):
-            with get_session() as s:
-                hr.move_application(s, int(app_id), ApplicationStage(stage))
-            st.success(f"Application {int(app_id)} → {stage}"); st.rerun()
-
-        st.divider()
-        st.markdown("##### Hire a candidate")
-        st.caption("Creates an Employee from the candidate, marks the application "
-                   "HIRED and fills the opening. Payroll takes over from there.")
-        with st.form("hire"):
-            h1, h2, h3 = st.columns(3)
-            h_app = h1.number_input("Application id", min_value=1, step=1, key="hire_app")
-            h_gross = h2.number_input("Monthly gross (₦)", min_value=0.0, step=10000.0)
-            h_paye = h3.number_input("PAYE rate", min_value=0.0, max_value=1.0, step=0.01)
-            if st.form_submit_button("Hire", type="primary"):
+        sel_a = ui.pick_row(pd.DataFrame(arows), key="app_pick")
+        if sel_a is None:
+            st.caption("Select an application to move its stage or hire.")
+        else:
+            st.markdown(f"**Selected:** {sel_a['candidate']} → "
+                        f"“{sel_a['opening']}” ({sel_a['stage']})")
+            mc1, mc2 = st.columns(2)
+            stage = mc1.selectbox("Stage", [s.value for s in ApplicationStage],
+                                  key="mv_stage")
+            if mc2.button("Update stage", key="mv_app_btn"):
                 with get_session() as s:
-                    res = hr.hire_candidate(s, int(h_app), monthly_gross=h_gross,
-                                            paye_rate=h_paye)
-                if res.get("already_hired"):
-                    st.info(f"Already hired → employee #{res['employee_id']}.")
-                else:
-                    st.success(f"Hired → employee #{res['employee_id']}. "
-                               "See the Employees & Payroll pages.")
+                    hr.move_application(s, int(sel_a["id"]),
+                                        ApplicationStage(stage))
+                ui.flash(f"{sel_a['candidate']} → {stage}")
                 st.rerun()
+
+            st.divider()
+            st.markdown("##### Hire this candidate")
+            st.caption("Creates an Employee from the candidate, marks the "
+                       "application HIRED and fills the opening. Payroll takes "
+                       "over from there. PAYE is graduated automatically — only "
+                       "set a flat rate to override it.")
+            with st.form("hire"):
+                h1, h2 = st.columns(2)
+                h_gross = h1.number_input("Monthly gross (₦)", min_value=0.0,
+                                          step=10000.0)
+                h_paye = h2.number_input("Flat PAYE override (0 = graduated)",
+                                         min_value=0.0, max_value=1.0, step=0.01)
+                if st.form_submit_button(f"Hire {sel_a['candidate']}",
+                                         type="primary"):
+                    with get_session() as s:
+                        res = hr.hire_candidate(s, int(sel_a["id"]),
+                                                monthly_gross=h_gross,
+                                                paye_rate=h_paye)
+                    if res.get("already_hired"):
+                        ui.flash("Already hired — see Employees.", icon="ℹ️")
+                    else:
+                        ui.flash(f"Hired {sel_a['candidate']} 🎉 See Employees "
+                                 "& Payroll.")
+                    st.rerun()
     else:
         st.caption("No applications yet.")
 

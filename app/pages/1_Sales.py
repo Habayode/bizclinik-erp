@@ -99,7 +99,8 @@ with tab_inv:
         cust_opts = _customer_options(s)
         prods = _product_options(s)
     if not cust_opts:
-        st.info("No customers yet — add one on the Settings page or import data first.")
+        st.info("No customers yet.")
+        st.page_link("pages/17_Settings.py", label="➕ Add your first customer in Settings", icon="⚙️")
     else:
         with get_session() as s:
             from bizclinik_erp.models import Currency
@@ -242,7 +243,8 @@ with tab_so:
         cust_opts = _customer_options(s)
         prods = _product_options(s)
     if not cust_opts:
-        st.info("No customers yet — add one on the Settings page.")
+        st.info("No customers yet.")
+        st.page_link("pages/17_Settings.py", label="➕ Add a customer in Settings", icon="⚙️")
     else:
         with st.form("new_so"):
             sel_cust = st.selectbox("Customer", list(cust_opts.keys()), key="so_cust")

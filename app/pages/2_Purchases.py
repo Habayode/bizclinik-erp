@@ -87,7 +87,10 @@ with tab_bill:
             "total": b.grand_total, "paid": b.amount_paid,
             "outstanding": b.outstanding, "status": b.status.value,
         } for b in bills]
-    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch",
+                 column_config={"total": ui.money_col("total"),
+                                "paid": ui.money_col("paid"),
+                                "outstanding": ui.money_col("outstanding")})
 
     st.divider()
     st.subheader("New bill")
@@ -97,6 +100,7 @@ with tab_bill:
         exp_opts = _expense_account_options(s)
     if not sup_opts:
         st.info("No suppliers yet.")
+        st.page_link("pages/17_Settings.py", label="➕ Add your first supplier in Settings", icon="⚙️")
     else:
         with get_session() as s:
             from bizclinik_erp.models import Currency
@@ -183,7 +187,8 @@ with tab_po:
         sup_opts = _supplier_options(s)
         prods = _product_options(s)
     if not sup_opts:
-        st.info("No suppliers yet — add one on the Settings page.")
+        st.info("No suppliers yet.")
+        st.page_link("pages/17_Settings.py", label="➕ Add a supplier in Settings", icon="⚙️")
     else:
         with st.form("new_po"):
             sel_sup = st.selectbox("Supplier", list(sup_opts.keys()), key="po_sup")
@@ -236,7 +241,8 @@ with tab_pay:
             "bill": p.bill.number if p.bill else "",
             "amount": p.amount, "method": p.method, "status": p.status.value,
         } for p in pays]
-    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch",
+                 column_config={"amount": ui.money_col("amount")})
 
     st.divider()
     st.subheader("Record payment")

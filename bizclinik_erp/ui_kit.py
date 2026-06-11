@@ -247,11 +247,44 @@ footer { visibility: hidden; }
 
 
 def inject_brand() -> None:
-    """Inject the global CSS. Call once per page."""
+    """Inject the global CSS. Call once per page. Also drains any flash
+    message queued by ``flash()`` before the last rerun (as a toast), so
+    confirmations survive st.rerun() instead of vanishing."""
     css = _CSS
     for key, val in BRAND.items():
         css = css.replace(f"__{key.upper()}__", val)
     st.markdown(css, unsafe_allow_html=True)
+    msg = st.session_state.pop("_ui_flash", None)
+    if msg:
+        st.toast(msg.get("text", ""), icon=msg.get("icon"))
+
+
+def flash(text: str, icon: str = "✅") -> None:
+    """Queue a toast that shows AFTER the next rerun (st.success + st.rerun
+    wipes the message before anyone reads it; this survives)."""
+    st.session_state["_ui_flash"] = {"text": text, "icon": icon}
+
+
+def money_col(label: str):
+    """Consistent ₦ column for st.dataframe/data_editor column_config —
+    thousands separators via the 'localized' preset, ₦ carried in the label."""
+    if "₦" not in label:
+        label = f"{label} (₦)"
+    return st.column_config.NumberColumn(label, format="localized")
+
+
+def pick_row(df, *, key: str, column_config=None, height=None):
+    """Render a single-row-selectable dataframe; return the selected row
+    (as a pandas Series) or None. Replaces the old 'type the id' pattern."""
+    kwargs = {"height": height} if height is not None else {}
+    event = st.dataframe(
+        df, hide_index=True, width="stretch", key=key,
+        on_select="rerun", selection_mode="single-row",
+        column_config=column_config, **kwargs)
+    rows = event.selection.rows if event and event.selection else []
+    if rows:
+        return df.iloc[rows[0]]
+    return None
 
 
 def hero(title: str, subtitle: str = "", *,

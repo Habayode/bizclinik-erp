@@ -55,16 +55,20 @@ with tab_pipe:
                   "amount": d.amount, "expected close": d.expected_close}
                  for d in deals]
     if drows:
-        st.dataframe(pd.DataFrame(drows), hide_index=True, width="stretch")
-        cm1, cm2 = st.columns(2)
-        move_id = cm1.number_input("Deal id", min_value=1, step=1, key="mv_id")
-        new_stage = cm2.selectbox("Move to stage", [s.value for s in DealStage],
-                                  key="mv_stage")
-        if st.button("Update stage", key="mv_btn"):
-            with get_session() as s:
-                crm.move_stage(s, int(move_id), DealStage(new_stage))
-            st.success(f"Deal {int(move_id)} → {new_stage}")
-            st.rerun()
+        sel_d = ui.pick_row(pd.DataFrame(drows), key="deal_pick",
+                            column_config={"amount": ui.money_col("amount")})
+        if sel_d is not None:
+            cm1, cm2 = st.columns(2)
+            new_stage = cm1.selectbox("Move to stage",
+                                      [s.value for s in DealStage],
+                                      key="mv_stage")
+            if cm2.button(f"Move “{sel_d['title']}”", key="mv_btn"):
+                with get_session() as s:
+                    crm.move_stage(s, int(sel_d["id"]), DealStage(new_stage))
+                ui.flash(f"“{sel_d['title']}” → {new_stage}")
+                st.rerun()
+        else:
+            st.caption("Select a deal to move its stage.")
     else:
         st.caption("No open deals. Create one below or convert a lead.")
 
@@ -78,7 +82,7 @@ with tab_pipe:
                 with get_session() as s:
                     crm.create_deal(s, title=t, amount=a, stage=DealStage(stg),
                                     expected_close=ec, owner_user_id=uid)
-                st.success("Deal created."); st.rerun()
+                ui.flash("Deal created."); st.rerun()
 
 
 # --------------------------------------------------------------------------- #
@@ -101,7 +105,7 @@ with tab_leads:
                 with get_session() as s:
                     crm.create_lead(s, name=name, company=company, email=email,
                                     phone=phone, source=source, owner_user_id=uid)
-                st.success("Lead added."); st.rerun()
+                ui.flash("Lead added."); st.rerun()
 
     st.divider()
     with get_session() as s:
@@ -110,19 +114,23 @@ with tab_leads:
                   "email": l.email or "", "status": l.status.value,
                   "source": l.source or ""} for l in leads]
     if lrows:
-        st.dataframe(pd.DataFrame(lrows), hide_index=True, width="stretch")
+        sel_l = ui.pick_row(pd.DataFrame(lrows), key="lead_pick")
         st.markdown("##### Convert a lead → customer")
-        cc1, cc2, cc3 = st.columns([1, 1, 1])
-        conv_id = cc1.number_input("Lead id", min_value=1, step=1, key="cv_id")
-        mk_deal = cc2.checkbox("Also open a deal", value=True)
-        deal_amt = cc3.number_input("Deal amount (₦)", min_value=0.0, step=1000.0)
-        if st.button("Convert", key="cv_btn"):
-            with get_session() as s:
-                res = crm.convert_lead(s, int(conv_id), create_deal=mk_deal,
-                                       deal_amount=deal_amt)
-            st.success(f"Converted → customer #{res['customer_id']}"
-                       + (f", deal #{res['deal_id']}" if res['deal_id'] else ""))
-            st.rerun()
+        if sel_l is None:
+            st.caption("Select a lead in the table to convert it.")
+        else:
+            cc1, cc2 = st.columns([1, 1])
+            mk_deal = cc1.checkbox("Also open a deal", value=True)
+            deal_amt = cc2.number_input("Deal amount (₦)", min_value=0.0,
+                                        step=1000.0)
+            if st.button(f"Convert {sel_l['name']} → customer", key="cv_btn"):
+                with get_session() as s:
+                    res = crm.convert_lead(s, int(sel_l["id"]),
+                                           create_deal=mk_deal,
+                                           deal_amount=deal_amt)
+                ui.flash(f"{sel_l['name']} converted → customer"
+                         + (" + deal opened" if res['deal_id'] else ""))
+                st.rerun()
     else:
         st.caption("No leads yet — capture one above.")
 
@@ -149,7 +157,7 @@ with tab_acts:
                 with get_session() as s:
                     crm.log_activity(s, subject=subj, kind=ActivityKind(kind),
                                      due_date=dd, owner_user_id=uid)
-                st.success("Follow-up logged."); st.rerun()
+                ui.flash("Follow-up logged."); st.rerun()
 
     st.divider()
     with get_session() as s:
@@ -157,13 +165,15 @@ with tab_acts:
         arows = [{"id": a.id, "subject": a.subject, "type": a.kind.value,
                   "due": a.due_date} for a in acts]
     if arows:
-        st.dataframe(pd.DataFrame(arows), hide_index=True, width="stretch")
-        done_id = st.number_input("Mark done — activity id", min_value=1, step=1,
-                                  key="done_id")
-        if st.button("Mark done", key="done_btn"):
-            with get_session() as s:
-                crm.complete_activity(s, int(done_id))
-            st.success(f"Activity {int(done_id)} completed."); st.rerun()
+        sel_act = ui.pick_row(pd.DataFrame(arows), key="act_pick")
+        if sel_act is not None:
+            if st.button(f"✔ Mark “{sel_act['subject']}” done", key="done_btn"):
+                with get_session() as s:
+                    crm.complete_activity(s, int(sel_act["id"]))
+                ui.flash(f"“{sel_act['subject']}” completed.")
+                st.rerun()
+        else:
+            st.caption("Select a follow-up to mark it done.")
     else:
         st.caption("No open follow-ups. 🎉")
 

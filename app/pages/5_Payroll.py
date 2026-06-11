@@ -41,7 +41,8 @@ with tab_emp:
             "pension_employer_rate": e.pension_employer_rate,
             "active": e.is_active,
         } for e in emps]
-    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch",
+                 column_config={"monthly_gross": ui.money_col("monthly_gross")})
 
     st.divider()
     st.subheader("Add employee")
@@ -50,8 +51,11 @@ with tab_emp:
         name = st.text_input("Name")
         email = st.text_input("Email")
         gross = st.number_input("Monthly gross (₦)", min_value=0.0, format="%.2f")
-        paye = st.number_input("PAYE effective rate (decimal)",
-                                min_value=0.0, max_value=1.0, format="%.3f", value=0.07)
+        paye = st.number_input("Flat PAYE override (0 = graduated, recommended)",
+                                min_value=0.0, max_value=1.0, format="%.3f", value=0.0,
+                                help="Leave 0 and PAYE is computed on the graduated "
+                                     "CITA bands automatically. Only set a flat "
+                                     "effective rate to override that.")
         pen_emp = st.number_input("Employee pension rate",
                                      min_value=0.0, max_value=1.0, format="%.3f", value=0.08)
         pen_er = st.number_input("Employer pension rate",
@@ -142,7 +146,10 @@ with tab_slip:
                 "pension_er": p.pension_employer,
                 "other": p.other_deductions, "net_pay": p.net_pay,
             } for p in slips]
-        st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+        st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch",
+                     column_config={c: ui.money_col(c) for c in
+                                    ("gross", "PAYE", "pension_emp",
+                                     "pension_er", "other", "net_pay")})
     else:
         st.info("Run payroll to generate payslips.")
 

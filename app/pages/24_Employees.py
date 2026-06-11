@@ -44,19 +44,25 @@ with tab_list:
             "active": e.is_active,
         } for e in emps]
     if rows:
-        st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
-        st.markdown("##### Activate / deactivate")
-        cc1, cc2 = st.columns([1, 1])
-        eid = cc1.number_input("Employee id", min_value=1, step=1, key="emp_toggle")
-        if cc2.button("Toggle active", key="emp_toggle_btn"):
-            with get_session() as s:
-                emp = next((e for e in hr.list_employees(s) if e.id == int(eid)), None)
-                if emp:
-                    hr.set_employee_active(s, int(eid), not emp.is_active)
-                    st.success(f"{emp.name} → {'active' if not emp.is_active else 'inactive'}")
-                    st.rerun()
-                else:
-                    st.error("No such employee id.")
+        sel_e = ui.pick_row(
+            pd.DataFrame(rows), key="emp_pick",
+            column_config={"monthly_gross": ui.money_col("monthly gross")})
+        if sel_e is not None:
+            action = "Deactivate" if sel_e["active"] else "Activate"
+            confirm = st.checkbox(
+                f"I confirm — {action.lower()} {sel_e['name']} "
+                f"({'they stop appearing in Payroll and Leave' if sel_e['active'] else 'they return to Payroll and Leave'}).",
+                key="emp_confirm")
+            if st.button(f"{action} {sel_e['name']}", key="emp_toggle_btn",
+                         disabled=not confirm):
+                with get_session() as s:
+                    hr.set_employee_active(s, int(sel_e["id"]),
+                                           not bool(sel_e["active"]))
+                ui.flash(f"{sel_e['name']} → "
+                         f"{'inactive' if sel_e['active'] else 'active'}")
+                st.rerun()
+        else:
+            st.caption("Select an employee to activate/deactivate.")
     else:
         st.caption("No employees yet — add one in the next tab.")
 
@@ -90,7 +96,7 @@ with tab_add:
                         employment_type=etype, monthly_gross=gross,
                         paye_rate=paye, annual_leave_days=leave_days,
                         hire_date=hire)
-                    st.success(f"Added {emp.name} ({emp.code})")
+                    ui.flash(f"Added {emp.name} ({emp.code})")
                 st.rerun()
 
 auth.render_logout_in_sidebar()

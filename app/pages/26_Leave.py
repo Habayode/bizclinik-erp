@@ -65,7 +65,7 @@ with tab_req:
                             s, employee_id=emp_opts[emp_label],
                             leave_type=LeaveType(ltype), start_date=start,
                             end_date=end, reason=reason or None)
-                    st.success(f"Requested {req.days:.0f} day(s) — pending approval.")
+                    ui.flash(f"Requested {req.days:.0f} day(s) — pending approval.")
                     st.rerun()
 
     st.divider()
@@ -91,17 +91,27 @@ with tab_appr:
                   "to": r.end_date, "days": r.days,
                   "reason": r.reason or ""} for r in pending]
     if prows:
-        st.dataframe(pd.DataFrame(prows), hide_index=True, width="stretch")
-        ac1, ac2, ac3 = st.columns([1, 1, 1])
-        req_id = ac1.number_input("Request id", min_value=1, step=1, key="ap_req")
-        if ac2.button("Approve", key="ap_yes", type="primary"):
-            with get_session() as s:
-                hr.decide_leave(s, int(req_id), approve=True, approver_user_id=uid)
-            st.success(f"Request {int(req_id)} approved."); st.rerun()
-        if ac3.button("Reject", key="ap_no"):
-            with get_session() as s:
-                hr.decide_leave(s, int(req_id), approve=False, approver_user_id=uid)
-            st.warning(f"Request {int(req_id)} rejected."); st.rerun()
+        st.caption("Select a request, then decide.")
+        sel = ui.pick_row(pd.DataFrame(prows), key="lv_pick")
+        if sel is None:
+            st.info("👆 Select a leave request in the table.")
+        else:
+            st.markdown(f"**Selected:** {sel['employee']} — {sel['type']} "
+                        f"{sel['from']} → {sel['to']} ({sel['days']:.0f} day(s))")
+            confirm = st.checkbox("I confirm this decision.", key="lv_confirm")
+            ac1, ac2, _ = st.columns([1, 1, 2])
+            if ac1.button("Approve", key="ap_yes", type="primary",
+                          disabled=not confirm):
+                with get_session() as s:
+                    hr.decide_leave(s, int(sel["id"]), approve=True,
+                                    approver_user_id=uid)
+                ui.flash(f"Leave for {sel['employee']} approved."); st.rerun()
+            if ac2.button("Reject", key="ap_no", disabled=not confirm):
+                with get_session() as s:
+                    hr.decide_leave(s, int(sel["id"]), approve=False,
+                                    approver_user_id=uid)
+                ui.flash(f"Leave for {sel['employee']} rejected.", icon="✋")
+                st.rerun()
     else:
         st.caption("No pending requests. 🎉")
 

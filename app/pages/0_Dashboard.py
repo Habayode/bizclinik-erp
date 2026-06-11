@@ -39,10 +39,13 @@ with get_session() as s:
 if not company:
     ui.hero("Trakit365 ERP", "Set up your company to get started",
             badge="T3")
-    st.info(
-        "**No company configured.** Open **Settings** to set the company "
-        "profile, or **Data** to import a BizClinik xlsx workbook."
-    )
+    st.info("**Welcome!** Set up your company profile to start posting.")
+    st.page_link("pages/17_Settings.py",
+                 label="⚙️ Set up your company in Settings", icon="➡️")
+    st.page_link("pages/18_Onboarding.py",
+                 label="🚀 Or use the guided Onboarding wizard", icon="➡️")
+    st.page_link("pages/16_Data.py",
+                 label="🗄️ Or import an existing xlsx workbook (Data)", icon="➡️")
     st.stop()
 
 
@@ -55,6 +58,27 @@ with get_session() as s:
     n_products = s.query(Product).count()
     n_invoices = s.query(SalesInvoice).count()
     n_bills = s.query(Bill).count()
+
+# Getting-started checklist for young books — disappears once trading starts.
+if n_invoices == 0 or n_customers == 0 or n_products == 0:
+    with st.container(border=True):
+        st.markdown("##### 🚀 Getting started")
+        steps = [
+            (True, "Company profile set", None, None),
+            (n_customers > 0, f"Add a customer ({n_customers} so far)",
+             "pages/17_Settings.py", "Settings"),
+            (n_products > 0, f"Add a product ({n_products} so far)",
+             "pages/17_Settings.py", "Settings"),
+            (n_invoices > 0, "Issue your first invoice",
+             "pages/1_Sales.py", "Sales"),
+            (n_bills > 0, "Receive your first bill",
+             "pages/2_Purchases.py", "Purchases"),
+        ]
+        for done, label, page, page_label in steps:
+            col_a, col_b = st.columns([4, 1])
+            col_a.markdown(("✅ ~~" + label + "~~") if done else f"⬜ {label}")
+            if not done and page:
+                col_b.page_link(page, label=f"→ {page_label}")
 
     pnl = reports.profit_and_loss(s, period_start=fy_start, period_end=today)
     bs = reports.balance_sheet(s, as_of=today)

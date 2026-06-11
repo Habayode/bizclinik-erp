@@ -60,30 +60,41 @@ with tab_queue:
             and r.requested_by_user_id != UID,
         } for r in pend]
     if rows:
-        st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
-        st.caption("You can only approve amounts within your role limit, and not "
-                   "your own requests.")
-        cc1, cc2, cc3 = st.columns([1, 1, 2])
-        rid = cc1.number_input("Request id", min_value=1, step=1, key="q_id")
-        note = cc3.text_input("Note (for rejection)", key="q_note")
-        if cc2.button("✅ Approve", type="primary", key="q_ok"):
-            try:
-                with get_session() as s:
-                    out = approvals.approve(s, int(rid), approver_user_id=UID,
-                                            approver_role=ROLE)
-                st.success(f"Approved — {out['doc_type']} posted as {out['ref']}.")
-                st.rerun()
-            except ValueError as e:
-                st.error(str(e))
-        if cc2.button("✋ Reject", key="q_no"):
-            try:
-                with get_session() as s:
-                    approvals.reject(s, int(rid), approver_user_id=UID,
-                                     approver_role=ROLE, note=note or None)
-                st.warning(f"Request {int(rid)} rejected.")
-                st.rerun()
-            except ValueError as e:
-                st.error(str(e))
+        st.caption("Select a request, then decide. You can only approve amounts "
+                   "within your role limit, and not your own requests.")
+        sel = ui.pick_row(pd.DataFrame(rows), key="q_pick",
+                          column_config={"amount": ui.money_col("amount")})
+        if sel is None:
+            st.info("👆 Select a request in the table to approve or reject it.")
+        else:
+            st.markdown(f"**Selected:** {sel['title']} — ₦{sel['amount']:,.2f} "
+                        f"(requested by {sel['requested_by']}, {sel['role']})")
+            note = st.text_input("Note (required for rejection)", key="q_note")
+            confirm = st.checkbox(
+                "I confirm this decision — approving posts the document to the "
+                "ledger; rejecting discards it.", key="q_confirm")
+            cc1, cc2, _ = st.columns([1, 1, 2])
+            if cc1.button("✅ Approve", type="primary", key="q_ok",
+                          disabled=not confirm):
+                try:
+                    with get_session() as s:
+                        out = approvals.approve(s, int(sel["id"]),
+                                                approver_user_id=UID,
+                                                approver_role=ROLE)
+                    ui.flash(f"Approved — {out['doc_type']} posted as {out['ref']}.")
+                    st.rerun()
+                except ValueError as e:
+                    st.error(str(e))
+            if cc2.button("✋ Reject", key="q_no",
+                          disabled=not (confirm and note.strip())):
+                try:
+                    with get_session() as s:
+                        approvals.reject(s, int(sel["id"]), approver_user_id=UID,
+                                         approver_role=ROLE, note=note or None)
+                    ui.flash(f"Request #{int(sel['id'])} rejected.", icon="✋")
+                    st.rerun()
+                except ValueError as e:
+                    st.error(str(e))
     else:
         st.caption("Nothing awaiting approval. 🎉")
 
@@ -98,17 +109,19 @@ with tab_mine:
                  "amount": r.amount_ngn, "status": r.status.value,
                  "result": r.result_ref or ""} for r in mine]
     if rows:
-        st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
-        cid = st.number_input("Cancel my pending request id", min_value=1, step=1,
-                              key="mine_cancel")
-        if st.button("Withdraw request", key="mine_btn"):
-            try:
-                with get_session() as s:
-                    approvals.cancel(s, int(cid), user_id=UID)
-                st.info(f"Request {int(cid)} withdrawn.")
-                st.rerun()
-            except ValueError as e:
-                st.error(str(e))
+        sel_m = ui.pick_row(pd.DataFrame(rows), key="mine_pick",
+                            column_config={"amount": ui.money_col("amount")})
+        if sel_m is not None and sel_m["status"] == "PENDING":
+            if st.button(f"Withdraw “{sel_m['title']}”", key="mine_btn"):
+                try:
+                    with get_session() as s:
+                        approvals.cancel(s, int(sel_m["id"]), user_id=UID)
+                    ui.flash(f"Request #{int(sel_m['id'])} withdrawn.", icon="↩️")
+                    st.rerun()
+                except ValueError as e:
+                    st.error(str(e))
+        elif sel_m is not None:
+            st.caption("Only PENDING requests can be withdrawn.")
     else:
         st.caption("You haven't submitted any approval requests.")
 
@@ -127,7 +140,8 @@ with tab_hist:
                  "result": r.result_ref or "",
                  "note": r.note or ""} for r in done]
     if rows:
-        st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+        st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch",
+                     column_config={"amount": ui.money_col("amount")})
     else:
         st.caption("No decisions yet.")
 
