@@ -115,12 +115,74 @@ KB = [
           "Chart of Accounts so you can start posting immediately."},
 ]
 
-SUGGESTIONS = ["Raise an invoice", "Record a bill", "How do approvals work?",
-               "Run payroll", "Add an employee", "View reports"]
+SUGGESTIONS = ["What's my revenue this month?", "How much cash do I have?",
+               "How many pending approvals?", "How do I raise an invoice?",
+               "Record a bill", "Run payroll"]
 
-GREETING = ("Hi! I'm the BizClinik assistant. Ask me how to do anything in the "
-            "ERP — e.g. \"How do I raise an invoice?\" or \"How do approvals "
-            "work?\". Soon I'll also answer from your live data.")
+GREETING = ("Hi! I'm the BizClinik assistant. Ask me how to use the ERP — e.g. "
+            "\"How do I raise an invoice?\" — or about your numbers, like "
+            "\"What's my revenue this month?\" or \"How many approvals are "
+            "pending?\".")
+
+
+def compute_snapshot(session) -> dict:
+    """A light, live data snapshot for the active business. Embedded into the
+    widget each run so the bot can answer data questions with rule-based
+    matching. Defensive: any piece that fails is simply omitted/zeroed."""
+    from datetime import date
+
+    from sqlalchemy import select
+    from .models import (BankAccount, Bill, Company, Customer, Employee,
+                         Product, SalesInvoice, Supplier)
+    from .services import reports, approvals
+    from .services.banking import bank_balance
+
+    def q(fn, default=0):
+        try:
+            return fn()
+        except Exception:
+            return default
+
+    if not q(lambda: session.query(Company).first(), None):
+        return {}
+
+    today = date.today()
+    month_start = today.replace(day=1)
+    fy_start = date(today.year, 1, 1)
+    pnl_mtd = q(lambda: reports.profit_and_loss(
+        session, period_start=month_start, period_end=today), {}) or {}
+    pnl_ytd = q(lambda: reports.profit_and_loss(
+        session, period_start=fy_start, period_end=today), {}) or {}
+    bs = q(lambda: reports.balance_sheet(session, as_of=today), {}) or {}
+
+    cash = 0.0
+    try:
+        for b in session.execute(select(BankAccount).where(
+                BankAccount.is_active == True)).scalars():  # noqa: E712
+            cash += bank_balance(session, b.id) or 0.0
+    except Exception:
+        pass
+
+    return {
+        "as_of": today.strftime("%d %b %Y"),
+        "revenue_mtd": round(pnl_mtd.get("total_revenue", 0) or 0, 2),
+        "revenue_ytd": round(pnl_ytd.get("total_revenue", 0) or 0, 2),
+        "net_profit_ytd": round(pnl_ytd.get("net_profit", 0) or 0, 2),
+        "inventory_value": round(sum(
+            r["amount"] for r in bs.get("assets", []) if r.get("code") == "1140"), 2),
+        "cash": round(cash, 2),
+        "ar_outstanding": round(sum(
+            r["total"] for r in q(lambda: reports.ar_aging(session, as_of=today), [])), 2),
+        "ap_outstanding": round(sum(
+            r["total"] for r in q(lambda: reports.ap_aging(session, as_of=today), [])), 2),
+        "customers": q(lambda: session.query(Customer).count()),
+        "suppliers": q(lambda: session.query(Supplier).count()),
+        "products": q(lambda: session.query(Product).count()),
+        "employees": q(lambda: session.query(Employee).count()),
+        "invoices": q(lambda: session.query(SalesInvoice).count()),
+        "bills": q(lambda: session.query(Bill).count()),
+        "pending_approvals": q(lambda: approvals.pending_count(session)),
+    }
 
 
 def _css() -> str:
@@ -173,11 +235,45 @@ function localAnswer(q){var qt=norm(q),best=null,bs=0;
   KB.forEach(function(e){var s=score(qt,e); if(s>bs){bs=s;best=e;}});
   if(best&&bs>=2) return best.a;
   return "I can help with how to use the ERP — try: invoicing, recording a bill, payments & approvals, payroll, employees, leave, recruitment, CRM, bank reconciliation, reports, budgets, FIRS e-invoice, currencies, plans & billing, users & roles, or backups.";}
+function fmtN(n){return "₦"+Math.round(n||0).toLocaleString();}
+function dataAnswer(q){
+  var D=window.__bzkData||{}; if(!D||!D.as_of) return null;
+  var s=q.toLowerCase(); var asof=" (as of "+D.as_of+")";
+  function has(){for(var i=0;i<arguments.length;i++){if(s.indexOf(arguments[i])>=0)return true;}return false;}
+  if(has("pending approval","approvals pending","awaiting approval","to approve","approvals waiting"))
+    return "There "+(D.pending_approvals===1?"is ":"are ")+D.pending_approvals+" approval"+(D.pending_approvals===1?"":"s")+" pending. See Finance & Accounting → Approvals.";
+  if(has("profit","net income","bottom line","made this year"))
+    return "Net profit year-to-date is "+fmtN(D.net_profit_ytd)+asof+".";
+  if(has("revenue","sales","turnover","income","earn")){
+    if(has("month","mtd")) return "Revenue this month is "+fmtN(D.revenue_mtd)+asof+".";
+    return "Revenue year-to-date is "+fmtN(D.revenue_ytd)+" ("+fmtN(D.revenue_mtd)+" this month)"+asof+".";
+  }
+  if(has("cash","bank balance","in the bank","how much money"))
+    return "Cash & bank balance is "+fmtN(D.cash)+asof+".";
+  if(has("receivable","owed to me","customers owe","outstanding invoice")|| /\bar\b/.test(s))
+    return "Accounts receivable outstanding is "+fmtN(D.ar_outstanding)+asof+".";
+  if(has("payable","i owe","we owe","owe supplier","outstanding bill")|| /\bap\b/.test(s))
+    return "Accounts payable outstanding is "+fmtN(D.ap_outstanding)+asof+".";
+  if(has("inventory","stock value","stock worth"))
+    return "Inventory at cost is "+fmtN(D.inventory_value)+asof+".";
+  if(has("how many","number of","count of","total ")){
+    if(has("customer")) return "You have "+D.customers+" customers.";
+    if(has("supplier","vendor")) return "You have "+D.suppliers+" suppliers.";
+    if(has("product","item","sku")) return "You have "+D.products+" products.";
+    if(has("employee","staff")) return "You have "+D.employees+" employees.";
+    if(has("invoice")) return "You have "+D.invoices+" sales invoices.";
+    if(has("bill")) return "You have "+D.bills+" bills.";
+  }
+  return null;
+}
 function answer(q){
-  // Data seam: if a backend is registered it can return a Promise<string> or null.
+  // 1) Future API: if a backend is registered, prefer it (Promise<string>|null).
   try{ if(window.__bzkAskBackend){ var r=window.__bzkAskBackend(q);
-    if(r&&typeof r.then==="function") return r.then(function(a){return a||localAnswer(q);});
+    if(r&&typeof r.then==="function") return r.then(function(a){return a||dataAnswer(q)||localAnswer(q);});
     if(r) return Promise.resolve(r); } }catch(e){}
+  // 2) Rule-based data answer from the live snapshot.
+  var da=dataAnswer(q); if(da) return Promise.resolve(da);
+  // 3) Built-in how-to help.
   return Promise.resolve(localAnswer(q));
 }
 var KEY="bzkAsstMsgs";
@@ -218,10 +314,15 @@ render();
     )
 
 
-def render_floating_widget() -> None:
-    """Inject the floating assistant into the parent document (idempotent)."""
+def render_floating_widget(snapshot: dict | None = None) -> None:
+    """Inject the floating assistant into the parent document.
+
+    The data snapshot is refreshed on every run (so the bot's data answers stay
+    current), while the widget DOM + listeners are injected only once.
+    """
     boot = (
         "<script>(function(){var w=window.parent,d=w.document;"
+        "w.__bzkData=" + json.dumps(snapshot or {}) + ";"   # refresh every run
         "if(w.__bzkAsst)return;w.__bzkAsst=true;"
         "var css=" + json.dumps(_css()) + ";"
         "var js=" + json.dumps(_js()) + ";"

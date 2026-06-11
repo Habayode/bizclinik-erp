@@ -97,9 +97,22 @@ NAV = {
 pg = st.navigation(NAV, position="sidebar")
 pg.run()
 
-# Floating help assistant (bottom-right) on every page.
+# Floating help assistant (bottom-right) on every page, with a live data
+# snapshot (cached 60s per business) so it can answer data questions too.
+@st.cache_data(ttl=60, show_spinner=False)
+def _assistant_snapshot(_tenant_key: str) -> dict:
+    from bizclinik_erp.db import get_session
+    from bizclinik_erp import assistant as _a
+    try:
+        with get_session() as s:
+            return _a.compute_snapshot(s)
+    except Exception:
+        return {}
+
+
 try:
     from bizclinik_erp import assistant
-    assistant.render_floating_widget()
+    _snap = _assistant_snapshot(auth.active_tenant() or "default")
+    assistant.render_floating_widget(_snap)
 except Exception:
     pass
