@@ -43,6 +43,24 @@ run_py migrate
 
 chown -R bizclinik:bizclinik "$APP_DIR"
 
+# ---- User-manual PDF (served by the in-app Download button) -----------------
+# Rebuilt on every deploy so it can't drift from docs/USER_MANUAL.md. Non-fatal:
+# a failed build keeps the previous PDF and never blocks the deploy.
+echo "==> Building user-manual PDF"
+export PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
+"$APP_DIR/venv/bin/pip" install --quiet markdown playwright || true
+"$APP_DIR/venv/bin/python" -m playwright install --with-deps chromium >/dev/null 2>&1 \
+  || "$APP_DIR/venv/bin/python" -m playwright install chromium >/dev/null 2>&1 || true
+chmod -R a+rX /opt/ms-playwright 2>/dev/null || true
+if sudo -u bizclinik env PYTHONPATH="$APP_DIR" \
+     PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright \
+     "$APP_DIR/venv/bin/python" "$APP_DIR/scripts/manual_to_pdf.py" \
+     "$APP_DIR/docs/USER_MANUAL.md" "$APP_DIR/Trakit365_ERP_User_Manual.pdf"; then
+  echo "Manual PDF rebuilt."
+else
+  echo "(PDF build failed — the in-app download keeps the previous copy)"
+fi
+
 echo "==> Restarting services"
 systemctl restart bizclinik-erp
 systemctl restart bizclinik-api 2>/dev/null || echo "(bizclinik-api not present — skipped)"
