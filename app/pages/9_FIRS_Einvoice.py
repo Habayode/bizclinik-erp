@@ -20,7 +20,7 @@ from bizclinik_erp.exporters.qr import make_qr_png_bytes
 from bizclinik_erp import ui_kit as ui
 from bizclinik_erp import auth
 
-st.set_page_config(page_title="FIRS E-Invoice · BizClinik ERP", layout="wide",
+st.set_page_config(page_title="FIRS E-Invoice · Trakit365 ERP", layout="wide",
                     page_icon="🧾")
 ui.inject_brand()
 auth.require_login()

@@ -1,4 +1,4 @@
-"""BizClinik ERP — Nigerian SME accounting / ERP system.
+"""Trakit365 ERP — Nigerian SME accounting / ERP system.
 
 Built around a SQLite system-of-record with double-entry general ledger.
 Compatible with the original BizClinik xlsx template via an importer.

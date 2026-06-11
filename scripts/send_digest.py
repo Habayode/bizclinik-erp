@@ -34,7 +34,7 @@ def _parse_as_of(value: str | None) -> date:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="send_digest",
-        description="Build and send (or print) the BizClinik ERP daily digest.",
+        description="Build and send (or print) the Trakit365 ERP daily digest.",
     )
     parser.add_argument("--to", required=True, help="Recipient email address.")
     parser.add_argument(

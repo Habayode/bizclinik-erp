@@ -1,4 +1,4 @@
-"""Convenience launcher for the BizClinik ERP REST API.
+"""Convenience launcher for the Trakit365 ERP REST API.
 
 The API is a SEPARATE service from the Streamlit UI and listens on port 8600.
 

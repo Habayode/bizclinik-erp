@@ -17,7 +17,7 @@ from bizclinik_erp.services import approvals
 from bizclinik_erp import auth
 from bizclinik_erp import ui_kit as ui
 
-st.set_page_config(page_title="Approvals · BizClinik ERP", layout="wide",
+st.set_page_config(page_title="Approvals · Trakit365 ERP", layout="wide",
                     page_icon="✅")
 ui.inject_brand()
 auth.require_login()

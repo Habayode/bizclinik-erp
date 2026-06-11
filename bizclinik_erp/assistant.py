@@ -119,7 +119,7 @@ SUGGESTIONS = ["What's my revenue this month?", "How much cash do I have?",
                "How many pending approvals?", "How do I raise an invoice?",
                "Record a bill", "Run payroll"]
 
-GREETING = ("Hi! I'm the BizClinik assistant. Ask me how to use the ERP — e.g. "
+GREETING = ("Hi! I'm the Trakit365 assistant. Ask me how to use the ERP — e.g. "
             "\"How do I raise an invoice?\" — or about your numbers, like "
             "\"What's my revenue this month?\" or \"How many approvals are "
             "pending?\".")
@@ -285,7 +285,7 @@ var root=document.createElement("div");root.id="bzk-asst";
 root.innerHTML=
  '<button id="bzk-asst-btn" title="Assistant">&#128172;</button>'+
  '<div id="bzk-asst-panel">'+
-  '<div id="bzk-asst-hd"><div><b>BizClinik Assistant</b><br><span>How-to help</span></div>'+
+  '<div id="bzk-asst-hd"><div><b>Trakit365 Assistant</b><br><span>How-to help</span></div>'+
    '<button id="bzk-asst-x">&times;</button></div>'+
   '<div id="bzk-asst-msgs"></div>'+
   '<div id="bzk-asst-chips"></div>'+

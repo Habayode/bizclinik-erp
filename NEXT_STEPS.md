@@ -1,4 +1,4 @@
-# BizClinik ERP — Path to a Great Accounting Product
+# Trakit365 ERP — Path to a Great Accounting Product
 
 Reviewer roles: chartered-accountant + financial-reporting lens, product-manager lens.
 Status today: a working ERP with double-entry GL, sales/purchase/inventory/banking/payroll/reports,

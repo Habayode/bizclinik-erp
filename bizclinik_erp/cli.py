@@ -1,4 +1,4 @@
-"""Command-line entry point for BizClinik ERP.
+"""Command-line entry point for Trakit365 ERP.
 
 Usage:
     python -m bizclinik_erp <command> [options]
@@ -248,7 +248,7 @@ def cmd_migrate(_args) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="bizclinik_erp",
-                                 description="BizClinik ERP — CLI")
+                                 description="Trakit365 ERP — CLI")
     sub = p.add_subparsers(dest="command", required=True)
 
     p_init = sub.add_parser("init", help="Init DB + seed defaults + bootstrap admin")

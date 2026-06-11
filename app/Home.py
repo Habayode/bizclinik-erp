@@ -1,4 +1,4 @@
-"""BizClinik ERP — application entry point.
+"""Trakit365 ERP — application entry point.
 
 Defines the grouped sidebar navigation (Finance & Accounting · CRM · HR ·
 System) via st.navigation and runs the selected module page.
@@ -24,7 +24,7 @@ from bizclinik_erp.db import init_db
 from bizclinik_erp import ui_kit as ui
 from bizclinik_erp import auth
 
-st.set_page_config(page_title="BizClinik ERP", layout="wide", page_icon="📊",
+st.set_page_config(page_title="Trakit365 ERP", layout="wide", page_icon="📊",
                     initial_sidebar_state="expanded")
 
 # Module pages each call st.set_page_config at the top (so they also work when

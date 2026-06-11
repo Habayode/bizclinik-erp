@@ -1,4 +1,4 @@
-# BizClinik ERP — Linux deployment (the permanent home)
+# Trakit365 ERP — Linux deployment (the permanent home)
 
 Why Linux: `systemd` supervises the app properly. If Streamlit ever crashes,
 `Restart=always` brings it back in ~3 seconds — no watchdog, no NSSM, no

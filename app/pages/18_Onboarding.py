@@ -19,7 +19,7 @@ from bizclinik_erp import auth
 from bizclinik_erp import ui_kit as ui
 
 
-st.set_page_config(page_title="Onboarding · BizClinik ERP", layout="wide",
+st.set_page_config(page_title="Onboarding · Trakit365 ERP", layout="wide",
                     page_icon="🚀")
 ui.inject_brand()
 auth.require_login()

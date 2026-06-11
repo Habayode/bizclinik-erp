@@ -16,7 +16,7 @@ from bizclinik_erp.importers.bizclinik_xlsx import import_workbook
 from bizclinik_erp import ui_kit as ui
 from bizclinik_erp import auth
 
-st.set_page_config(page_title="Data · BizClinik ERP", layout="wide",
+st.set_page_config(page_title="Data · Trakit365 ERP", layout="wide",
                     page_icon="💾")
 ui.inject_brand()
 auth.require_login()

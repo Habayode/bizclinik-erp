@@ -106,7 +106,7 @@ def _render_brand_card() -> None:
         "<div style='width:36px; height:36px; border-radius:8px; "
         "background:#1F3864; color:white; display:flex; align-items:center; "
         "justify-content:center; font-weight:700;'>BC</div>"
-        "<div><div style='font-weight:700; color:#0F172A;'>BizClinik ERP</div>"
+        "<div><div style='font-weight:700; color:#0F172A;'>Trakit365 ERP</div>"
         "<div style='font-size:0.8rem; color:#64748B;'>Sign in to continue</div></div>"
         "</div>"
         "</div>",

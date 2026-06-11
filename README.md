@@ -1,4 +1,4 @@
-# BizClinik ERP
+# Trakit365 ERP
 
 A Nigerian SME ERP built around a SQLite system-of-record with proper
 double-entry general ledger. Modules: Sales (quote → order → invoice →

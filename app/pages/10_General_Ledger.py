@@ -22,7 +22,7 @@ from bizclinik_erp.services.ledger import (
 from bizclinik_erp import ui_kit as ui
 from bizclinik_erp import auth
 
-st.set_page_config(page_title="General Ledger · BizClinik ERP", layout="wide",
+st.set_page_config(page_title="General Ledger · Trakit365 ERP", layout="wide",
                     page_icon="📒")
 ui.inject_brand()
 auth.require_login()

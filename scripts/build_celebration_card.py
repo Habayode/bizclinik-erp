@@ -1,4 +1,4 @@
-"""Render a BizClinik ERP card (PNG + PDF) — brand: dark navy + teal, rounded
+"""Render a Trakit365 ERP card (PNG + PDF) — brand: dark navy + teal, rounded
 panels. Footer attributes the build to HAG_Ai (provider). No public ERP URL.
 
 Presets:
@@ -10,7 +10,7 @@ Usage:
   python scripts/build_celebration_card.py [--variant expanded|fresh]
                                            [--name BRAND] [--out BASENAME]
 The brand word renders white + " ERP" in teal. --name sets the product brand
-at render time without code changes (default BizClinik).
+at render time without code changes (default Trakit365).
 """
 from __future__ import annotations
 
@@ -265,7 +265,7 @@ PRESETS = {
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--variant", choices=list(PRESETS), default="expanded")
-    ap.add_argument("--name", default="BizClinik")
+    ap.add_argument("--name", default="Trakit365")
     ap.add_argument("--out", default=None)
     a = ap.parse_args()
     out = Path(a.out) if a.out else ROOT / f"BizClinik_ERP_Celebration_Card_{a.variant}"

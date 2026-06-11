@@ -18,7 +18,7 @@ from bizclinik_erp.services import crm
 from bizclinik_erp import auth
 from bizclinik_erp import ui_kit as ui
 
-st.set_page_config(page_title="CRM · BizClinik ERP", layout="wide", page_icon="🤝")
+st.set_page_config(page_title="CRM · Trakit365 ERP", layout="wide", page_icon="🤝")
 ui.inject_brand()
 auth.require_login()
 from bizclinik_erp import gate as _gate; _gate.require_feature("crm", "CRM")

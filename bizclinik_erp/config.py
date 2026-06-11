@@ -14,7 +14,7 @@ class Settings:
     currency_code: str = "NGN"
     default_vat_rate: float = 0.075       # 7.5% Nigerian VAT
     default_wht_rate: float = 0.05        # 5% withholding tax (services)
-    company_name: str = "BizClinik ERP"
+    company_name: str = "Trakit365 ERP"
     fiscal_year_start_month: int = 1      # January
 
     @property

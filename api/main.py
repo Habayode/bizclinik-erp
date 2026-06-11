@@ -1,4 +1,4 @@
-"""BizClinik ERP — REST API (FastAPI).
+"""Trakit365 ERP — REST API (FastAPI).
 
 A SEPARATE application from the Streamlit UI. It reuses the exact same domain
 services and SQLite system-of-record via ``bizclinik_erp.db.get_session`` —
@@ -50,9 +50,9 @@ except Exception:
     pass
 
 app = FastAPI(
-    title="BizClinik ERP API",
+    title="Trakit365 ERP API",
     version="1.1",
-    description="REST + webhooks layer over the BizClinik ERP services "
+    description="REST + webhooks layer over the Trakit365 ERP services "
                 "(per-tenant API keys).",
 )
 

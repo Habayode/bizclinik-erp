@@ -32,7 +32,7 @@ def _login_url(slug: str) -> str:
     return _TENANT_URL_TEMPLATE.format(slug=slug)
 
 
-st.set_page_config(page_title="Tenants · BizClinik ERP", layout="wide",
+st.set_page_config(page_title="Tenants · Trakit365 ERP", layout="wide",
                     page_icon="🏬")
 ui.inject_brand()
 auth.require_login()

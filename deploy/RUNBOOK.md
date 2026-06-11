@@ -1,4 +1,4 @@
-# BizClinik ERP — VPS deployment runbook
+# Trakit365 ERP — VPS deployment runbook
 
 Target: **VPS1 (185.126.227.211:42014)** · subdomain **erp.hagai.online**
 

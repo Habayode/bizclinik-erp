@@ -198,7 +198,7 @@ def render_digest_text(digest: dict) -> str:
     """Plain-text summary suitable for email body / console output."""
     items = digest.get("items", {})
     lines: list[str] = []
-    lines.append("BizClinik ERP — Daily Digest")
+    lines.append("Trakit365 ERP — Daily Digest")
     lines.append(f"As of {digest.get('as_of', '')}  (generated {digest.get('generated_at', '')})")
     lines.append("=" * 48)
     lines.append("")
@@ -285,7 +285,7 @@ def render_digest_html(digest: dict) -> str:
         "<div style='max-width:680px;margin:0 auto;font-family:Arial,sans-serif;'>"
         f"<div style='background:{_NAVY};color:#FFFFFF;padding:18px 22px;"
         "border-radius:10px 10px 0 0;'>"
-        "<div style='font-size:18px;font-weight:700;'>BizClinik ERP — Daily Digest</div>"
+        "<div style='font-size:18px;font-weight:700;'>Trakit365 ERP — Daily Digest</div>"
         f"<div style='font-size:13px;color:#DBEAFE;margin-top:2px;'>"
         f"As of {digest.get('as_of', '')} · generated {digest.get('generated_at', '')}</div>"
         "</div>"
@@ -326,7 +326,7 @@ def send_digest_email(digest: dict, *, to_addr: str) -> bool:
         from_addr = os.environ.get("SMTP_FROM", user or "bizclinik@localhost").strip()
 
         msg = MIMEMultipart("alternative")
-        msg["Subject"] = f"BizClinik ERP — Daily Digest ({digest.get('as_of', '')})"
+        msg["Subject"] = f"Trakit365 ERP — Daily Digest ({digest.get('as_of', '')})"
         msg["From"] = from_addr
         msg["To"] = to_addr
         msg.attach(MIMEText(render_digest_text(digest), "plain", "utf-8"))

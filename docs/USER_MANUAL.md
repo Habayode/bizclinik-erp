@@ -1,4 +1,4 @@
-# BizClinik ERP — User Manual
+# Trakit365 ERP — User Manual
 
 **A complete, worked guide — built around a real case-study company, *GreenLeaf Stores Ltd*, with a full month of transactions posted across every module and the resulting financial statements.**
 
@@ -61,7 +61,7 @@ For GreenLeaf at month-end, the dashboard shows **Total Assets ₦7,435,375**, *
 
 # 2. Data model — every record, with a real example
 
-BizClinik is a double-entry ledger with master data in front of it. These are the record types you'll work with.
+Trakit365 is a double-entry ledger with master data in front of it. These are the record types you'll work with.
 
 ### Company
 The business profile printed on documents and used for tax IDs.
@@ -449,4 +449,4 @@ Captured live from the GreenLeaf demo (May 2026 data, plus the June HR/approvals
 
 ---
 
-*BizClinik ERP · built & operated by HAG_Ai · Updated 2026-06-11 (adds People & HR, Approvals, Plans & access, and the in-app assistant). The financial figures are reproducible: run `python scripts/demo_seed.py` against a fresh database to regenerate GreenLeaf and every figure above.*
+*Trakit365 ERP · built & operated by HAG_Ai · Updated 2026-06-11 (adds People & HR, Approvals, Plans & access, and the in-app assistant). The financial figures are reproducible: run `python scripts/demo_seed.py` against a fresh database to regenerate GreenLeaf and every figure above.*

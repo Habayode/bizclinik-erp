@@ -16,7 +16,7 @@ from bizclinik_erp.services.tax import vat_return, wht_position
 from bizclinik_erp import ui_kit as ui
 from bizclinik_erp import auth
 
-st.set_page_config(page_title="Reports · BizClinik ERP", layout="wide",
+st.set_page_config(page_title="Reports · Trakit365 ERP", layout="wide",
                     page_icon="📈")
 ui.inject_brand()
 auth.require_login()

@@ -1,8 +1,8 @@
-# BizClinik ERP — Frequently Asked Questions
+# Trakit365 ERP — Frequently Asked Questions
 
-*Built & operated by HAG_Ai for BizClinik. Last updated: 2026-06-06.*
+*Built & operated by HAG_Ai. Last updated: 2026-06-11.*
 
-This FAQ answers the questions businesses ask most often when using BizClinik ERP.
+This FAQ answers the questions businesses ask most often when using Trakit365 ERP.
 For step-by-step walkthroughs with screenshots, see the **User Manual**
 (`docs/USER_MANUAL.md`).
 
@@ -28,7 +28,7 @@ For step-by-step walkthroughs with screenshots, see the **User Manual**
 
 ## 1. Getting started
 
-**Q: What is BizClinik ERP?**
+**Q: What is Trakit365 ERP?**
 A complete, double-entry accounting and business-management system built for Nigerian
 SMEs. It covers your ledger, sales, purchases, inventory, banking, payroll, tax, fixed
 assets, budgets, reporting, CRM and more — in one place, with proper books behind every
@@ -267,7 +267,7 @@ open inbound ports on the server.
 
 ## 11. Running multiple businesses
 
-**Q: Can I run more than one company in BizClinik ERP?**
+**Q: Can I run more than one company in Trakit365 ERP?**
 Yes. It is **multi-tenant**: each business (tenant) has its own fully isolated database.
 One company's data is never visible to another.
 
@@ -342,11 +342,11 @@ That means there's no exchange rate on file for that currency and date. Add the 
 **Currencies** page, then re-run the revaluation.
 
 **Q: Something looks wrong and I can't resolve it.**
-Contact HAG_Ai support. As the team that builds and operates BizClinik ERP for you, HAG_Ai
+Contact HAG_Ai support. As the team that builds and operates Trakit365 ERP for you, HAG_Ai
 handles hosting, backups, upgrades and recovery. Business-plan customers receive priority
 support.
 
 ---
 
-*BizClinik ERP is built and operated by **HAG_Ai**. For support or to change your plan,
+*Trakit365 ERP is built and operated by **HAG_Ai**. For support or to change your plan,
 contact HAG_Ai or use the in-app **Billing** page.*

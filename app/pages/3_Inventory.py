@@ -17,7 +17,7 @@ from bizclinik_erp.services import inventory as inv_svc
 from bizclinik_erp import ui_kit as ui
 from bizclinik_erp import auth
 
-st.set_page_config(page_title="Inventory · BizClinik ERP", layout="wide",
+st.set_page_config(page_title="Inventory · Trakit365 ERP", layout="wide",
                     page_icon="📦")
 ui.inject_brand()
 auth.require_login()

@@ -1,4 +1,4 @@
-"""SQLite snapshot / prune / restore for BizClinik ERP.
+"""SQLite snapshot / prune / restore for Trakit365 ERP.
 
 The database is a single sqlite file in WAL mode. To snapshot safely we
 checkpoint the WAL first so the .db file contains every committed page,

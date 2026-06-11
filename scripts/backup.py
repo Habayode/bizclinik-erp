@@ -123,7 +123,7 @@ def cmd_restore(args: argparse.Namespace) -> int:
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="backup",
-        description="Snapshot / list / restore BizClinik ERP sqlite database.",
+        description="Snapshot / list / restore Trakit365 ERP sqlite database.",
     )
     sub = p.add_subparsers(dest="command", required=True)
 

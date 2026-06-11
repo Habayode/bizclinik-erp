@@ -1,4 +1,4 @@
-"""Render a BizClinik markdown doc to a branded PDF (markdown + Chromium/Playwright).
+"""Render a Trakit365 markdown doc to a branded PDF (markdown + Chromium/Playwright).
 
 Usage:
     python scripts/manual_to_pdf.py                      # User Manual (default)

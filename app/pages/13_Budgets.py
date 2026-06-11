@@ -18,7 +18,7 @@ from bizclinik_erp.services import budget as budget_svc
 from bizclinik_erp import ui_kit as ui
 from bizclinik_erp import auth
 
-st.set_page_config(page_title="Budgets · BizClinik ERP", layout="wide",
+st.set_page_config(page_title="Budgets · Trakit365 ERP", layout="wide",
                    page_icon="📐")
 ui.inject_brand()
 auth.require_login()

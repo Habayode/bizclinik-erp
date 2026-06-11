@@ -28,7 +28,7 @@ from bizclinik_erp.services import fx as fx_svc
 from bizclinik_erp import ui_kit as ui
 from bizclinik_erp import auth
 
-st.set_page_config(page_title="Purchases · BizClinik ERP", layout="wide",
+st.set_page_config(page_title="Purchases · Trakit365 ERP", layout="wide",
                     page_icon="📥")
 ui.inject_brand()
 auth.require_login()

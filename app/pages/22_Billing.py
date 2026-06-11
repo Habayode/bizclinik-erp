@@ -12,7 +12,7 @@ from bizclinik_erp import auth
 from bizclinik_erp import ui_kit as ui
 from bizclinik_erp.services import billing, payments
 
-st.set_page_config(page_title="Billing · BizClinik ERP", layout="wide",
+st.set_page_config(page_title="Billing · Trakit365 ERP", layout="wide",
                     page_icon="💳")
 ui.inject_brand()
 auth.require_login()

@@ -154,4 +154,4 @@ def test_render_digest_text_mentions_overdue(fresh_db):
     assert "Overdue invoices: 1" in text
     # HTML renderer also produces non-empty branded output.
     html = notifications.render_digest_html(digest)
-    assert "BizClinik ERP" in html and "#1F3864" in html
+    assert "Trakit365 ERP" in html and "#1F3864" in html

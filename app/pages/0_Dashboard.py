@@ -1,4 +1,4 @@
-"""BizClinik ERP — Dashboard (overview)."""
+"""Trakit365 ERP — Dashboard (overview)."""
 from __future__ import annotations
 
 import sys
@@ -27,7 +27,7 @@ from bizclinik_erp.services.banking import bank_balance
 from bizclinik_erp import ui_kit as ui
 from bizclinik_erp import auth
 
-st.set_page_config(page_title="Dashboard · BizClinik ERP", layout="wide",
+st.set_page_config(page_title="Dashboard · Trakit365 ERP", layout="wide",
                     page_icon="📊")
 ui.inject_brand()
 auth.require_login()
@@ -37,7 +37,7 @@ with get_session() as s:
     company = s.query(Company).first()
 
 if not company:
-    ui.hero("BizClinik ERP", "Set up your company to get started",
+    ui.hero("Trakit365 ERP", "Set up your company to get started",
             badge="BE")
     st.info(
         "**No company configured.** Open **Settings** to set the company "
