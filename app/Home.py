@@ -96,3 +96,10 @@ NAV = {
 
 pg = st.navigation(NAV, position="sidebar")
 pg.run()
+
+# Floating help assistant (bottom-right) on every page.
+try:
+    from bizclinik_erp import assistant
+    assistant.render_floating_widget()
+except Exception:
+    pass
