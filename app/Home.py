@@ -97,12 +97,14 @@ NAV = {
 }
 
 pg = st.navigation(NAV, position="sidebar")
-pg.run()
 
 # Floating launcher (pure CSS + anchor — no JS/iframe) that opens the Assistant
-# page from any screen. Rendered every run so it shows on every page.
+# page from any screen. Injected BEFORE pg.run() so it still renders even when a
+# page calls st.stop() (e.g. the "no company configured" dashboard, gated pages).
 try:
     from bizclinik_erp import assistant
     st.markdown(assistant.launcher_html("assistant"), unsafe_allow_html=True)
 except Exception:
     pass
+
+pg.run()
