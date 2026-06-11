@@ -38,7 +38,7 @@ with get_session() as s:
 
 if not company:
     ui.hero("Trakit365 ERP", "Set up your company to get started",
-            badge="BE")
+            badge="T3")
     st.info(
         "**No company configured.** Open **Settings** to set the company "
         "profile, or **Data** to import a BizClinik xlsx workbook."
