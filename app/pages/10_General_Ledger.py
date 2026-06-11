@@ -27,7 +27,7 @@ st.set_page_config(page_title="General Ledger · Trakit365 ERP", layout="wide",
 ui.inject_brand()
 auth.require_login()
 ui.hero("General Ledger", "Trial balance · journal entries · account inquiry",
-         badge="GL", right_label="Module", right_value="Bookkeeping")
+         badge="GL", right_label="Module", right_value="Bookkeeping", compact=True)
 
 tab_tb, tab_coa, tab_je, tab_inq, tab_journals = st.tabs(
     ["⚖️ Trial Balance", "📚 Chart of Accounts", "➕ New journal",

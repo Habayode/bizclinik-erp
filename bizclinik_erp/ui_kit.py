@@ -93,6 +93,10 @@ html, body, [class*="css"] {
     margin-bottom: 18px;
 }
 .brand-hero .brand-left { display: flex; gap: 14px; align-items: center; }
+.brand-hero.compact { padding: 8px 16px; margin-bottom: 10px; border-radius: 10px; }
+.brand-hero.compact .logo { width: 30px; height: 30px; font-size: 0.8rem; }
+.brand-hero.compact h1 { font-size: 1.05rem; }
+.brand-hero.compact .sub { font-size: 0.75rem; margin-top: 0; }
 .brand-hero .logo {
     width: 44px; height: 44px; border-radius: 10px;
     background: rgba(255,255,255,0.18);
@@ -290,7 +294,8 @@ def pick_row(df, *, key: str, column_config=None, height=None):
 def hero(title: str, subtitle: str = "", *,
          badge: Optional[str] = None,
          right_label: Optional[str] = None,
-         right_value: Optional[str] = None) -> None:
+         right_value: Optional[str] = None,
+         compact: bool = False) -> None:
     """Branded page hero bar. Title on left, optional summary on right."""
     right_html = ""
     if right_label or right_value:
@@ -301,8 +306,9 @@ def hero(title: str, subtitle: str = "", *,
             "</div>"
         )
     initials = (badge or title)[:2].upper()
+    compact_cls = " compact" if compact else ""
     html = _h(f"""
-        <div class='brand-hero'>
+        <div class='brand-hero{compact_cls}'>
             <div class='brand-left'>
                 <div class='logo'>{initials}</div>
                 <div>

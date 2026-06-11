@@ -79,18 +79,70 @@ def _expense_account_options(session) -> dict[str, int]:
 
 with tab_bill:
     st.subheader("Bills")
+    fc1, fc2 = st.columns([1, 2])
+    f_status = fc1.selectbox(
+        "Status", ["All", "POSTED", "PARTIAL", "PAID", "CANCELLED"],
+        key="bill_f_status")
+    f_text = fc2.text_input("Search (number or supplier)", key="bill_f_text")
     with get_session() as s:
         bills = s.execute(select(Bill).order_by(Bill.bill_date.desc())).scalars().all()
         rows = [{
+            "id": b.id,
             "number": b.number, "date": b.bill_date,
             "supplier": b.supplier.name if b.supplier else "",
             "total": b.grand_total, "paid": b.amount_paid,
             "outstanding": b.outstanding, "status": b.status.value,
         } for b in bills]
-    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch",
-                 column_config={"total": ui.money_col("total"),
-                                "paid": ui.money_col("paid"),
-                                "outstanding": ui.money_col("outstanding")})
+    if f_status != "All":
+        rows = [r for r in rows if r["status"] == f_status]
+    if f_text.strip():
+        _q = f_text.strip().lower()
+        rows = [r for r in rows
+                if _q in r["number"].lower() or _q in r["supplier"].lower()]
+    sel_bill = None
+    if rows:
+        sel_bill = ui.pick_row(
+            pd.DataFrame(rows), key="bill_pick",
+            column_config={"total": ui.money_col("total"),
+                           "paid": ui.money_col("paid"),
+                           "outstanding": ui.money_col("outstanding"),
+                           "id": None})
+    else:
+        st.caption("No bills match.")
+
+    if sel_bill is not None:
+        with st.container(border=True):
+            st.markdown(f"##### {sel_bill['number']} — {sel_bill['supplier']} "
+                        f"· {sel_bill['status']}")
+            from bizclinik_erp.models import JournalEntry
+            with get_session() as s:
+                b = s.get(Bill, int(sel_bill["id"]))
+                line_rows = [{
+                    "description": l.description, "qty": l.qty,
+                    "unit_cost": l.unit_cost, "tax_rate": l.tax_rate,
+                } for l in b.lines]
+                pay_rows = [{
+                    "number": p.number, "date": p.payment_date,
+                    "amount": p.amount, "method": p.method,
+                    "status": p.status.value,
+                } for p in s.execute(select(Payment).where(
+                    Payment.bill_id == b.id)).scalars()]
+                je = s.get(JournalEntry, b.je_id) if b.je_id else None
+                je_no = je.entry_no if je else None
+            st.dataframe(pd.DataFrame(line_rows), hide_index=True,
+                         width="stretch",
+                         column_config={"unit_cost": ui.money_col("unit_cost")})
+            if pay_rows:
+                st.markdown("**Payments applied**")
+                st.dataframe(pd.DataFrame(pay_rows), hide_index=True,
+                             width="stretch",
+                             column_config={"amount": ui.money_col("amount")})
+            else:
+                st.caption("No payments applied yet.")
+            if je_no:
+                st.caption(f"Posted as journal **{je_no}**.")
+    else:
+        st.caption("Select a bill to see its lines and payments.")
 
     st.divider()
     st.subheader("New bill")
@@ -116,34 +168,51 @@ with tab_bill:
             sel_cur = c3.selectbox("Currency", cur_codes or ["NGN"],
                                     help="Foreign bills post to the ledger in NGN "
                                          "at the latest rate; stock valued in NGN.")
-            line_type = st.radio("Line type", ["Inventory (stockable)", "Expense"],
-                                  horizontal=True)
-            seed = []
-            if line_type.startswith("Inv") and prods:
-                seed = [{"product_id": p["id"], "description": p["name"], "qty": 1,
-                         "unit_cost": p["cost"], "tax_rate": 0.075,
-                         "expense_account_id": None} for p in prods[:3]]
-            else:
-                default_acct = list(exp_opts.values())[0] if exp_opts else None
-                seed = [{"product_id": None, "description": "", "qty": 1,
-                         "unit_cost": 0.0, "tax_rate": 0.075,
-                         "expense_account_id": default_acct}]
-            grid = st.data_editor(pd.DataFrame(seed), num_rows="dynamic", key="bill_grid")
+            prod_by_label = {f"{p['sku']} — {p['name']}": p for p in prods}
+            seed = [{"product": "(none)", "description": "", "qty": 1.0,
+                     "unit_cost": 0.0, "tax_rate": 0.075,
+                     "expense_account": "(auto)"}]
+            grid = st.data_editor(
+                pd.DataFrame(seed), num_rows="dynamic", key="bill_grid",
+                column_config={
+                    "product": st.column_config.SelectboxColumn(
+                        "Product", options=["(none)"] + list(prod_by_label),
+                        help="Pick a stock product, or (none) for an expense line"),
+                    "description": st.column_config.TextColumn(
+                        "Description", width="large"),
+                    "qty": st.column_config.NumberColumn("Qty", min_value=0.0),
+                    "unit_cost": st.column_config.NumberColumn(
+                        "Unit cost (₦)", min_value=0.0, format="%.2f"),
+                    "tax_rate": st.column_config.NumberColumn(
+                        "Tax (decimal)", min_value=0.0, max_value=1.0,
+                        format="%.3f"),
+                    "expense_account": st.column_config.SelectboxColumn(
+                        "Expense account",
+                        options=["(auto)"] + list(exp_opts),
+                        help="For non-stock lines; (auto) uses the default "
+                             "expense account"),
+                })
             notes = st.text_area("Notes")
             submit = st.form_submit_button("Receive bill", type="primary")
         if submit:
             line_dicts = []
             for _, row in grid.iterrows():
+                prod = prod_by_label.get(str(row.get("product") or ""))
                 desc = str(row.get("description") or "").strip()
+                if not desc and prod:
+                    desc = prod["name"]
                 if not desc:
                     continue
+                cost = float(row["unit_cost"] or 0)
+                if cost == 0 and prod:
+                    cost = float(prod["cost"] or 0)
+                acct = exp_opts.get(str(row.get("expense_account") or ""))
                 line_dicts.append({
-                    "product_id": int(row["product_id"]) if pd.notna(row["product_id"]) else None,
+                    "product_id": prod["id"] if prod else None,
                     "description": desc, "qty": float(row["qty"] or 0),
-                    "unit_cost": float(row["unit_cost"] or 0),
+                    "unit_cost": cost,
                     "tax_rate": float(row["tax_rate"] or 0),
-                    "expense_account_id": int(row["expense_account_id"])
-                    if pd.notna(row.get("expense_account_id")) else None,
+                    "expense_account_id": acct,
                 })
             if not line_dicts:
                 st.error("Add at least one line.")
@@ -193,24 +262,41 @@ with tab_po:
         with st.form("new_po"):
             sel_sup = st.selectbox("Supplier", list(sup_opts.keys()), key="po_sup")
             order_date = st.date_input("Order date", value=date.today(), key="po_date")
-            seed = [{"product_id": p["id"], "description": p["name"], "qty": 1,
-                     "unit_cost": p["cost"], "tax_rate": 0.075}
-                    for p in prods[:3]] or [{"product_id": None, "description": "",
-                                                "qty": 1, "unit_cost": 0.0,
-                                                "tax_rate": 0.075}]
-            grid = st.data_editor(pd.DataFrame(seed), num_rows="dynamic", key="po_grid")
+            po_prod_by_label = {f"{p['sku']} — {p['name']}": p for p in prods}
+            seed = [{"product": "(none)", "description": "", "qty": 1.0,
+                     "unit_cost": 0.0, "tax_rate": 0.075}]
+            grid = st.data_editor(
+                pd.DataFrame(seed), num_rows="dynamic", key="po_grid",
+                column_config={
+                    "product": st.column_config.SelectboxColumn(
+                        "Product", options=["(none)"] + list(po_prod_by_label)),
+                    "description": st.column_config.TextColumn(
+                        "Description", width="large"),
+                    "qty": st.column_config.NumberColumn("Qty", min_value=0.0),
+                    "unit_cost": st.column_config.NumberColumn(
+                        "Unit cost (₦)", min_value=0.0, format="%.2f"),
+                    "tax_rate": st.column_config.NumberColumn(
+                        "Tax (decimal)", min_value=0.0, max_value=1.0,
+                        format="%.3f"),
+                })
             notes = st.text_area("Notes", key="po_notes")
             submit = st.form_submit_button("Save purchase order", type="primary")
         if submit:
             line_dicts = []
             for _, row in grid.iterrows():
+                prod = po_prod_by_label.get(str(row.get("product") or ""))
                 desc = str(row.get("description") or "").strip()
+                if not desc and prod:
+                    desc = prod["name"]
                 if not desc:
                     continue
+                cost = float(row["unit_cost"] or 0)
+                if cost == 0 and prod:
+                    cost = float(prod["cost"] or 0)
                 line_dicts.append({
-                    "product_id": int(row["product_id"]) if pd.notna(row["product_id"]) else None,
+                    "product_id": prod["id"] if prod else None,
                     "description": desc, "qty": float(row["qty"] or 0),
-                    "unit_cost": float(row["unit_cost"] or 0),
+                    "unit_cost": cost,
                     "tax_rate": float(row["tax_rate"] or 0),
                     "expense_account_id": None,
                 })

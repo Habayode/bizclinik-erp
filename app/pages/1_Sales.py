@@ -64,12 +64,18 @@ def _bank_options(session) -> dict[str, int]:
 
 
 with tab_inv:
-    st.subheader("Existing invoices")
+    st.subheader("Invoices")
+    fc1, fc2 = st.columns([1, 2])
+    f_status = fc1.selectbox(
+        "Status", ["All", "POSTED", "PARTIAL", "PAID", "CANCELLED"],
+        key="inv_f_status")
+    f_text = fc2.text_input("Search (number or customer)", key="inv_f_text")
     with get_session() as s:
         invs = s.execute(
             select(SalesInvoice).order_by(SalesInvoice.invoice_date.desc())
         ).scalars().all()
         rows = [{
+            "id": i.id,
             "number": i.number,
             "date": i.invoice_date,
             "customer": i.customer.name if i.customer else "",
@@ -78,20 +84,72 @@ with tab_inv:
             "outstanding": i.outstanding,
             "status": i.status.value,
         } for i in invs]
-    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+    if f_status != "All":
+        rows = [r for r in rows if r["status"] == f_status]
+    if f_text.strip():
+        _q = f_text.strip().lower()
+        rows = [r for r in rows
+                if _q in r["number"].lower() or _q in r["customer"].lower()]
+    sel_inv = None
+    if rows:
+        sel_inv = ui.pick_row(
+            pd.DataFrame(rows), key="inv_pick",
+            column_config={"total": ui.money_col("total"),
+                           "paid": ui.money_col("paid"),
+                           "outstanding": ui.money_col("outstanding"),
+                           "id": None})
+    else:
+        st.caption("No invoices match.")
 
-    sel = st.selectbox("Generate PDF for invoice",
-                       options=[""] + [r["number"] for r in rows])
-    if sel and st.button("Generate PDF", key="pdf_btn"):
-        with get_session() as s:
-            inv = s.execute(select(SalesInvoice).where(
-                SalesInvoice.number == sel)).scalar_one()
-            tmpdir = Path(tempfile.mkdtemp(prefix="bizclinik_pdf_"))
-            out = tmpdir / f"{sel.replace('/', '_')}.pdf"
-            write_invoice_pdf(s, inv.id, out)
-        st.success(f"Generated {out.name}")
-        st.download_button("Download invoice PDF", data=out.read_bytes(),
-                            file_name=out.name, mime="application/pdf")
+    if sel_inv is not None:
+        with st.container(border=True):
+            st.markdown(f"##### {sel_inv['number']} — {sel_inv['customer']} "
+                        f"· {sel_inv['status']}")
+            from bizclinik_erp.models import JournalEntry
+            with get_session() as s:
+                inv = s.get(SalesInvoice, int(sel_inv["id"]))
+                line_rows = [{
+                    "description": l.description, "qty": l.qty,
+                    "unit_price": l.unit_price, "tax_rate": l.tax_rate,
+                    "subtotal": l.subtotal,
+                } for l in inv.lines]
+                rct_rows = [{
+                    "number": r.number, "date": r.receipt_date,
+                    "amount": r.amount, "method": r.method,
+                    "status": r.status.value,
+                } for r in s.execute(select(Receipt).where(
+                    Receipt.invoice_id == inv.id)).scalars()]
+                je = s.get(JournalEntry, inv.je_id) if inv.je_id else None
+                je_no = je.entry_no if je else None
+            st.dataframe(pd.DataFrame(line_rows), hide_index=True,
+                         width="stretch",
+                         column_config={"unit_price": ui.money_col("unit_price"),
+                                        "subtotal": ui.money_col("subtotal")})
+            dc1, dc2 = st.columns([2, 1])
+            with dc1:
+                if rct_rows:
+                    st.markdown("**Receipts applied**")
+                    st.dataframe(pd.DataFrame(rct_rows), hide_index=True,
+                                 width="stretch",
+                                 column_config={"amount": ui.money_col("amount")})
+                else:
+                    st.caption("No receipts applied yet.")
+                if je_no:
+                    st.caption(f"Posted as journal **{je_no}**.")
+            with dc2:
+                if st.button("📄 Generate PDF", key="pdf_btn",
+                             use_container_width=True):
+                    with get_session() as s:
+                        tmpdir = Path(tempfile.mkdtemp(prefix="bizclinik_pdf_"))
+                        out = tmpdir / f"{sel_inv['number'].replace('/', '_')}.pdf"
+                        write_invoice_pdf(s, int(sel_inv["id"]), out)
+                    st.download_button("⬇ Download invoice PDF",
+                                       data=out.read_bytes(),
+                                       file_name=out.name,
+                                       mime="application/pdf",
+                                       use_container_width=True)
+    else:
+        st.caption("Select an invoice to see its lines, receipts and PDF.")
 
     st.divider()
     st.subheader("New invoice")
@@ -116,20 +174,23 @@ with tab_inv:
             sel_cur = c3.selectbox("Currency", cur_codes or ["NGN"],
                                     help="Foreign-currency invoices post to the "
                                          "ledger in NGN at the latest rate.")
-            seed = [{"product_id": p["id"], "description": p["name"], "qty": 1,
-                     "unit_price": p["price"], "tax_rate": 0.075}
-                    for p in prods[:3]] or [{"product_id": None, "description": "",
-                                                "qty": 1, "unit_price": 0.0,
-                                                "tax_rate": 0.075}]
+            prod_by_label = {f"{p['sku']} — {p['name']}": p for p in prods}
+            seed = [{"product": "(none)", "description": "", "qty": 1.0,
+                     "unit_price": 0.0, "tax_rate": 0.075}]
             grid = st.data_editor(pd.DataFrame(seed), num_rows="dynamic",
+                                  key="inv_grid",
                                   column_config={
-                                      "product_id": st.column_config.NumberColumn(
-                                          "Product ID", help="Product ID from Inventory page"),
+                                      "product": st.column_config.SelectboxColumn(
+                                          "Product",
+                                          options=["(none)"] + list(prod_by_label),
+                                          help="Pick a product, or leave (none) "
+                                               "for a free-text line"),
                                       "description": st.column_config.TextColumn(
                                           "Description", width="large"),
                                       "qty": st.column_config.NumberColumn("Qty", min_value=0.0),
                                       "unit_price": st.column_config.NumberColumn(
-                                          "Unit price (₦)", min_value=0.0, format="%.2f"),
+                                          "Unit price (₦)", min_value=0.0, format="%.2f",
+                                          help="0 with a product selected = use its list price"),
                                       "tax_rate": st.column_config.NumberColumn(
                                           "Tax (decimal)", min_value=0.0, max_value=1.0,
                                           format="%.3f"),
@@ -139,13 +200,19 @@ with tab_inv:
         if submit:
             lines = []
             for _, row in grid.iterrows():
+                prod = prod_by_label.get(str(row.get("product") or ""))
                 desc = str(row.get("description") or "").strip()
+                if not desc and prod:
+                    desc = prod["name"]
                 if not desc:
                     continue
+                price = float(row["unit_price"] or 0)
+                if price == 0 and prod:
+                    price = float(prod["price"] or 0)
                 lines.append(sales_svc.LineInput(
-                    product_id=int(row["product_id"]) if pd.notna(row["product_id"]) else None,
+                    product_id=prod["id"] if prod else None,
                     description=desc, qty=float(row["qty"] or 0),
-                    unit_price=float(row["unit_price"] or 0),
+                    unit_price=price,
                     tax_rate=float(row["tax_rate"] or 0),
                 ))
             if not lines:

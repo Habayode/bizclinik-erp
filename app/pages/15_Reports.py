@@ -21,7 +21,7 @@ st.set_page_config(page_title="Reports · Trakit365 ERP", layout="wide",
 ui.inject_brand()
 auth.require_login()
 ui.hero("Reports", "Profit & Loss · Balance Sheet · Cash Flow · Aging · Tax",
-         badge="RP", right_label="Module", right_value="Financial reports")
+         badge="RP", right_label="Module", right_value="Financial reports", compact=True)
 
 
 def money(x: float) -> str:

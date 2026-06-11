@@ -52,12 +52,63 @@ if not company:
 today = date.today()
 fy_start = date(today.year, 1, 1)
 
-with get_session() as s:
-    n_customers = s.query(Customer).count()
-    n_suppliers = s.query(Supplier).count()
-    n_products = s.query(Product).count()
-    n_invoices = s.query(SalesInvoice).count()
-    n_bills = s.query(Bill).count()
+
+@st.cache_data(ttl=60, show_spinner=False)
+def _dash(_tenant_key: str, _today_iso: str) -> dict:
+    """All dashboard figures, cached 60s per business — the monthly P&L loop
+    alone runs N full reports, which is heavy on a small server."""
+    with get_session() as s:
+        d = {
+            "n_customers": s.query(Customer).count(),
+            "n_suppliers": s.query(Supplier).count(),
+            "n_products": s.query(Product).count(),
+            "n_invoices": s.query(SalesInvoice).count(),
+            "n_bills": s.query(Bill).count(),
+            "pnl": reports.profit_and_loss(s, period_start=fy_start,
+                                           period_end=today),
+            "bs": reports.balance_sheet(s, as_of=today),
+            "ar_aging": reports.ar_aging(s, as_of=today),
+            "ap_aging": reports.ap_aging(s, as_of=today),
+        }
+        banks = s.execute(select(BankAccount).where(
+            BankAccount.is_active == True)).scalars().all()  # noqa: E712
+        d["bank_rows"] = [{"name": f"{b.code} · {b.name}",
+                           "balance": bank_balance(s, b.id) or 0.0}
+                          for b in banks]
+        d["total_cash"] = round(sum(r["balance"] for r in d["bank_rows"]), 2)
+        monthly = []
+        for m in range(1, today.month + 1):
+            m_start = date(today.year, m, 1)
+            m_end = (date(today.year, m + 1, 1) if m < 12
+                     else date(today.year + 1, 1, 1)) - timedelta(days=1)
+            rp = reports.profit_and_loss(s, period_start=m_start, period_end=m_end)
+            monthly.append({
+                "month": m_start.strftime("%b"),
+                "revenue": rp["total_revenue"],
+                "expense": rp["total_direct_costs"] + rp["total_operating_expenses"],
+                "net": rp["net_profit"],
+            })
+        d["monthly"] = monthly
+        recent_jes = s.execute(select(JournalEntry).order_by(
+            JournalEntry.posted_at.desc().nullslast(),
+            JournalEntry.id.desc()
+        ).limit(8)).scalars().all()
+        d["recent_rows"] = [{
+            "Date": j.entry_date.isoformat(),
+            "JE": j.entry_no,
+            "Source": (j.source_kind or "Manual").replace("_", " "),
+            "Memo": (j.memo or "")[:90],
+            "Amount": ui.money(j.total_debit),
+        } for j in recent_jes]
+    return d
+
+
+_D = _dash(auth.active_tenant() or "default", today.isoformat())
+n_customers = _D["n_customers"]
+n_suppliers = _D["n_suppliers"]
+n_products = _D["n_products"]
+n_invoices = _D["n_invoices"]
+n_bills = _D["n_bills"]
 
 # Getting-started checklist for young books — disappears once trading starts.
 if n_invoices == 0 or n_customers == 0 or n_products == 0:
@@ -80,42 +131,14 @@ if n_invoices == 0 or n_customers == 0 or n_products == 0:
             if not done and page:
                 col_b.page_link(page, label=f"→ {page_label}")
 
-    pnl = reports.profit_and_loss(s, period_start=fy_start, period_end=today)
-    bs = reports.balance_sheet(s, as_of=today)
-    ar_aging = reports.ar_aging(s, as_of=today)
-    ap_aging = reports.ap_aging(s, as_of=today)
-
-    banks = s.execute(select(BankAccount).where(BankAccount.is_active == True)  # noqa: E712
-                       ).scalars().all()
-    bank_rows = [{"name": f"{b.code} · {b.name}",
-                   "balance": bank_balance(s, b.id) or 0.0} for b in banks]
-    total_cash = round(sum(r["balance"] for r in bank_rows), 2)
-
-    # Build monthly P&L series for the trend chart.
-    monthly = []
-    for m in range(1, today.month + 1):
-        m_start = date(today.year, m, 1)
-        m_end = (date(today.year, m + 1, 1) if m < 12 else date(today.year + 1, 1, 1)) - timedelta(days=1)
-        rp = reports.profit_and_loss(s, period_start=m_start, period_end=m_end)
-        monthly.append({
-            "month": m_start.strftime("%b"),
-            "revenue": rp["total_revenue"],
-            "expense": rp["total_direct_costs"] + rp["total_operating_expenses"],
-            "net": rp["net_profit"],
-        })
-
-    # Recent journals for activity feed.
-    recent_jes = s.execute(select(JournalEntry).order_by(
-        JournalEntry.posted_at.desc().nullslast(),
-        JournalEntry.id.desc()
-    ).limit(8)).scalars().all()
-    recent_rows = [{
-        "Date": j.entry_date.isoformat(),
-        "JE": j.entry_no,
-        "Source": (j.source_kind or "Manual").replace("_", " "),
-        "Memo": (j.memo or "")[:90],
-        "Amount": ui.money(j.total_debit),
-    } for j in recent_jes]
+pnl = _D["pnl"]
+bs = _D["bs"]
+ar_aging = _D["ar_aging"]
+ap_aging = _D["ap_aging"]
+bank_rows = _D["bank_rows"]
+total_cash = _D["total_cash"]
+monthly = _D["monthly"]
+recent_rows = _D["recent_rows"]
 
 
 # ---- Hero -------------------------------------------------------------------
@@ -261,7 +284,7 @@ with right:
         f"{_tile('Customers', n_customers)}"
         f"{_tile('Suppliers', n_suppliers)}"
         f"{_tile('Products', n_products)}"
-        f"{_tile('Bank accounts', len(banks))}"
+        f"{_tile('Bank accounts', len(bank_rows))}"
         f"{_tile('Invoices', n_invoices)}"
         f"{_tile('Bills', n_bills)}"
         "</div></div>"

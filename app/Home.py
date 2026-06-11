@@ -49,6 +49,21 @@ def _page(path: str, title: str, icon: str, default: bool = False):
     return st.Page(path, title=title, icon=icon, default=default)
 
 
+@st.cache_data(ttl=30, show_spinner=False)
+def _pending_approvals(_tenant_key: str) -> int:
+    try:
+        from bizclinik_erp.db import get_session
+        from bizclinik_erp.services import approvals as _appr
+        with get_session() as s:
+            return _appr.pending_count(s)
+    except Exception:
+        return 0
+
+
+_n_pending = _pending_approvals(auth.active_tenant() or "default")
+_appr_title = f"Approvals ({_n_pending})" if _n_pending else "Approvals"
+
+
 # --------------------------------------------------------------------------- #
 # Grouped navigation                                                          #
 # --------------------------------------------------------------------------- #
@@ -71,7 +86,8 @@ NAV = {
         _page("pages/11_Month_End.py", "Month-End", "📅"),
         _page("pages/12_Statements.py", "Statements", "📃"),
         _page("pages/15_Reports.py", "Reports", "📈"),
-        _page("pages/28_Approvals.py", "Approvals", "✅"),
+        st.Page("pages/28_Approvals.py", title=_appr_title, icon="✅",
+                url_path="approvals-queue"),
     ],
     "CRM": [
         _page("pages/23_CRM.py", "CRM", "🤝"),
