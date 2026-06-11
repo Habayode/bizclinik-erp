@@ -7,7 +7,7 @@ Every financial figure in this manual is *real*: it was produced by posting the 
 - **Case study:** GreenLeaf Stores Ltd — a Lagos retail + delivery SME
 - **Period:** May 2026
 - **Result:** Trial Balance **₦9,541,875 DR = ₦9,541,875 CR** (balanced ✓)
-- **Workspace:** the ERP groups every module into **Overview · Finance & Accounting · CRM · HR · System**, with an always-available help assistant.
+- **Workspace:** the ERP groups every module into **Overview · Finance & Accounting · CRM · HR · System**.
 
 ---
 
@@ -21,7 +21,7 @@ Every financial figure in this manual is *real*: it was produced by posting the 
 | **4. Module guide** | Each module: what it does → the flow → the GL impact → GreenLeaf's real entries. Includes **People & HR** and **Approvals** |
 | **5. The month in review** | GreenLeaf's full May 2026, transaction by transaction |
 | **6. Reports** | The actual P&L, Balance Sheet, Cash Flow, agings, VAT, budget — with figures |
-| **7. Platform features** | Multi-business, plans & access, approvals, REST API, billing, backups, the assistant |
+| **7. Platform features** | Multi-business, plans & access, approvals, REST API, billing, backups |
 | **8. Screenshots** | Visual reference of each screen |
 
 > **Conventions.** *DR* = debit, *CR* = credit. Every transaction posts a **balanced double-entry journal** automatically — you never touch the ledger by hand. The functional currency is the **Naira (₦)**; foreign documents post to the ledger in ₦ at the day's rate.
@@ -44,7 +44,6 @@ Open the app URL in any browser. You'll see the **sign-in card**. Enter your **u
   - **System** — Onboarding, Settings, Admin, Notifications, Data, Tenants, Billing, **User Manual**
 - **Main panel** — the active module.
 - **Plan badge** — the active subscription plan shows in the sidebar; **Sign-out** is at the bottom.
-- **Help assistant** — a floating **💬 bubble** (bottom-right of every page) answers how-to questions *and* questions about your live numbers (e.g. "What's my revenue this month?", "How many approvals are pending?").
 - **This manual** is also available inside the app under **System → User Manual**.
 
 ## 1.3 The dashboard (Home)
@@ -364,7 +363,6 @@ Output ₦63,375 − Input ₦222,000 = **₦158,625 creditable**.
 - **Multi-business (multi-tenant).** Run many businesses from one login; each is a fully isolated database with its own subdomain and its own invoice branding. Manage under **System → Tenants**.
 - **REST API + webhooks.** Every core function is reachable via the REST API with a per-business API key (`X-API-Key`): customers, products, invoices, reports, bank feed, CRM, billing. *(Business plan.)*
 - **Billing.** Subscriptions via Paystack / Flutterwave / Moniepoint (switchable), under **Billing**.
-- **In-app help assistant.** A floating 💬 bubble on every page answers how-to questions and live-data questions (revenue, cash, AR/AP, pending approvals, counts) for the current business.
 - **User Manual in-app.** This guide is available under **System → User Manual** (with a download button).
 - **Backups & recovery.** Nightly, the system `pg_dump`s every database, **encrypts** it, and uploads it off-site. The encryption passphrase is your recovery key — keep it in a password manager. (See the separate operations/secrets reference.)
 - **Security.** No open inbound ports (secured tunnel), per-user roles, audit trail on every change, period locks, and approval limits on spend.
@@ -449,4 +447,4 @@ Captured live from the GreenLeaf demo (May 2026 data, plus the June HR/approvals
 
 ---
 
-*Trakit365 ERP · built & operated by HAG_Ai · Updated 2026-06-11 (adds People & HR, Approvals, Plans & access, and the in-app assistant). The financial figures are reproducible: run `python scripts/demo_seed.py` against a fresh database to regenerate GreenLeaf and every figure above.*
+*Trakit365 ERP · built & operated by HAG_Ai · Updated 2026-06-11 (adds People & HR, Approvals, and Plans & access). The financial figures are reproducible: run `python scripts/demo_seed.py` against a fresh database to regenerate GreenLeaf and every figure above.*

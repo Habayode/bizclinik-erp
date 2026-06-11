@@ -55,8 +55,6 @@ def _page(path: str, title: str, icon: str, default: bool = False):
 NAV = {
     "Overview": [
         _page("pages/0_Dashboard.py", "Dashboard", "📊", default=True),
-        st.Page("pages/29_Assistant.py", title="Assistant", icon="💬",
-                url_path="assistant"),
     ],
     "Finance & Accounting": [
         _page("pages/1_Sales.py", "Sales", "🧾"),
@@ -97,14 +95,4 @@ NAV = {
 }
 
 pg = st.navigation(NAV, position="sidebar")
-
-# Floating launcher (pure CSS + anchor — no JS/iframe) that opens the Assistant
-# page from any screen. Injected BEFORE pg.run() so it still renders even when a
-# page calls st.stop() (e.g. the "no company configured" dashboard, gated pages).
-try:
-    from bizclinik_erp import assistant
-    st.markdown(assistant.launcher_html("assistant"), unsafe_allow_html=True)
-except Exception:
-    pass
-
 pg.run()
