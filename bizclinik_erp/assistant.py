@@ -317,17 +317,20 @@ render();
 def render_floating_widget(snapshot: dict | None = None) -> None:
     """Inject the floating assistant into the parent document.
 
-    The data snapshot is refreshed on every run (so the bot's data answers stay
-    current), while the widget DOM + listeners are injected only once.
+    Self-healing: the data snapshot is refreshed on every run, and the widget is
+    re-injected whenever its DOM node is missing (e.g. after Streamlit rebuilds
+    the page on a rerun/reconnect) rather than relying on a one-shot flag — so
+    the bubble can't silently disappear.
     """
     boot = (
         "<script>(function(){var w=window.parent,d=w.document;"
-        "w.__bzkData=" + json.dumps(snapshot or {}) + ";"   # refresh every run
-        "if(w.__bzkAsst)return;w.__bzkAsst=true;"
-        "var css=" + json.dumps(_css()) + ";"
-        "var js=" + json.dumps(_js()) + ";"
-        "var s=d.createElement('style');s.textContent=css;d.head.appendChild(s);"
-        "var sc=d.createElement('script');sc.textContent=js;d.body.appendChild(sc);"
+        "w.__bzkData=" + json.dumps(snapshot or {}) + ";"          # refresh data every run
+        "if(!d.getElementById('bzk-asst-style')){"
+        "var s=d.createElement('style');s.id='bzk-asst-style';"
+        "s.textContent=" + json.dumps(_css()) + ";d.head.appendChild(s);}"
+        "if(!d.getElementById('bzk-asst')){"                        # DOM-based guard (self-healing)
+        "var sc=d.createElement('script');"
+        "sc.textContent=" + json.dumps(_js()) + ";d.body.appendChild(sc);}"
         "})();</script>"
     )
     components.html(boot, height=0)

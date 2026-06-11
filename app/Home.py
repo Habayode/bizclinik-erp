@@ -112,7 +112,11 @@ def _assistant_snapshot(_tenant_key: str) -> dict:
 
 try:
     from bizclinik_erp import assistant
-    _snap = _assistant_snapshot(auth.active_tenant() or "default")
+    # A snapshot failure must NOT suppress the bubble — fall back to empty data.
+    try:
+        _snap = _assistant_snapshot(auth.active_tenant() or "default")
+    except Exception:
+        _snap = {}
     assistant.render_floating_widget(_snap)
 except Exception:
     pass
