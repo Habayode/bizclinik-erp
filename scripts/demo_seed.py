@@ -87,9 +87,15 @@ def seed_demo() -> dict:
             Product(sku="DELIV", name="Delivery Service", unit="trip", standard_price=5000, standard_cost=0, is_stockable=False),
         ])
         s.add_all([
-            Employee(code="E001", name="Chioma Okeke", monthly_gross=250000),
-            Employee(code="E002", name="Bola Adewale", monthly_gross=180000),
-            Employee(code="E003", name="Emeka Driver", monthly_gross=120000),
+            Employee(code="E001", name="Chioma Okeke", monthly_gross=250000,
+                     department="Operations", job_title="Store Manager",
+                     employment_type="full-time"),
+            Employee(code="E002", name="Bola Adewale", monthly_gross=180000,
+                     department="Sales", job_title="Sales Associate",
+                     employment_type="full-time"),
+            Employee(code="E003", name="Emeka Driver", monthly_gross=120000,
+                     department="Logistics", job_title="Delivery Driver",
+                     employment_type="full-time"),
         ])
         s.flush()
 
@@ -238,6 +244,80 @@ def seed_demo() -> dict:
         firs_sub = firs.generate_for_invoice(s, inv["i1"])
         firs_irn = firs_sub.irn
 
+    # ---- 12b. HR (recruitment + leave) and Approvals demo --------------------
+    # NOTE: deliberately ledger-neutral — the only approval that gets APPROVED
+    # is a purchase order (no GL impact), the over-limit bill stays PENDING and
+    # the third request is REJECTED, so May's verified figures don't change.
+    from bizclinik_erp.services import hr as hr_svc
+    from bizclinik_erp.services import approvals as appr_svc
+    from bizclinik_erp.models import ApplicationStage, LeaveType
+    with get_session() as s:
+        # Recruitment: one open role mid-pipeline, one filled by a hire.
+        op1 = hr_svc.create_opening(s, title="Store Cashier", department="Retail",
+                                    location="Ikeja, Lagos", employment_type="full-time",
+                                    description="Front-desk cashier for the Ikeja store.")
+        op2 = hr_svc.create_opening(s, title="Warehouse Assistant", department="Logistics",
+                                    location="Ikeja, Lagos", employment_type="contract")
+        c1 = hr_svc.add_candidate(s, name="Chidi Nwosu", email="chidi.n@mail.ng",
+                                  phone="0803 222 1100", source="job board")
+        c2 = hr_svc.add_candidate(s, name="Funke Adebayo", email="funke.a@mail.ng",
+                                  source="referral")
+        a1 = hr_svc.apply(s, opening_id=op1.id, candidate_id=c1.id,
+                          applied_date=date(2026, 5, 20))
+        hr_svc.move_application(s, a1.id, ApplicationStage.INTERVIEW)
+        a2 = hr_svc.apply(s, opening_id=op2.id, candidate_id=c2.id,
+                          applied_date=date(2026, 5, 15))
+        hr_svc.hire_candidate(s, a2.id, monthly_gross=95000,
+                              job_title="Warehouse Assistant")
+        # Leave: one approved (reduces balance), one pending.
+        emp_ids = {e.code: e.id for e in hr_svc.list_employees(s)}
+        lr1 = hr_svc.request_leave(s, employee_id=emp_ids["E001"],
+                                   leave_type=LeaveType.ANNUAL,
+                                   start_date=date(2026, 6, 8), end_date=date(2026, 6, 12),
+                                   reason="Family travel")
+        hr_svc.decide_leave(s, lr1.id, approve=True)
+        hr_svc.request_leave(s, employee_id=emp_ids["E002"],
+                             leave_type=LeaveType.SICK,
+                             start_date=date(2026, 6, 3), end_date=date(2026, 6, 4),
+                             reason="Medical")
+        # Approvals: one APPROVED PO (no GL), one PENDING bill, one REJECTED.
+        sup_ids = {x.code: x.id for x in s.query(Supplier).all()}
+        po_payload = {"supplier_id": sup_ids["S002"], "order_date": "2026-06-02",
+                      "notes": "June restock commitment",
+                      "lines": [{"product_id": None, "description": "Cartons restock",
+                                 "qty": 300, "unit_cost": 1200, "tax_rate": 0.075,
+                                 "expense_account_id": None}]}
+        r_ok = appr_svc.gate(s, doc_type="PO", amount=387_000.0,
+                             title="PO — PackRight Supplies (₦387,000)",
+                             payload=po_payload, user_id=None, role="AP")
+        appr_svc.approve(s, r_ok["request_id"], approver_user_id=1,
+                         approver_role="ACCOUNTANT")
+        exp_row = s.execute(
+            select(Account).where(Account.code == "6300")).scalar_one_or_none()
+        exp_acct = exp_row.id if exp_row else None
+        bill_payload = {"supplier_id": sup_ids["S001"], "bill_date": "2026-06-05",
+                        "due_date": "2026-07-05", "currency_code": "NGN",
+                        "fx_rate": None, "notes": "June bulk restock",
+                        "lines": [{"product_id": None, "description": "Rice 50kg x 15",
+                                   "qty": 15, "unit_cost": 40000, "tax_rate": 0.075,
+                                   "expense_account_id": exp_acct}]}
+        appr_svc.gate(s, doc_type="BILL", amount=645_000.0,
+                      title="Bill — FreshFarm Produce (₦645,000)",
+                      payload=bill_payload, user_id=None, role="AP")  # stays PENDING
+        r_no = appr_svc.gate(s, doc_type="PAYMENT", amount=300_000.0,
+                             title="Payment — PackRight advance (₦300,000)",
+                             payload={"supplier_id": sup_ids["S002"],
+                                      "payment_date": "2026-06-06", "amount": 300000,
+                                      "bank_account_id": _bank(s, "BANK1").id,
+                                      "bill_id": None, "method": "BANK",
+                                      "reference": None, "settlement_fx_rate": None},
+                             user_id=None, role="AP")
+        appr_svc.reject(s, r_no["request_id"], approver_user_id=1,
+                        approver_role="ACCOUNTANT", note="Not budgeted — defer to July")
+        hr_summary = {"recruitment": hr_svc.recruitment_summary(s),
+                      "leave": hr_svc.leave_summary(s),
+                      "pending_approvals": appr_svc.pending_count(s)}
+
     # ---- 13. Reports --------------------------------------------------------
     with get_session() as s:
         tb = trial_balance(s)
@@ -268,6 +348,7 @@ def seed_demo() -> dict:
         "month_end_checklist": checklist,
         "crm_pipeline": crm_pipe,
         "firs_irn": firs_irn,
+        "hr_approvals": hr_summary,
     }
 
 

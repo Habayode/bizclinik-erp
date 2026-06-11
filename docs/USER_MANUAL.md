@@ -235,11 +235,15 @@ The **HR** group manages your people end to end. **Payroll** (4.5) lives here to
 
 **Recruitment** — a lightweight applicant tracker that mirrors the CRM shape:
 **Flow:** open a **Job Opening** (title, department, headcount) → add **Candidates** → file **Applications** and move them through stages (Applied → Screening → Interview → Offer → Hired/Rejected) → **Hire**. Hiring creates a real **Employee** from the candidate and marks the opening *Filled*, so Payroll takes over with no re-keying.
-*Example:* opening "Cashier" → candidate Chidi → interview → **Hire** → new employee created, opening filled.
+*GreenLeaf:* "Store Cashier" is open with Chidi Nwosu at the **Interview** stage; Funke Adebayo was **hired** into "Warehouse Assistant" (₦95,000/month) — the hire created her employee record and filled that opening.
 
 **Leave** — request, approve and track time off.
 **Flow:** an employee's **leave request** (type, dates → days computed) is **Pending** until a manager **approves/rejects** it. The **balance** = annual entitlement − approved *annual* days taken this year (sick/unpaid/other are tracked but don't reduce the annual balance).
-*Example:* Ngozi requests 1–5 Jun annual (5 days) → approved → her balance shows 20 − 5 = **15 days** remaining.
+*GreenLeaf:* Chioma's 8–12 Jun annual leave (5 days) is approved → her balance shows 20 − 5 = **15 days**; Bola's 2-day sick leave is pending.
+
+![Employees](manual_images/21_employees.png)
+![Recruitment](manual_images/22_recruitment.png)
+![Leave](manual_images/23_leave.png)
 
 ## 4.15 Approvals — spending controls
 Money-out documents (**Bills, Purchase Orders, Payments**) and **Payroll runs** that exceed the submitter's **role limit** are **blocked from posting** and routed to **Finance & Accounting → Approvals**.
@@ -250,7 +254,9 @@ Money-out documents (**Bills, Purchase Orders, Payments**) and **Payroll runs** 
 - An **approver whose limit covers the amount** approves it on the Approvals page, and *only then* is the document created and posted. You **cannot approve your own** request, and an approver can't clear an amount above their own limit.
 - Rejected requests never post (and never consume a document number). Requesters can withdraw their own pending requests.
 
-*Example:* an AP clerk (₦250k limit) receives a **₦645,000** bill → it's queued; the Accountant (₦1m limit) approves → the bill posts as `BIL-…`. The **Approvals** page shows the queue, your own requests, full history, and (Admin) the limit editor.
+*GreenLeaf:* an AP clerk (₦250k limit) submits a **₦645,000** FreshFarm bill → it sits in the Pending queue below; a ₦387,000 PackRight PO was approved by the Accountant, and a ₦300,000 advance payment was rejected ("not budgeted"). The **Approvals** page shows the queue, your own requests, full history, and (Admin) the limit editor.
+
+![Approvals](manual_images/24_approvals.png)
 
 ---
 
@@ -367,7 +373,7 @@ Output ₦63,375 − Input ₦222,000 = **₦158,625 creditable**.
 
 # 8. Screenshots — visual reference
 
-Captured live from the GreenLeaf demo (May 2026 data). Every figure shown matches the reports above. The newer **People & HR**, **Approvals** and **Plans** screens are covered in **§4.14–4.15** and **§7**; their visuals will be added on the next capture run.
+Captured live from the GreenLeaf demo (May 2026 data, plus the June HR/approvals examples). Every figure shown matches the reports above.
 
 ### Dashboard
 ![Dashboard](manual_images/01_dashboard.png)
@@ -428,6 +434,18 @@ Captured live from the GreenLeaf demo (May 2026 data). Every figure shown matche
 
 ### Recurring transactions
 ![Recurring](manual_images/20_recurring.png)
+
+### Employees (HR)
+![Employees](manual_images/21_employees.png)
+
+### Recruitment (HR)
+![Recruitment](manual_images/22_recruitment.png)
+
+### Leave (HR)
+![Leave](manual_images/23_leave.png)
+
+### Approvals (spending controls)
+![Approvals](manual_images/24_approvals.png)
 
 ---
 

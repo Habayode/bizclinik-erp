@@ -20,6 +20,7 @@ OUT.mkdir(parents=True, exist_ok=True)
 
 # (filename, sidebar-link-text, settle-seconds) — navigate by CLICK to keep the
 # Streamlit session (full-page navigation logs you out).
+# Link names match the grouped st.navigation sidebar in app/Home.py.
 PAGES = [
     ("02_sales", "Sales", 4),
     ("03_purchases", "Purchases", 4),
@@ -30,16 +31,21 @@ PAGES = [
     ("08_fixed_assets", "Fixed Assets", 4),
     ("09_general_ledger", "General Ledger", 5),
     ("10_statements", "Statements", 5),
-    ("11_month_end", "Month End", 4),
+    ("11_month_end", "Month-End", 4),
     ("12_budgets", "Budgets", 4),
     ("13_currencies", "Currencies", 4),
-    ("14_firs_einvoice", "FIRS Einvoice", 4),
+    ("14_firs_einvoice", "FIRS E-Invoice", 4),
     ("15_crm", "CRM", 4),
     ("16_settings", "Settings", 4),
     ("17_tenants", "Tenants", 4),
     ("18_billing", "Billing", 4),
     ("19_reports", "Reports", 5),
     ("20_recurring", "Recurring", 4),
+    # HR + controls (added with the HR/Approvals release)
+    ("21_employees", "Employees", 4),
+    ("22_recruitment", "Recruitment", 4),
+    ("23_leave", "Leave", 4),
+    ("24_approvals", "Approvals", 4),
 ]
 
 
