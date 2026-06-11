@@ -2,12 +2,12 @@
 
 **A complete, worked guide — built around a real case-study company, *GreenLeaf Stores Ltd*, with a full month of transactions posted across every module and the resulting financial statements.**
 
-Every figure in this manual is *real*: it was produced by posting the transactions below into a live copy of the system (`scripts/demo_seed.py`) and reading back the actual reports. Nothing is invented.
+Every financial figure in this manual is *real*: it was produced by posting the transactions below into a live copy of the system (`scripts/demo_seed.py`) and reading back the actual reports. Nothing is invented. (The newer People & HR, Approvals and Plans sections describe how those modules work, with worked examples.)
 
-- **Live app:** https://erp.hagai.online
 - **Case study:** GreenLeaf Stores Ltd — a Lagos retail + delivery SME
 - **Period:** May 2026
 - **Result:** Trial Balance **₦9,541,875 DR = ₦9,541,875 CR** (balanced ✓)
+- **Workspace:** the ERP groups every module into **Overview · Finance & Accounting · CRM · HR · System**, with an always-available help assistant.
 
 ---
 
@@ -18,10 +18,10 @@ Every figure in this manual is *real*: it was produced by posting the transactio
 | **1. Getting started** | Logging in, the layout, the dashboard |
 | **2. Data model** | Every record type, its key fields, and a real example |
 | **3. Onboarding** | Setting up GreenLeaf (company, COA, customers, suppliers, products, staff, bank, branding) |
-| **4. Module guide** | Each module: what it does → the flow → the GL impact → GreenLeaf's real entries |
+| **4. Module guide** | Each module: what it does → the flow → the GL impact → GreenLeaf's real entries. Includes **People & HR** and **Approvals** |
 | **5. The month in review** | GreenLeaf's full May 2026, transaction by transaction |
 | **6. Reports** | The actual P&L, Balance Sheet, Cash Flow, agings, VAT, budget — with figures |
-| **7. Platform features** | Multi-business, REST API, billing, backups |
+| **7. Platform features** | Multi-business, plans & access, approvals, REST API, billing, backups, the assistant |
 | **8. Screenshots** | Visual reference of each screen |
 
 > **Conventions.** *DR* = debit, *CR* = credit. Every transaction posts a **balanced double-entry journal** automatically — you never touch the ledger by hand. The functional currency is the **Naira (₦)**; foreign documents post to the ledger in ₦ at the day's rate.
@@ -36,9 +36,16 @@ Open the app URL in any browser. You'll see the **sign-in card**. Enter your **u
 > On a brand-new install the first sign-in uses the bootstrap admin (`admin`) with the password set during setup.
 
 ## 1.2 The layout
-- **Left sidebar** — navigation to every module (Home, Sales, Purchases, Inventory, Banking, Payroll, Fixed Assets, Bank Reconciliation, Recurring, FIRS E-invoice, General Ledger, Month End, Statements, Budgets, Notifications, Reports, Data, Settings, Admin, Currencies, Tenants, Billing, CRM).
+- **Left sidebar** — navigation, organised into collapsible **groups** so related modules sit together:
+  - **Overview** — Dashboard
+  - **Finance & Accounting** — Sales, Purchases, Inventory, Banking, Bank Reconciliation, Fixed Assets, Recurring, FIRS E-invoice, Currencies, General Ledger, Budgets, Month-End, Statements, Reports, **Approvals**
+  - **CRM** — Leads, pipeline, follow-ups
+  - **HR** — Employees, Recruitment, Leave, Payroll
+  - **System** — Onboarding, Settings, Admin, Notifications, Data, Tenants, Billing, **User Manual**
 - **Main panel** — the active module.
-- **Sign-out** is at the bottom of the sidebar.
+- **Plan badge** — the active subscription plan shows in the sidebar; **Sign-out** is at the bottom.
+- **Help assistant** — a floating **💬 bubble** (bottom-right of every page) answers how-to questions *and* questions about your live numbers (e.g. "What's my revenue this month?", "How many approvals are pending?").
+- **This manual** is also available inside the app under **System → User Manual**.
 
 ## 1.3 The dashboard (Home)
 The Home page is a live snapshot **as of today**, showing:
@@ -112,7 +119,7 @@ Cash in from a customer / cash out to a supplier, linked to an invoice/bill and 
 The underlying double-entry record. Every document above generates one or more balanced journal entries automatically; you can also post manual journals.
 
 ### Other records
-**FixedAsset** (register + depreciation), **BankStatement / BankStatementLine** (reconciliation), **RecurringTemplate** (auto-repeating documents), **Budget / BudgetLine**, **Currency / ExchangeRate**, **InvoiceTemplate** (per-business branding), **Lead / Deal / Activity** (CRM), and the multi-tenant **Tenant / Subscription** control-plane records.
+**FixedAsset** (register + depreciation), **BankStatement / BankStatementLine** (reconciliation), **RecurringTemplate** (auto-repeating documents), **Budget / BudgetLine**, **Currency / ExchangeRate**, **InvoiceTemplate** (per-business branding), **Lead / Deal / Activity** (CRM), **JobOpening / Candidate / JobApplication** and **LeaveRequest** (HR), **ApprovalLimit / ApprovalRequest** (approval workflow), and the multi-tenant **Tenant / Subscription** control-plane records.
 
 ---
 
@@ -220,6 +227,31 @@ GreenLeaf draft IRN for INV-2026-0001: `INV20260001-TIN204711880001-20260506`.
 **Flow:** capture **Leads** → work **Deals** through stages (Lead → Qualified → Proposal → Negotiation → Won/Lost) → log **follow-up activities** → **convert** a won lead into a Customer.
 GreenLeaf pipeline: 2 open deals worth **₦1,350,000** (Tunde/TB Mega Foods ₦900k Qualified; Eze Catering ₦450k Proposal), plus a follow-up call due.
 
+## 4.14 People & HR
+The **HR** group manages your people end to end. **Payroll** (4.5) lives here too.
+
+**Employees** — the staff directory. Each person has a code, department, job title, employment type, pay (monthly gross, PAYE & pension rates) and an **annual leave entitlement** (default 20 days). Activate/deactivate here; active staff flow into Payroll and Leave.
+*GreenLeaf:* E001 Chioma, E002 Bola, E003 Emeka.
+
+**Recruitment** — a lightweight applicant tracker that mirrors the CRM shape:
+**Flow:** open a **Job Opening** (title, department, headcount) → add **Candidates** → file **Applications** and move them through stages (Applied → Screening → Interview → Offer → Hired/Rejected) → **Hire**. Hiring creates a real **Employee** from the candidate and marks the opening *Filled*, so Payroll takes over with no re-keying.
+*Example:* opening "Cashier" → candidate Chidi → interview → **Hire** → new employee created, opening filled.
+
+**Leave** — request, approve and track time off.
+**Flow:** an employee's **leave request** (type, dates → days computed) is **Pending** until a manager **approves/rejects** it. The **balance** = annual entitlement − approved *annual* days taken this year (sick/unpaid/other are tracked but don't reduce the annual balance).
+*Example:* Ngozi requests 1–5 Jun annual (5 days) → approved → her balance shows 20 − 5 = **15 days** remaining.
+
+## 4.15 Approvals — spending controls
+Money-out documents (**Bills, Purchase Orders, Payments**) and **Payroll runs** that exceed the submitter's **role limit** are **blocked from posting** and routed to **Finance & Accounting → Approvals**.
+
+**How it works:**
+- Each **role** has an NGN authorisation limit (defaults, editable by an Admin on *Approvals → Limits*): **Admin = unlimited · Accountant ₦1,000,000 · AP ₦250,000 · Sales/Viewer ₦0**.
+- If you submit something **within** your limit, it posts immediately. **Above** it, you see a 🔒 notice and it becomes a **Pending** request — nothing hits the ledger yet.
+- An **approver whose limit covers the amount** approves it on the Approvals page, and *only then* is the document created and posted. You **cannot approve your own** request, and an approver can't clear an amount above their own limit.
+- Rejected requests never post (and never consume a document number). Requesters can withdraw their own pending requests.
+
+*Example:* an AP clerk (₦250k limit) receives a **₦645,000** bill → it's queued; the Accountant (₦1m limit) approves → the bill posts as `BIL-…`. The **Approvals** page shows the queue, your own requests, full history, and (Admin) the limit editor.
+
 ---
 
 # 5. GreenLeaf's month in review — May 2026
@@ -312,17 +344,30 @@ Output ₦63,375 − Input ₦222,000 = **₦158,625 creditable**.
 
 # 7. Platform features
 
-- **Multi-business (multi-tenant).** Run many businesses from one login; each is a fully isolated database with its own subdomain (`yourbusiness-erp.hagai.online`) and its own invoice branding. Manage under **Tenants**.
-- **REST API + webhooks.** Every core function is reachable at `https://api.hagai.online` with a per-business API key (`X-API-Key`): customers, products, invoices, reports, bank feed, CRM, billing.
-- **Billing.** Subscriptions via Paystack / Flutterwave / Moniepoint (switchable). Free / Starter / Business plans under **Billing**.
-- **Backups & recovery.** Nightly, the system `pg_dump`s every database, **encrypts** it, and uploads it to Cloudflare R2 (off-site). The encryption passphrase is your recovery key — keep it in a password manager. (See the separate operations/secrets reference.)
-- **Security.** No open ports (Cloudflare tunnel), per-user roles, audit trail on every change, period locks.
+- **Plans & access (entitlements).** Three plans gate the premium add-ons; **core accounting is on every plan**. Manage under **System → Billing**, which shows what your plan unlocks and your user cap:
+
+  | Plan | Users | Unlocks |
+  |------|-------|---------|
+  | **Free** | up to 2 | Core accounting (sales, purchases, inventory, banking, payroll, tax, fixed assets, GL, statements, month-end, reports) |
+  | **Starter** | up to 5 | + Bank Reconciliation, Recurring, FIRS e-invoice drafts |
+  | **Business** | unlimited | + Multi-currency, CRM, Budgets, REST API & webhooks |
+
+  Open a locked module and it shows which plan unlocks it; if a subscription lapses you drop to **Free** (core stays usable, premium locks until you renew). Adding users beyond your plan's cap is blocked until you upgrade.
+
+- **Approvals & limits.** Per-role spending limits with a block-until-approved queue for money-out and payroll — see **§4.15**.
+- **Multi-business (multi-tenant).** Run many businesses from one login; each is a fully isolated database with its own subdomain and its own invoice branding. Manage under **System → Tenants**.
+- **REST API + webhooks.** Every core function is reachable via the REST API with a per-business API key (`X-API-Key`): customers, products, invoices, reports, bank feed, CRM, billing. *(Business plan.)*
+- **Billing.** Subscriptions via Paystack / Flutterwave / Moniepoint (switchable), under **Billing**.
+- **In-app help assistant.** A floating 💬 bubble on every page answers how-to questions and live-data questions (revenue, cash, AR/AP, pending approvals, counts) for the current business.
+- **User Manual in-app.** This guide is available under **System → User Manual** (with a download button).
+- **Backups & recovery.** Nightly, the system `pg_dump`s every database, **encrypts** it, and uploads it off-site. The encryption passphrase is your recovery key — keep it in a password manager. (See the separate operations/secrets reference.)
+- **Security.** No open inbound ports (secured tunnel), per-user roles, audit trail on every change, period locks, and approval limits on spend.
 
 ---
 
 # 8. Screenshots — visual reference
 
-Captured live from the GreenLeaf demo (May 2026 data). Every figure shown matches the reports above.
+Captured live from the GreenLeaf demo (May 2026 data). Every figure shown matches the reports above. The newer **People & HR**, **Approvals** and **Plans** screens are covered in **§4.14–4.15** and **§7**; their visuals will be added on the next capture run.
 
 ### Dashboard
 ![Dashboard](manual_images/01_dashboard.png)
@@ -386,4 +431,4 @@ Captured live from the GreenLeaf demo (May 2026 data). Every figure shown matche
 
 ---
 
-*BizClinik ERP · HAG_Ai · This manual is reproducible: run `python scripts/demo_seed.py` against a fresh database to regenerate GreenLeaf and every figure above.*
+*BizClinik ERP · built & operated by HAG_Ai · Updated 2026-06-11 (adds People & HR, Approvals, Plans & access, and the in-app assistant). The financial figures are reproducible: run `python scripts/demo_seed.py` against a fresh database to regenerate GreenLeaf and every figure above.*
