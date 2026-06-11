@@ -23,6 +23,8 @@ from bizclinik_erp.models import (
     Supplier,
 )
 from bizclinik_erp.services import purchase as p_svc
+from bizclinik_erp.services import approvals
+from bizclinik_erp.services import fx as fx_svc
 from bizclinik_erp import ui_kit as ui
 from bizclinik_erp import auth
 
@@ -32,6 +34,22 @@ ui.inject_brand()
 auth.require_login()
 ui.hero("Purchases", "Purchase orders · Bills · Payments",
          badge="PU", right_label="Module", right_value="AP cycle")
+
+_u = auth.current_user() or {}
+UID, ROLE = _u.get("user_id"), _u.get("role")
+
+
+def _gate_msg(res, posted_label: str):
+    """Show the right message after an approval-gated action."""
+    if res["status"] == "pending":
+        lim = res.get("limit")
+        lim_txt = f"₦{lim:,.0f}" if lim is not None else "your"
+        st.warning(
+            f"🔒 Above your approval limit ({lim_txt}) — submitted for approval "
+            f"(request #{res['request_id']}). It will post once approved on the "
+            "**Approvals** page.", icon="🔒")
+    else:
+        st.success(posted_label.format(ref=res["ref"]))
 
 
 tab_bill, tab_po, tab_pay = st.tabs(["🧾 Bills", "📋 Purchase orders", "💸 Payments"])
@@ -110,34 +128,40 @@ with tab_bill:
             notes = st.text_area("Notes")
             submit = st.form_submit_button("Receive bill", type="primary")
         if submit:
-            lines = []
+            line_dicts = []
             for _, row in grid.iterrows():
                 desc = str(row.get("description") or "").strip()
                 if not desc:
                     continue
-                lines.append(p_svc.POLineInput(
-                    product_id=int(row["product_id"]) if pd.notna(row["product_id"]) else None,
-                    description=desc, qty=float(row["qty"] or 0),
-                    unit_cost=float(row["unit_cost"] or 0),
-                    tax_rate=float(row["tax_rate"] or 0),
-                    expense_account_id=int(row["expense_account_id"])
+                line_dicts.append({
+                    "product_id": int(row["product_id"]) if pd.notna(row["product_id"]) else None,
+                    "description": desc, "qty": float(row["qty"] or 0),
+                    "unit_cost": float(row["unit_cost"] or 0),
+                    "tax_rate": float(row["tax_rate"] or 0),
+                    "expense_account_id": int(row["expense_account_id"])
                     if pd.notna(row.get("expense_account_id")) else None,
-                ))
-            if not lines:
+                })
+            if not line_dicts:
                 st.error("Add at least one line.")
             else:
                 try:
                     with get_session() as s:
-                        bill = p_svc.receive_bill(
-                            s, supplier_id=sup_opts[sel_sup], bill_date=bdate,
-                            due_date=due, lines=lines, notes=notes or None,
-                            currency_code=sel_cur,
-                        )
-                        cur = bill.currency_code
-                        st.success(f"Bill {bill.number} posted — total {cur} "
-                                   f"{bill.grand_total:,.2f}"
-                                   + (f" (₦{bill.grand_total * bill.fx_rate:,.2f})"
-                                      if cur != "NGN" else ""))
+                        rate = fx_svc.resolve_rate(s, sel_cur, fx_rate=None, as_of=bdate)
+                        ngn_total = round(sum(
+                            l["qty"] * l["unit_cost"] * (1 + l["tax_rate"])
+                            for l in line_dicts) * rate, 2)
+                        payload = {
+                            "supplier_id": sup_opts[sel_sup],
+                            "bill_date": bdate.isoformat(),
+                            "due_date": due.isoformat() if due else None,
+                            "lines": line_dicts, "notes": notes or None,
+                            "currency_code": sel_cur, "fx_rate": rate,
+                        }
+                        res = approvals.gate(
+                            s, doc_type="BILL", amount=ngn_total,
+                            title=f"Bill — {sel_sup} (₦{ngn_total:,.0f})",
+                            payload=payload, user_id=UID, role=ROLE)
+                    _gate_msg(res, "Bill {ref} posted.")
                 except ValueError as e:
                     st.error(str(e))
 
@@ -173,26 +197,33 @@ with tab_po:
             notes = st.text_area("Notes", key="po_notes")
             submit = st.form_submit_button("Save purchase order", type="primary")
         if submit:
-            lines = []
+            line_dicts = []
             for _, row in grid.iterrows():
                 desc = str(row.get("description") or "").strip()
                 if not desc:
                     continue
-                lines.append(p_svc.POLineInput(
-                    product_id=int(row["product_id"]) if pd.notna(row["product_id"]) else None,
-                    description=desc, qty=float(row["qty"] or 0),
-                    unit_cost=float(row["unit_cost"] or 0),
-                    tax_rate=float(row["tax_rate"] or 0),
-                ))
-            if not lines:
+                line_dicts.append({
+                    "product_id": int(row["product_id"]) if pd.notna(row["product_id"]) else None,
+                    "description": desc, "qty": float(row["qty"] or 0),
+                    "unit_cost": float(row["unit_cost"] or 0),
+                    "tax_rate": float(row["tax_rate"] or 0),
+                    "expense_account_id": None,
+                })
+            if not line_dicts:
                 st.error("Add at least one line.")
             else:
+                ngn_total = round(sum(
+                    l["qty"] * l["unit_cost"] * (1 + l["tax_rate"])
+                    for l in line_dicts), 2)
+                payload = {"supplier_id": sup_opts[sel_sup],
+                           "order_date": order_date.isoformat(),
+                           "lines": line_dicts, "notes": notes or None}
                 with get_session() as s:
-                    po = p_svc.create_purchase_order(
-                        s, supplier_id=sup_opts[sel_sup], order_date=order_date,
-                        lines=lines, notes=notes or None,
-                    )
-                    st.success(f"Saved {po.number}")
+                    res = approvals.gate(
+                        s, doc_type="PO", amount=ngn_total,
+                        title=f"PO — {sel_sup} (₦{ngn_total:,.0f})",
+                        payload=payload, user_id=UID, role=ROLE)
+                _gate_msg(res, "Saved {ref}.")
 
 
 with tab_pay:
@@ -229,13 +260,18 @@ with tab_pay:
             pdate = st.date_input("Payment date", value=date.today())
             submit = st.form_submit_button("Record payment", type="primary")
         if submit:
+            payload = {
+                "supplier_id": sup_opts[sel_sup], "payment_date": pdate.isoformat(),
+                "amount": amt, "bank_account_id": bank_opts[sel_bank],
+                "bill_id": bill_opts.get(sel_bill) if sel_bill else None,
+                "method": method, "reference": ref or None,
+                "settlement_fx_rate": None,
+            }
             with get_session() as s:
-                pay = p_svc.record_payment(
-                    s, supplier_id=sup_opts[sel_sup], payment_date=pdate,
-                    amount=amt, bank_account_id=bank_opts[sel_bank],
-                    bill_id=bill_opts.get(sel_bill) if sel_bill else None,
-                    method=method, reference=ref or None,
-                )
-                st.success(f"Payment {pay.number} posted — ₦{pay.amount:,.2f}")
+                res = approvals.gate(
+                    s, doc_type="PAYMENT", amount=float(amt),
+                    title=f"Payment — {sel_sup} (₦{amt:,.0f})",
+                    payload=payload, user_id=UID, role=ROLE)
+            _gate_msg(res, "Payment {ref} posted.")
 
 auth.render_logout_in_sidebar()

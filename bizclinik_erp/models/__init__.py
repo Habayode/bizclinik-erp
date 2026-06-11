@@ -61,6 +61,7 @@ from .hr import (
     LeaveType,
     OpeningStatus,
 )
+from .approvals import ApprovalLimit, ApprovalRequest, ApprovalStatus
 
 __all__ = [
     # master
@@ -97,4 +98,6 @@ __all__ = [
     # HR — recruitment + leave
     "JobOpening", "OpeningStatus", "Candidate", "JobApplication",
     "ApplicationStage", "LeaveRequest", "LeaveType", "LeaveStatus",
+    # Approvals
+    "ApprovalLimit", "ApprovalRequest", "ApprovalStatus",
 ]

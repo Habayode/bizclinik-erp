@@ -71,6 +71,7 @@ NAV = {
         _page("pages/11_Month_End.py", "Month-End", "📅"),
         _page("pages/12_Statements.py", "Statements", "📃"),
         _page("pages/15_Reports.py", "Reports", "📈"),
+        _page("pages/28_Approvals.py", "Approvals", "✅"),
     ],
     "CRM": [
         _page("pages/23_CRM.py", "CRM", "🤝"),

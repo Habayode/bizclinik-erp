@@ -14,6 +14,7 @@ from sqlalchemy import select
 from bizclinik_erp.db import get_session
 from bizclinik_erp.models import BankAccount, Employee, PayrollPayslip, PayrollRun
 from bizclinik_erp.services import payroll as pr_svc
+from bizclinik_erp.services import approvals
 from bizclinik_erp import ui_kit as ui
 from bizclinik_erp import auth
 
@@ -23,6 +24,9 @@ ui.inject_brand()
 auth.require_login()
 ui.hero("Payroll", "Employees · runs · payslips",
          badge="PR", right_label="Module", right_value="HR")
+
+_u = auth.current_user() or {}
+UID, ROLE = _u.get("user_id"), _u.get("role")
 
 tab_emp, tab_run, tab_slip = st.tabs(["👤 Employees", "🧮 Run payroll", "🧾 Payslips"])
 
@@ -90,21 +94,35 @@ with tab_run:
             notes = st.text_area("Notes")
             submit = st.form_submit_button("Run payroll", type="primary")
         if submit:
-            inputs = []
+            input_dicts = []
             for _, row in grid.iterrows():
-                inputs.append(pr_svc.PayslipInput(
-                    employee_id=int(row["employee_id"]),
-                    gross=float(row["gross"] or 0),
-                    other_deductions=float(row["other_deductions"] or 0),
-                ))
+                input_dicts.append({
+                    "employee_id": int(row["employee_id"]),
+                    "gross": float(row["gross"] or 0),
+                    "other_deductions": float(row["other_deductions"] or 0),
+                })
+            total_gross = round(sum(d["gross"] for d in input_dicts), 2)
+            payload = {
+                "period_start": p_start.isoformat(), "period_end": p_end.isoformat(),
+                "pay_date": pay_date.isoformat(),
+                "bank_account_id": bank_opts[sel_bank], "notes": notes or None,
+                "inputs": input_dicts,
+            }
             with get_session() as s:
-                run = pr_svc.run_payroll(
-                    s, period_start=p_start, period_end=p_end,
-                    pay_date=pay_date, inputs=inputs,
-                    bank_account_id=bank_opts[sel_bank],
-                    notes=notes or None,
-                )
-                st.success(f"Payroll {run.number} posted ({len(run.payslips)} payslips)")
+                res = approvals.gate(
+                    s, doc_type="PAYROLL", amount=total_gross,
+                    title=f"Payroll {p_start:%b %Y} (₦{total_gross:,.0f})",
+                    payload=payload, user_id=UID, role=ROLE)
+            if res["status"] == "pending":
+                lim = res.get("limit")
+                lim_txt = f"₦{lim:,.0f}" if lim is not None else "your"
+                st.warning(
+                    f"🔒 Gross ₦{total_gross:,.0f} is above your approval limit "
+                    f"({lim_txt}) — submitted for approval (request "
+                    f"#{res['request_id']}). It posts once approved on the "
+                    "**Approvals** page.", icon="🔒")
+            else:
+                st.success(f"Payroll {res['ref']} posted.")
 
 
 with tab_slip:

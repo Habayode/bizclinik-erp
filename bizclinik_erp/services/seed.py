@@ -190,3 +190,5 @@ def seed_defaults(session: Session) -> None:
     seed_disposal_account(session)
     seed_fx(session)
     seed_warehouses_and_bank(session)
+    from .approvals import seed_limits
+    seed_limits(session)
