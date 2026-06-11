@@ -78,6 +78,17 @@ def void_invoice(session: Session, invoice_id: int, *,
         return {"already_cancelled": True, "invoice_id": invoice_id}
     if not reason or len(reason.strip()) < 3:
         raise ValueError("A reason is required to void an invoice.")
+    # Cash applied to the invoice must be dealt with first, or the receipts
+    # would stay booked against a cancelled sale.
+    live_receipts = list(session.execute(
+        select(Receipt).where(Receipt.invoice_id == inv.id,
+                              Receipt.status != DocStatus.CANCELLED)
+    ).scalars())
+    if live_receipts:
+        nums = ", ".join(r.number for r in live_receipts)
+        raise ValueError(
+            f"Invoice {inv.number} has {len(live_receipts)} receipt(s) applied "
+            f"({nums}). Void the receipt(s) first, then void the invoice.")
     on = on or date.today()
     rev_jes = []
     for je in (_find_je(session, inv.je_id), _find_je(session, inv.cogs_je_id)):
@@ -109,6 +120,17 @@ def void_bill(session: Session, bill_id: int, *,
         return {"already_cancelled": True, "bill_id": bill_id}
     if not reason or len(reason.strip()) < 3:
         raise ValueError("A reason is required to void a bill.")
+    # Cash applied to the bill must be dealt with first, or the payments would
+    # stay booked against a cancelled purchase.
+    live_payments = list(session.execute(
+        select(Payment).where(Payment.bill_id == bill.id,
+                              Payment.status != DocStatus.CANCELLED)
+    ).scalars())
+    if live_payments:
+        nums = ", ".join(p.number for p in live_payments)
+        raise ValueError(
+            f"Bill {bill.number} has {len(live_payments)} payment(s) applied "
+            f"({nums}). Void the payment(s) first, then void the bill.")
     on = on or date.today()
     rev_jes = []
     je = _find_je(session, bill.je_id)

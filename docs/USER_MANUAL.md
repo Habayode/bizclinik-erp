@@ -6,7 +6,7 @@ Every financial figure in this manual is *real*: it was produced by posting the 
 
 - **Case study:** GreenLeaf Stores Ltd — a Lagos retail + delivery SME
 - **Period:** May 2026
-- **Result:** Trial Balance **₦9,541,875 DR = ₦9,541,875 CR** (balanced ✓)
+- **Result:** Trial Balance **₦9,589,092.34 DR = ₦9,589,092.34 CR** (balanced ✓)
 - **Workspace:** the ERP groups every module into **Overview · Finance & Accounting · CRM · HR · System**.
 
 ---
@@ -52,7 +52,7 @@ The Home page is a live snapshot **as of today**, showing:
 - **Performance chart** — revenue vs expense by month.
 - **Expenses by account** — where the money goes.
 
-For GreenLeaf at month-end, the dashboard shows **Total Assets ₦7,435,375**, **Balanced ✓**, **Cash & Bank ₦2,914,425**.
+For GreenLeaf at month-end, the dashboard shows **Total Assets ₦7,482,592**, **Balanced ✓**, **Cash & Bank ₦2,961,642**.
 
 ![GreenLeaf dashboard](manual_images/01_dashboard.png)
 
@@ -189,7 +189,7 @@ GreenLeaf imported its May GTBank statement (capital, rent, the Sunrise receipt,
 ## 4.5 Payroll
 **What it does:** runs Nigerian **graduated PAYE** + pension and posts the payroll journal.
 **Flow:** pick the period + pay date → select employees (gross defaults from each employee) → **Run Payroll**. The system computes banded PAYE, 8% employee pension, 10% employer pension, and posts salaries, the pension liability, and the net paid from the bank.
-GreenLeaf's May run (3 staff, ₦550,000 gross): **Salaries ₦550,000**, **Employer pension ₦55,000**, **Pension Payable ₦99,000**.
+GreenLeaf's May run (3 staff, ₦550,000 gross): **Salaries ₦550,000**, **PAYE ₦47,217.34** (graduated — ₦24,966.67 / ₦14,790.67 / ₦7,460 per employee), **Employer pension ₦55,000**, **Pension Payable ₦99,000**.
 
 ## 4.6 Fixed assets & depreciation
 **Flow:** **Add Asset** (cost, useful life, salvage, the asset/accum-dep/expense accounts) → run **Depreciation** at month-end (straight-line). Depreciation begins the **month after** acquisition, so GreenLeaf's freezer (acquired 3 May) starts depreciating in June — May shows ₦0, which is correct.
@@ -289,7 +289,7 @@ The **Reports** page produces Profit & Loss, Balance Sheet, Cash Flow, AR/AP agi
 ![Financial reports — Profit & Loss](manual_images/19_reports.png)
 
 ## 6.1 Trial Balance
-**DR ₦9,541,875.00 = CR ₦9,541,875.00 — balanced ✓** (17 active accounts).
+**DR ₦9,589,092.34 = CR ₦9,589,092.34 — balanced ✓** (18 active accounts).
 
 ## 6.2 Profit & Loss
 | Line | ₦ |
@@ -310,15 +310,16 @@ The **Reports** page produces Profit & Loss, Balance Sheet, Cash Flow, AR/AP agi
 ## 6.3 Balance Sheet (as at 31 May 2026)
 | Assets | ₦ | | Liabilities & Equity | ₦ |
 |--------|---|---|----------------------|---|
-| Bank — Operating | 2,914,425 | | Accounts Payable | 3,102,000 |
+| Bank — Operating | 2,961,642.34 | | Accounts Payable | 3,102,000 |
 | Accounts Receivable | 522,950 | | Output VAT | 63,375 |
+| | | | PAYE Payable | 47,217.34 |
 | Inventory — Stock | 1,976,000 | | Pension Payable | 99,000 |
 | Input VAT | 222,000 | | Accrued Expenses | 45,000 |
-| Equipment | 1,800,000 | | **Total liabilities** | **3,309,375** |
+| Equipment | 1,800,000 | | **Total liabilities** | **3,356,592.34** |
 | | | | Share Capital | 5,000,000 |
 | | | | Current-year earnings | (874,000) |
 | | | | **Total equity** | **4,126,000** |
-| **Total assets** | **7,435,375** | | **Total L + E** | **7,435,375** |
+| **Total assets** | **7,482,592.34** | | **Total L + E** | **7,482,592.34** |
 
 **Assets = Liabilities + Equity ✓**
 

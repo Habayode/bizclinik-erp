@@ -1,9 +1,10 @@
 """Payroll: build payslips from employee master data, post a single payroll JE.
 
-Simplified Nigerian PAYE: employee.paye_rate is the effective rate to apply
-to gross (caller responsible for getting it right — real PAYE is graduated
-under CITA, this just lets you store a per-employee effective rate). Pension:
-employee 8% + employer 10% of gross are the statutory minimums.
+PAYE is **graduated** (CITA Sixth Schedule bands with CRA + pension relief —
+see services.paye). An employee with an explicit `paye_rate > 0` keeps that
+flat effective rate as an override; otherwise the graduated calculation
+applies. Pension: employee 8% + employer 10% of gross are the statutory
+minimums.
 """
 from __future__ import annotations
 
@@ -24,6 +25,7 @@ from ..models import (
 )
 from .ledger import JELine, post_journal
 from .numbering import next_number
+from .paye import compute_paye_monthly
 
 
 @dataclass
@@ -75,7 +77,14 @@ def run_payroll(
         if not emp:
             raise ValueError(f"Employee {inp.employee_id} not found.")
         gross = inp.gross if inp.gross is not None else emp.monthly_gross
-        paye = round(gross * (emp.paye_rate or 0), 2)
+        if (emp.paye_rate or 0) > 0:
+            # Explicit flat effective rate kept as a per-employee override.
+            paye = round(gross * emp.paye_rate, 2)
+        else:
+            # Graduated CITA bands with CRA + pension relief (services.paye).
+            paye = compute_paye_monthly(
+                gross, pension_employee_rate=emp.pension_rate or 0.0
+            ).paye_monthly
         pen_emp = round(gross * (emp.pension_rate or 0), 2)
         pen_er = round(gross * (emp.pension_employer_rate or 0), 2)
         other = round(inp.other_deductions, 2)

@@ -202,6 +202,11 @@ def record_payment(
     ap_acct = supplier.payable_account_id or accts["AP"].id
 
     bill = session.get(Bill, bill_id) if bill_id else None
+    if bill and amount > bill.outstanding + 0.01:
+        raise ValueError(
+            f"Payment {amount:,.2f} exceeds the outstanding balance "
+            f"{bill.outstanding:,.2f} on {bill.number}. Record the excess as a "
+            "separate unapplied payment (supplier advance) instead.")
     issue_rate = bill.fx_rate if bill else 1.0
     settle_rate = settlement_fx_rate if settlement_fx_rate is not None else issue_rate
 

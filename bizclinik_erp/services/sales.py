@@ -316,6 +316,11 @@ def record_receipt(
     ar_account_id = customer.receivable_account_id or accts["AR"].id
 
     invoice = session.get(SalesInvoice, invoice_id) if invoice_id else None
+    if invoice and amount > invoice.outstanding + 0.01:
+        raise ValueError(
+            f"Receipt {amount:,.2f} exceeds the outstanding balance "
+            f"{invoice.outstanding:,.2f} on {invoice.number}. Record the excess "
+            "as a separate unapplied receipt (customer advance) instead.")
     issue_rate = invoice.fx_rate if invoice else 1.0
     settle_rate = settlement_fx_rate if settlement_fx_rate is not None else issue_rate
 

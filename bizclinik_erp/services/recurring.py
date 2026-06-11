@@ -181,6 +181,31 @@ def _materialise(session: Session, tpl: RecurringTemplate, on: date) -> str:
         return inv.number
 
     if tpl.kind == RecurringKind.BILL:
+        # Recurring money-out respects the approval workflow: a system-raised
+        # bill is treated as an AP-clerk submission, so anything above the AP
+        # role limit is queued for human approval instead of auto-posting.
+        from . import approvals as appr_svc
+        total = round((tpl.qty or 0.0) * (tpl.unit_cost or 0.0)
+                      * (1 + (tpl.tax_rate or 0.0)), 2)
+        if appr_svc.requires_approval(session, "AP", total):
+            payload = {
+                "supplier_id": tpl.supplier_id,
+                "bill_date": on.isoformat(), "due_date": None,
+                "currency_code": "NGN", "fx_rate": None,
+                "notes": f"Recurring template {tpl.code}",
+                "lines": [{
+                    "product_id": None,
+                    "description": tpl.line_description or tpl.name,
+                    "qty": tpl.qty or 0.0, "unit_cost": tpl.unit_cost or 0.0,
+                    "tax_rate": tpl.tax_rate or 0.0,
+                    "expense_account_id": tpl.expense_account_id,
+                }],
+            }
+            req = appr_svc.submit(
+                session, doc_type="BILL", amount=total,
+                title=f"Recurring bill — {tpl.name} (₦{total:,.0f})",
+                payload=payload, user_id=None, role="AP")
+            return f"APPROVAL-{req.id}"
         bill = purchase_svc.receive_bill(
             session,
             supplier_id=tpl.supplier_id,
