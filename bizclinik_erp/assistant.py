@@ -1,23 +1,18 @@
-"""Floating in-app assistant — a help chatbot that knows how to use the ERP.
+"""In-app assistant — a help + live-data chatbot that knows how to use the ERP.
 
-Renders a floating chat bubble (bottom-right) on every page. It answers
-"how do I…" questions from a built-in knowledge base (client-side retrieval
-over distilled manual/FAQ content) — no API key required.
+Backs the native **Assistant page** (Streamlit chat): ``answer(question,
+snapshot)`` resolves a question against a built-in how-to knowledge base and a
+live per-business data snapshot (``compute_snapshot``), entirely rule-based — no
+API key required. ``launcher_html()`` renders a floating 💬 bubble (pure CSS +
+anchor) that opens the page from anywhere.
 
-Architecture for "feed on data later": the widget calls ``answer(q)`` which
-first tries ``window.__bzkAskBackend(q)`` if a backend has been registered
-(returns a Promise or null). Wire a server endpoint there to return
-data-grounded answers (e.g. "revenue this month", "pending approvals") and the
-bubble upgrades from a help bot to a data assistant with no UI change.
-
-The widget is injected into the parent document (so it floats over the whole
-app and survives Streamlit reruns) and guarded against double-injection.
+Future API seam: when an LLM/data endpoint exists, call it inside ``answer`` and
+fall back to the rule-based result for offline/cheap answers — no UI change.
 """
 from __future__ import annotations
 
-import json
-
-import streamlit.components.v1 as components
+import re
+from typing import Optional
 
 
 # --------------------------------------------------------------------------- #
@@ -185,152 +180,137 @@ def compute_snapshot(session) -> dict:
     }
 
 
-def _css() -> str:
-    return """
-#bzk-asst-btn{position:fixed;bottom:22px;right:22px;width:58px;height:58px;border:none;
- border-radius:50%;cursor:pointer;z-index:99999;font-size:26px;color:#06241f;
- background:linear-gradient(135deg,#2be2c6,#16b39b);box-shadow:0 8px 24px rgba(0,0,0,.4);
- display:flex;align-items:center;justify-content:center;transition:transform .15s;}
-#bzk-asst-btn:hover{transform:scale(1.06);}
-#bzk-asst-panel{position:fixed;bottom:92px;right:22px;width:374px;max-height:72vh;
- background:#0d1326;border:1px solid #24304d;border-radius:16px;z-index:99999;
- box-shadow:0 18px 50px rgba(0,0,0,.5);display:none;flex-direction:column;overflow:hidden;
- font-family:'Segoe UI',Calibri,Arial,sans-serif;}
-#bzk-asst.bzk-open #bzk-asst-panel{display:flex;}
-#bzk-asst-hd{padding:14px 16px;background:#101a30;border-bottom:1px solid #24304d;
- display:flex;align-items:center;justify-content:space-between;}
-#bzk-asst-hd b{color:#fff;font-size:15px;}
-#bzk-asst-hd span{color:#2be2c6;font-size:12px;}
-#bzk-asst-x{cursor:pointer;color:#8aa;background:none;border:none;font-size:18px;}
-#bzk-asst-msgs{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px;}
-.bzk-m{max-width:84%;padding:9px 12px;border-radius:12px;font-size:13.5px;line-height:1.45;
- white-space:pre-wrap;}
-.bzk-m.bot{align-self:flex-start;background:#16203a;color:#dfe6f2;border:1px solid #243152;}
-.bzk-m.user{align-self:flex-end;background:#15473f;color:#d6fff6;}
-#bzk-asst-chips{display:flex;flex-wrap:wrap;gap:6px;padding:0 14px 8px;}
-.bzk-chip{font-size:12px;color:#2be2c6;border:1px solid #2be2c6;border-radius:14px;
- padding:4px 10px;cursor:pointer;background:transparent;}
-.bzk-chip:hover{background:rgba(43,226,198,.12);}
-#bzk-asst-in{display:flex;gap:8px;padding:10px;border-top:1px solid #24304d;}
-#bzk-asst-in textarea{flex:1;resize:none;height:38px;background:#0a1120;color:#fff;
- border:1px solid #24304d;border-radius:10px;padding:8px 10px;font-size:13.5px;font-family:inherit;}
-#bzk-asst-in button{background:#2be2c6;color:#06241f;border:none;border-radius:10px;
- padding:0 14px;font-weight:700;cursor:pointer;}
-"""
+# --------------------------------------------------------------------------- #
+# Answering (Python — used by the native Assistant page)                       #
+# --------------------------------------------------------------------------- #
+
+_STOP = {"how", "do", "i", "to", "the", "a", "an", "of", "and", "or", "is",
+         "are", "my", "me", "you", "your", "can", "it", "on", "in", "for",
+         "with", "what", "when", "much", "many"}
 
 
-def _js() -> str:
-    return (
-        "var KB=" + json.dumps(KB) + ";\n"
-        "var SUG=" + json.dumps(SUGGESTIONS) + ";\n"
-        "var GREET=" + json.dumps(GREETING) + ";\n"
-        + r"""
-var STOP=new Set("how do i to the a an of and or is are my me you your can it on in for with what when".split(" "));
-function norm(s){return (s||"").toLowerCase().replace(/[^a-z0-9 ]/g," ").split(/\s+/).filter(Boolean);}
-function score(qt,e){var hay=new Set(norm(e.q+" "+(e.tags||"")));var s=0;
-  qt.forEach(function(t){if(STOP.has(t))return; if(hay.has(t)){s+=2;return;}
-    hay.forEach(function(h){if(t.length>3&&(h.indexOf(t)>=0||t.indexOf(h)>=0))s+=1;});});
-  return s;}
-function localAnswer(q){var qt=norm(q),best=null,bs=0;
-  KB.forEach(function(e){var s=score(qt,e); if(s>bs){bs=s;best=e;}});
-  if(best&&bs>=2) return best.a;
-  return "I can help with how to use the ERP — try: invoicing, recording a bill, payments & approvals, payroll, employees, leave, recruitment, CRM, bank reconciliation, reports, budgets, FIRS e-invoice, currencies, plans & billing, users & roles, or backups.";}
-function fmtN(n){return "₦"+Math.round(n||0).toLocaleString();}
-function dataAnswer(q){
-  var D=window.__bzkData||{}; if(!D||!D.as_of) return null;
-  var s=q.toLowerCase(); var asof=" (as of "+D.as_of+")";
-  function has(){for(var i=0;i<arguments.length;i++){if(s.indexOf(arguments[i])>=0)return true;}return false;}
-  if(has("pending approval","approvals pending","awaiting approval","to approve","approvals waiting"))
-    return "There "+(D.pending_approvals===1?"is ":"are ")+D.pending_approvals+" approval"+(D.pending_approvals===1?"":"s")+" pending. See Finance & Accounting → Approvals.";
-  if(has("profit","net income","bottom line","made this year"))
-    return "Net profit year-to-date is "+fmtN(D.net_profit_ytd)+asof+".";
-  if(has("revenue","sales","turnover","income","earn")){
-    if(has("month","mtd")) return "Revenue this month is "+fmtN(D.revenue_mtd)+asof+".";
-    return "Revenue year-to-date is "+fmtN(D.revenue_ytd)+" ("+fmtN(D.revenue_mtd)+" this month)"+asof+".";
-  }
-  if(has("cash","bank balance","in the bank","how much money"))
-    return "Cash & bank balance is "+fmtN(D.cash)+asof+".";
-  if(has("receivable","owed to me","customers owe","outstanding invoice")|| /\bar\b/.test(s))
-    return "Accounts receivable outstanding is "+fmtN(D.ar_outstanding)+asof+".";
-  if(has("payable","i owe","we owe","owe supplier","outstanding bill")|| /\bap\b/.test(s))
-    return "Accounts payable outstanding is "+fmtN(D.ap_outstanding)+asof+".";
-  if(has("inventory","stock value","stock worth"))
-    return "Inventory at cost is "+fmtN(D.inventory_value)+asof+".";
-  if(has("how many","number of","count of","total ")){
-    if(has("customer")) return "You have "+D.customers+" customers.";
-    if(has("supplier","vendor")) return "You have "+D.suppliers+" suppliers.";
-    if(has("product","item","sku")) return "You have "+D.products+" products.";
-    if(has("employee","staff")) return "You have "+D.employees+" employees.";
-    if(has("invoice")) return "You have "+D.invoices+" sales invoices.";
-    if(has("bill")) return "You have "+D.bills+" bills.";
-  }
-  return null;
-}
-function answer(q){
-  // 1) Future API: if a backend is registered, prefer it (Promise<string>|null).
-  try{ if(window.__bzkAskBackend){ var r=window.__bzkAskBackend(q);
-    if(r&&typeof r.then==="function") return r.then(function(a){return a||dataAnswer(q)||localAnswer(q);});
-    if(r) return Promise.resolve(r); } }catch(e){}
-  // 2) Rule-based data answer from the live snapshot.
-  var da=dataAnswer(q); if(da) return Promise.resolve(da);
-  // 3) Built-in how-to help.
-  return Promise.resolve(localAnswer(q));
-}
-var KEY="bzkAsstMsgs";
-function load(){try{var m=JSON.parse(localStorage.getItem(KEY));if(m&&m.length)return m;}catch(e){}
-  return [{r:"bot",t:GREET}];}
-function save(m){try{localStorage.setItem(KEY,JSON.stringify(m.slice(-40)));}catch(e){}}
-var msgs=load();
-var root=document.createElement("div");root.id="bzk-asst";
-root.innerHTML=
- '<button id="bzk-asst-btn" title="Assistant">&#128172;</button>'+
- '<div id="bzk-asst-panel">'+
-  '<div id="bzk-asst-hd"><div><b>Trakit365 Assistant</b><br><span>How-to help</span></div>'+
-   '<button id="bzk-asst-x">&times;</button></div>'+
-  '<div id="bzk-asst-msgs"></div>'+
-  '<div id="bzk-asst-chips"></div>'+
-  '<div id="bzk-asst-in"><textarea placeholder="Ask how to do something..."></textarea>'+
-   '<button id="bzk-asst-send">Send</button></div>'+
- '</div>';
-document.body.appendChild(root);
-var msgsEl=root.querySelector("#bzk-asst-msgs");
-var chipsEl=root.querySelector("#bzk-asst-chips");
-var ta=root.querySelector("#bzk-asst-in textarea");
-function render(){msgsEl.innerHTML="";msgs.forEach(function(m){var d=document.createElement("div");
-  d.className="bzk-m "+(m.r==="user"?"user":"bot");d.textContent=m.t;msgsEl.appendChild(d);});
-  msgsEl.scrollTop=msgsEl.scrollHeight;}
-function add(r,t){msgs.push({r:r,t:t});save(msgs);render();}
-function send(q){q=(q||ta.value).trim();if(!q)return;ta.value="";add("user",q);
-  add("bot","…");
-  answer(q).then(function(a){msgs.pop();add("bot",a);});}
-SUG.forEach(function(s){var c=document.createElement("button");c.className="bzk-chip";
-  c.textContent=s;c.onclick=function(){send(s);};chipsEl.appendChild(c);});
-root.querySelector("#bzk-asst-btn").onclick=function(){root.classList.toggle("bzk-open");render();};
-root.querySelector("#bzk-asst-x").onclick=function(){root.classList.remove("bzk-open");};
-root.querySelector("#bzk-asst-send").onclick=function(){send();};
-ta.addEventListener("keydown",function(e){if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}});
-render();
-"""
-    )
+def _norm(s: str) -> list[str]:
+    return [t for t in re.sub(r"[^a-z0-9 ]", " ", (s or "").lower()).split()
+            if t]
 
 
-def render_floating_widget(snapshot: dict | None = None) -> None:
-    """Inject the floating assistant into the parent document.
+def _stem(t: str) -> str:
+    return t[:-1] if len(t) > 3 and t.endswith("s") else t
 
-    Self-healing: the data snapshot is refreshed on every run, and the widget is
-    re-injected whenever its DOM node is missing (e.g. after Streamlit rebuilds
-    the page on a rerun/reconnect) rather than relying on a one-shot flag — so
-    the bubble can't silently disappear.
+
+def _kb_answer(q: str) -> str:
+    qt = [_stem(t) for t in _norm(q)]
+    best, best_score = None, 0
+    for e in KB:
+        hay = {_stem(t) for t in _norm(e["q"] + " " + e.get("tags", ""))}
+        score = 0
+        for t in qt:
+            if t in _STOP:
+                continue
+            if t in hay:
+                score += 2
+            elif len(t) > 3 and any(t in h or h in t
+                                    for h in hay if len(h) > 3):
+                score += 1
+        if score > best_score:
+            best_score, best = score, e
+    if best and best_score >= 2:
+        return best["a"]
+    return ("I can help with how to use the ERP — try: invoicing, recording a "
+            "bill, payments & approvals, payroll, employees, leave, recruitment, "
+            "CRM, bank reconciliation, reports, budgets, FIRS e-invoice, "
+            "currencies, plans & billing, users & roles, or backups.")
+
+
+def _fmt(n) -> str:
+    return "₦{:,.0f}".format(round(n or 0))
+
+
+def _data_answer(q: str, D: dict) -> Optional[str]:
+    if not D or not D.get("as_of"):
+        return None
+    s = (q or "").lower()
+    asof = " (as of {})".format(D["as_of"])
+
+    def has(*ws) -> bool:
+        return any(w in s for w in ws)
+
+    if "approval" in s and ("pending" in s or "waiting" in s
+                            or "awaiting" in s or "how many" in s):
+        n = D.get("pending_approvals", 0)
+        return ("There {} {} approval{} pending. See Finance & Accounting → "
+                "Approvals.".format("is" if n == 1 else "are", n,
+                                    "" if n == 1 else "s"))
+    if has("profit", "net income", "bottom line"):
+        return "Net profit year-to-date is {}{}.".format(
+            _fmt(D.get("net_profit_ytd")), asof)
+    if has("revenue", "sales", "turnover", "income", "earn"):
+        if has("month", "mtd"):
+            return "Revenue this month is {}{}.".format(
+                _fmt(D.get("revenue_mtd")), asof)
+        return "Revenue year-to-date is {} ({} this month){}.".format(
+            _fmt(D.get("revenue_ytd")), _fmt(D.get("revenue_mtd")), asof)
+    if has("cash", "bank balance", "in the bank", "money"):
+        return "Cash & bank balance is {}{}.".format(_fmt(D.get("cash")), asof)
+    if has("receivable", "owed to me", "customers owe", "outstanding invoice") \
+            or re.search(r"\bar\b", s):
+        return "Accounts receivable outstanding is {}{}.".format(
+            _fmt(D.get("ar_outstanding")), asof)
+    if has("payable", "i owe", "we owe", "owe supplier", "outstanding bill") \
+            or re.search(r"\bap\b", s):
+        return "Accounts payable outstanding is {}{}.".format(
+            _fmt(D.get("ap_outstanding")), asof)
+    if has("inventory", "stock value", "stock worth"):
+        return "Inventory at cost is {}{}.".format(
+            _fmt(D.get("inventory_value")), asof)
+    if has("how many", "number of", "count of"):
+        if has("customer"):
+            return "You have {} customers.".format(D.get("customers", 0))
+        if has("supplier", "vendor"):
+            return "You have {} suppliers.".format(D.get("suppliers", 0))
+        if has("product", "item", "sku"):
+            return "You have {} products.".format(D.get("products", 0))
+        if has("employee", "staff"):
+            return "You have {} employees.".format(D.get("employees", 0))
+        if has("invoice"):
+            return "You have {} sales invoices.".format(D.get("invoices", 0))
+        if has("bill"):
+            return "You have {} bills.".format(D.get("bills", 0))
+    return None
+
+
+def answer(question: str, snapshot: Optional[dict] = None) -> str:
+    """Rule-based answer: try the live-data snapshot first, then the how-to KB.
+
+    (Future API seam: when an LLM/data endpoint exists, call it here and fall
+    back to this for offline/cheap answers.)
     """
-    boot = (
-        "<script>(function(){var w=window.parent,d=w.document;"
-        "w.__bzkData=" + json.dumps(snapshot or {}) + ";"          # refresh data every run
-        "if(!d.getElementById('bzk-asst-style')){"
-        "var s=d.createElement('style');s.id='bzk-asst-style';"
-        "s.textContent=" + json.dumps(_css()) + ";d.head.appendChild(s);}"
-        "if(!d.getElementById('bzk-asst')){"                        # DOM-based guard (self-healing)
-        "var sc=d.createElement('script');"
-        "sc.textContent=" + json.dumps(_js()) + ";d.body.appendChild(sc);}"
-        "})();</script>"
+    da = _data_answer(question, snapshot or {})
+    if da:
+        return da
+    return _kb_answer(question)
+
+
+# --------------------------------------------------------------------------- #
+# Floating launcher — pure CSS + anchor (no JS/iframe), links to the page       #
+# --------------------------------------------------------------------------- #
+
+def launcher_html(url_path: str = "assistant") -> str:
+    """A floating 💬 bubble (bottom-right) that opens the Assistant page.
+
+    Rendered via st.markdown(unsafe_allow_html=True) on every page — no
+    JavaScript and no component iframe, so it renders reliably everywhere.
+    """
+    return (
+        "<style>"
+        ".bzk-fab{position:fixed;bottom:22px;right:22px;width:56px;height:56px;"
+        "border-radius:50%;background:linear-gradient(135deg,#2be2c6,#16b39b);"
+        "color:#06241f;display:flex;align-items:center;justify-content:center;"
+        "font-size:26px;text-decoration:none;box-shadow:0 8px 24px rgba(0,0,0,.4);"
+        "z-index:99999;transition:transform .15s;}"
+        ".bzk-fab:hover{transform:scale(1.07);}"
+        "</style>"
+        f'<a class="bzk-fab" href="{url_path}" target="_self" '
+        'title="Trakit365 Assistant">&#128172;</a>'
     )
-    components.html(boot, height=0)
+

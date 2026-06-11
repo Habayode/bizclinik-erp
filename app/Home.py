@@ -55,6 +55,8 @@ def _page(path: str, title: str, icon: str, default: bool = False):
 NAV = {
     "Overview": [
         _page("pages/0_Dashboard.py", "Dashboard", "📊", default=True),
+        st.Page("pages/29_Assistant.py", title="Assistant", icon="💬",
+                url_path="assistant"),
     ],
     "Finance & Accounting": [
         _page("pages/1_Sales.py", "Sales", "🧾"),
@@ -97,26 +99,10 @@ NAV = {
 pg = st.navigation(NAV, position="sidebar")
 pg.run()
 
-# Floating help assistant (bottom-right) on every page, with a live data
-# snapshot (cached 60s per business) so it can answer data questions too.
-@st.cache_data(ttl=60, show_spinner=False)
-def _assistant_snapshot(_tenant_key: str) -> dict:
-    from bizclinik_erp.db import get_session
-    from bizclinik_erp import assistant as _a
-    try:
-        with get_session() as s:
-            return _a.compute_snapshot(s)
-    except Exception:
-        return {}
-
-
+# Floating launcher (pure CSS + anchor — no JS/iframe) that opens the Assistant
+# page from any screen. Rendered every run so it shows on every page.
 try:
     from bizclinik_erp import assistant
-    # A snapshot failure must NOT suppress the bubble — fall back to empty data.
-    try:
-        _snap = _assistant_snapshot(auth.active_tenant() or "default")
-    except Exception:
-        _snap = {}
-    assistant.render_floating_widget(_snap)
+    st.markdown(assistant.launcher_html("assistant"), unsafe_allow_html=True)
 except Exception:
     pass
