@@ -56,6 +56,16 @@ class Plan:
     def is_free(self) -> bool:
         return self.price_ngn <= 0
 
+    @property
+    def annual_price_ngn(self) -> float:
+        """Annual price = 10 months (pay for 10, get 12 — 2 months free)."""
+        return round(self.price_ngn * 10, 2)
+
+    def price_for(self, interval: str) -> float:
+        return self.annual_price_ngn if interval == "yearly" else self.price_ngn
+
+
+ANNUAL_FREE_MONTHS = 2   # annual billing = monthly × (12 - this)
 
 PLANS: dict[str, Plan] = {
     "free": Plan(
@@ -63,13 +73,13 @@ PLANS: dict[str, Plan] = {
         ["1 business", "Up to 2 users", "Core accounting"],
         max_users=2, unlocks=frozenset()),
     "starter": Plan(
-        "starter", "Starter", 15000, "monthly",
+        "starter", "Starter", 50000, "monthly",
         ["Up to 5 users", "Invoicing + bank rec", "Recurring",
          "FIRS e-invoice drafts"],
         max_users=5,
         unlocks=frozenset({"bank_reconciliation", "firs_einvoice", "recurring"})),
     "business": Plan(
-        "business", "Business", 45000, "monthly",
+        "business", "Business", 150000, "monthly",
         ["Unlimited users", "Multi-currency", "CRM", "Budgets",
          "API + webhooks", "Priority support"],
         max_users=None, unlocks=GATED_FEATURES),
@@ -80,6 +90,7 @@ _PERIOD_DAYS = {"monthly": 30, "yearly": 365}
 
 def list_plans() -> list[dict]:
     return [{"code": p.code, "name": p.name, "price_ngn": p.price_ngn,
+             "annual_price_ngn": p.annual_price_ngn,
              "interval": p.interval, "features": list(p.features),
              "is_free": p.is_free, "max_users": p.max_users,
              "unlocks": sorted(p.unlocks)} for p in PLANS.values()]
@@ -192,21 +203,27 @@ def _upsert_subscription(s, *, tenant_slug, plan_code, status,
 
 
 def start_subscription(tenant_slug: str, plan_code: str, *, email: str,
+                       interval: str = "monthly",
                        callback_url: Optional[str] = None,
                        provider_name: Optional[str] = None) -> dict:
-    """Begin (or change) a subscription.
+    """Begin (or change) a subscription on a ``monthly`` or ``yearly`` cycle.
 
-    Free plan -> activated immediately. Paid plan -> a pending charge is created
-    and the payment provider is asked to initialise a checkout; the returned
-    dict carries ``authorization_url`` and ``reference`` for the caller to
-    redirect the tenant to. Raises ValueError on unknown tenant/plan, and
-    RuntimeError if a paid plan is requested with no provider configured.
+    Annual billing charges 10× the monthly price (2 months free) and runs for a
+    365-day period. Free plan -> activated immediately. Paid plan -> a pending
+    charge is created for the chosen cycle's amount and the payment provider is
+    asked to initialise a checkout; the returned dict carries
+    ``authorization_url`` and ``reference``. Raises ValueError on unknown
+    tenant/plan/interval, and RuntimeError if a paid plan is requested with no
+    provider configured.
     """
     if not tenancy.get_tenant(tenant_slug):
         raise ValueError(f"Unknown tenant '{tenant_slug}'.")
     plan = get_plan(plan_code)
     if not plan:
         raise ValueError(f"Unknown plan '{plan_code}'.")
+    interval = (interval or "monthly").lower()
+    if interval not in _PERIOD_DAYS:
+        raise ValueError(f"Unknown billing interval '{interval}'.")
 
     from ..tenancy import BillingCharge
     fac = tenancy._control_factory()
@@ -216,11 +233,13 @@ def start_subscription(tenant_slug: str, plan_code: str, *, email: str,
             start = _now()
             _upsert_subscription(s, tenant_slug=tenant_slug, plan_code=plan.code,
                                  status="active", period_start=start,
-                                 period_end=_period_end(start, plan.interval))
+                                 period_end=_period_end(start, interval))
             s.commit()
         return {"plan": plan.code, "status": "active", "free": True,
+                "interval": interval, "amount_ngn": 0.0,
                 "authorization_url": None, "reference": None}
 
+    amount = plan.price_for(interval)
     provider = payments.get_provider(provider_name)
     if not provider.configured():
         raise RuntimeError(
@@ -228,17 +247,18 @@ def start_subscription(tenant_slug: str, plan_code: str, *, email: str,
             "API key to subscribe to a paid plan.")
 
     reference = _gen_reference(tenant_slug)
-    init = provider.initialize(amount_ngn=plan.price_ngn, email=email,
+    init = provider.initialize(amount_ngn=amount, email=email,
                                reference=reference, callback_url=callback_url)
     with fac() as s:
         s.add(BillingCharge(reference=init.reference or reference,
                             tenant_slug=tenant_slug, plan_code=plan.code,
-                            amount_ngn=plan.price_ngn, provider=provider.name,
+                            amount_ngn=amount, provider=provider.name,
                             status="pending"))
         _upsert_subscription(s, tenant_slug=tenant_slug, plan_code=plan.code,
                              status="pending")
         s.commit()
     return {"plan": plan.code, "status": "pending", "free": False,
+            "interval": interval, "amount_ngn": amount,
             "authorization_url": init.authorization_url,
             "reference": init.reference or reference, "provider": provider.name}
 
@@ -260,17 +280,21 @@ def confirm_by_reference(reference: str, *, provider_name: Optional[str] = None)
             return {"reference": reference, "status": status.status,
                     "tenant_slug": charge.tenant_slug, "activated": False}
         plan = get_plan(charge.plan_code) or PLANS["free"]
+        # The cycle is recoverable from the amount charged: annual = monthly×10,
+        # so a charge at (or above) the annual price means a 365-day period.
+        interval = ("yearly" if charge.amount_ngn >= plan.annual_price_ngn - 0.5
+                    else "monthly")
         start = _now()
         charge.status = "paid"
         charge.paid_at = start
         _upsert_subscription(s, tenant_slug=charge.tenant_slug,
                              plan_code=charge.plan_code, status="active",
                              period_start=start,
-                             period_end=_period_end(start, plan.interval))
+                             period_end=_period_end(start, interval))
         s.commit()
         return {"reference": reference, "status": "success",
                 "tenant_slug": charge.tenant_slug, "activated": True,
-                "plan_code": charge.plan_code}
+                "plan_code": charge.plan_code, "interval": interval}
 
 
 def _extract_reference(body: bytes) -> Optional[str]:

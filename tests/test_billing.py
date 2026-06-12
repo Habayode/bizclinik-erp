@@ -45,8 +45,24 @@ def test_plans_registry():
     from bizclinik_erp.services import billing
     codes = {p["code"] for p in billing.list_plans()}
     assert {"free", "starter", "business"} <= codes
-    assert billing.get_plan("starter").price_ngn == 15000
+    assert billing.get_plan("starter").price_ngn == 50000
+    assert billing.get_plan("business").price_ngn == 150000
     assert billing.get_plan("free").is_free
+
+
+def test_annual_pricing_is_two_months_free():
+    from bizclinik_erp.services import billing
+    starter = billing.get_plan("starter")
+    business = billing.get_plan("business")
+    # Annual = monthly × 10 (pay for 10, get 12).
+    assert starter.annual_price_ngn == 500_000
+    assert business.annual_price_ngn == 1_500_000
+    assert starter.price_for("yearly") == 500_000
+    assert starter.price_for("monthly") == 50_000
+    assert billing.get_plan("free").annual_price_ngn == 0
+    # Saving equals two monthly payments.
+    assert business.price_ngn * 12 - business.annual_price_ngn == business.price_ngn * 2
+    assert {"annual_price_ngn"} <= billing.list_plans()[1].keys()
 
 
 def test_free_plan_activates_immediately(control_env):
@@ -80,8 +96,38 @@ def test_paid_plan_checkout_then_confirm(control_env, monkeypatch):
 
     conf = billing.confirm_by_reference(res["reference"])
     assert conf["activated"] is True
+    assert conf["interval"] == "monthly"
     assert billing.is_active("acme") is True
-    assert billing.current_subscription("acme")["plan_code"] == "starter"
+    sub = billing.current_subscription("acme")
+    assert sub["plan_code"] == "starter"
+    # Monthly cycle -> ~30-day period.
+    days = (sub["current_period_end"] - sub["current_period_start"]).days
+    assert 29 <= days <= 31
+
+
+def test_annual_checkout_charges_10x_and_runs_a_year(control_env, monkeypatch):
+    from bizclinik_erp.services import billing, payments
+    monkeypatch.setattr(payments, "get_provider", lambda name=None: FakeProvider())
+
+    res = billing.start_subscription("acme", "business", email="a@b.com",
+                                     interval="yearly")
+    assert res["status"] == "pending"
+    assert res["interval"] == "yearly"
+    assert res["amount_ngn"] == 1_500_000          # 150k × 10
+
+    conf = billing.confirm_by_reference(res["reference"])
+    assert conf["activated"] is True
+    assert conf["interval"] == "yearly"             # recovered from the amount
+    sub = billing.current_subscription("acme")
+    days = (sub["current_period_end"] - sub["current_period_start"]).days
+    assert days >= 360                              # ~365-day period
+
+
+def test_unknown_interval_rejected(control_env):
+    from bizclinik_erp.services import billing
+    with pytest.raises(ValueError, match="interval"):
+        billing.start_subscription("acme", "starter", email="a@b.com",
+                                   interval="weekly")
 
 
 def test_webhook_activates_on_valid_signature(control_env, monkeypatch):

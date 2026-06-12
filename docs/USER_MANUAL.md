@@ -352,13 +352,13 @@ Output ₦63,375 − Input ₦222,000 = **₦158,625 creditable**.
 
 - **Plans & access (entitlements).** Three plans gate the premium add-ons; **core accounting is on every plan**. Manage under **System → Billing**, which shows what your plan unlocks and your user cap:
 
-  | Plan | Users | Unlocks |
-  |------|-------|---------|
-  | **Free** | up to 2 | Core accounting (sales, purchases, inventory, banking, payroll, tax, fixed assets, GL, statements, month-end, reports) |
-  | **Starter** | up to 5 | + Bank Reconciliation, Recurring, FIRS e-invoice drafts |
-  | **Business** | unlimited | + Multi-currency, CRM, Budgets, REST API & webhooks |
+  | Plan | Monthly | Annual (2 months free) | Users | Unlocks |
+  |------|---------|------------------------|-------|---------|
+  | **Free** | ₦0 | ₦0 | up to 2 | Core accounting (sales, purchases, inventory, banking, payroll, tax, fixed assets, GL, statements, month-end, reports) |
+  | **Starter** | ₦50,000/mo | ₦500,000/yr | up to 5 | + Bank Reconciliation, Recurring, FIRS e-invoice drafts |
+  | **Business** | ₦150,000/mo | ₦1,500,000/yr | unlimited | + Multi-currency, CRM, Budgets, REST API & webhooks |
 
-  Open a locked module and it shows which plan unlocks it; if a subscription lapses you drop to **Free** (core stays usable, premium locks until you renew). Adding users beyond your plan's cap is blocked until you upgrade.
+  Choose **Monthly or Annual** on the Billing page — annual billing charges 10 months (so **2 months are free**) and runs for a year. Open a locked module and it shows which plan unlocks it; if a subscription lapses you drop to **Free** (core stays usable, premium locks until you renew). Adding users beyond your plan's cap is blocked until you upgrade.
 
 - **Approvals & limits.** Per-role spending limits with a block-until-approved queue for money-out and payroll — see **§4.15**.
 - **Multi-business (multi-tenant).** Run many businesses from one login; each is a fully isolated database with its own subdomain and its own invoice branding. Manage under **System → Tenants**.

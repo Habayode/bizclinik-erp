@@ -256,11 +256,11 @@ slide((s) => {
 // 12. PLANS
 slide((s) => {
   s.background = { color: BG }; bar(s);
-  head(s, "PLANS", "Start free. Grow when you're ready.");
+  head(s, "PLANS", "Start free. Grow when you're ready. Annual billing = 2 months free.");
   const plans = [
     ["Free", "₦0", ["1 business", "Up to 2 users", "Core accounting"], NAVY],
-    ["Starter", "₦15,000/mo", ["Up to 5 users", "Invoicing + bank rec", "FIRS e-invoice drafts"], TEAL],
-    ["Business", "₦45,000/mo", ["Unlimited users", "Multi-currency", "API + priority support"], INFO],
+    ["Starter", "₦50,000/mo", ["Up to 5 users", "Invoicing + bank rec", "Annual: ₦500,000/yr"], TEAL],
+    ["Business", "₦150,000/mo", ["Unlimited users", "Multi-currency · CRM · API", "Annual: ₦1,500,000/yr"], INFO],
   ];
   const cw = 2.9, gx = 0.25, x0 = (W - (3 * cw + 2 * gx)) / 2;
   plans.forEach((p, i) => {

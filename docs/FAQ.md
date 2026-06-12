@@ -204,13 +204,13 @@ subscriptions). *(Available on Starter and Business plans.)*
 
 **Q: What are the plans?**
 
-| Plan | Price | Users | What's included |
-|------|-------|-------|-----------------|
-| **Free** | ₦0/mo | Up to 2 | Core accounting: sales, purchases, inventory, banking, payroll, tax, fixed assets, reports, GL, statements, month-end |
-| **Starter** | ₦15,000/mo | Up to 5 | Everything in Free **+** Bank Reconciliation, Recurring transactions, FIRS e-invoice drafts |
-| **Business** | ₦45,000/mo | Unlimited | Everything in Starter **+** Multi-currency, CRM, Budgets, REST API & webhooks, priority support |
+| Plan | Monthly | Annual (2 months free) | Users | What's included |
+|------|---------|------------------------|-------|-----------------|
+| **Free** | ₦0 | ₦0 | Up to 2 | Core accounting: sales, purchases, inventory, banking, payroll, tax, fixed assets, reports, GL, statements, month-end |
+| **Starter** | ₦50,000/mo | ₦500,000/yr | Up to 5 | Everything in Free **+** Bank Reconciliation, Recurring transactions, FIRS e-invoice drafts |
+| **Business** | ₦150,000/mo | ₦1,500,000/yr | Unlimited | Everything in Starter **+** Multi-currency, CRM, Budgets, REST API & webhooks, priority support |
 
-*(Prices are configurable and may be tailored to your agreement.)*
+**Annual billing saves you 2 months** — pay for 10, get 12. Choose Monthly or Annual on the **Billing** page. *(Prices are configurable and may be tailored to your agreement.)*
 
 **Q: Is core accounting ever locked behind a plan?**
 No. Sales, purchases, inventory, banking, payroll, tax, fixed assets, the general ledger,

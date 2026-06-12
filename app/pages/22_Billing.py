@@ -75,24 +75,40 @@ with ec2:
 
 st.divider()
 st.subheader("Plans")
+cycle = st.radio(
+    "Billing cycle", ["Monthly", "Annual — 2 months free"],
+    horizontal=True, key="bill_cycle")
+is_annual = cycle.startswith("Annual")
+interval = "yearly" if is_annual else "monthly"
+
 plans = billing.list_plans()
 cols = st.columns(len(plans))
 for col, p in zip(cols, plans):
     with col:
-        price = "Free" if p["is_free"] else f"₦{p['price_ngn']:,.0f}/{p['interval'][:2]}"
         current = "  ✓ current" if (sub and eff.code == p["code"]
                                     and sub["is_active"]) else ""
         st.markdown(f"### {p['name']}{current}")
-        st.markdown(f"**{price}**")
+        if p["is_free"]:
+            st.markdown("**Free**")
+        elif is_annual:
+            yr = p["annual_price_ngn"]
+            st.markdown(f"**₦{yr:,.0f}/yr**")
+            st.caption(f"≈ ₦{yr / 12:,.0f}/mo · **2 months free** "
+                       f"(vs ₦{p['price_ngn'] * 12:,.0f} monthly)")
+        else:
+            st.markdown(f"**₦{p['price_ngn']:,.0f}/mo**")
+            st.caption(f"or ₦{p['annual_price_ngn']:,.0f}/yr (2 months free)")
         cap = p["max_users"]
         st.caption(f"👥 {'Unlimited users' if cap is None else f'Up to {cap} users'}")
         for f in p["features"]:
             st.markdown(f"- {f}")
-        if st.button(f"Choose {p['name']}", key=f"plan_{p['code']}",
+        btn_label = ("Choose Free" if p["is_free"]
+                     else f"Choose {p['name']} ({'Annual' if is_annual else 'Monthly'})")
+        if st.button(btn_label, key=f"plan_{p['code']}",
                      use_container_width=True):
             try:
                 res = billing.start_subscription(
-                    tenant, p["code"],
+                    tenant, p["code"], interval=interval,
                     email=(auth.current_user() or {}).get("username", "admin")
                     + "@" + tenant + ".local")
             except (ValueError, RuntimeError) as exc:
@@ -102,7 +118,10 @@ for col, p in zip(cols, plans):
                     st.success("Activated the Free plan.")
                     st.rerun()
                 elif res.get("authorization_url"):
-                    st.success("Checkout created — complete payment to activate:")
+                    amt = res.get("amount_ngn", 0)
+                    st.success(f"Checkout created for ₦{amt:,.0f} "
+                               f"({'annual' if is_annual else 'monthly'}) — "
+                               "complete payment to activate:")
                     st.link_button("Pay now", res["authorization_url"],
                                    use_container_width=True)
                     st.caption(f"Reference: {res['reference']}")
