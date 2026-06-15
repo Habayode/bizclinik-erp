@@ -18,7 +18,6 @@ from bizclinik_erp.models import (
     Customer,
     Supplier,
 )
-from bizclinik_erp.services import contact_import
 from bizclinik_erp import ui_kit as ui
 from bizclinik_erp import auth
 
@@ -33,50 +32,6 @@ tab_co, tab_cu, tab_su, tab_ba, tab_tpl = st.tabs(
     ["🏢 Company", "👥 Customers", "🚚 Suppliers", "🏦 Bank accounts",
      "🎨 Invoice template"]
 )
-
-_XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-
-
-def _bulk_import(kind: str, label: str) -> None:
-    """Downloadable Excel template + uploader for bulk customer/supplier import."""
-    with st.expander(f"📥 Bulk import {label.lower()} from Excel "
-                     "(migrate your existing list at once)"):
-        st.markdown(
-            f"**Faster than one-by-one:** download the template, fill one row "
-            f"per {kind}, then upload it here. `name` is required; `code` is "
-            "optional (auto-generated if blank). The first sheet is where you "
-            "fill data — the **Instructions** sheet has an example.")
-        st.download_button(
-            f"⬇ Download {kind} template (.xlsx)",
-            data=contact_import.template_bytes(kind),
-            file_name=f"Trakit365_{label.lower()}_template.xlsx",
-            mime=_XLSX_MIME, key=f"{kind}_tpl_dl")
-        up = st.file_uploader("Upload your filled template", type=["xlsx"],
-                              key=f"{kind}_upload")
-        if up is not None:
-            try:
-                df = pd.read_excel(up)
-            except Exception as e:   # noqa: BLE001
-                st.error(f"Couldn't read that file: {e}")
-                return
-            valid = int(df["name"].notna().sum()) if "name" in df.columns else 0
-            st.caption(f"{valid} row(s) with a name found. Preview:")
-            st.dataframe(df.head(20), hide_index=True, width="stretch")
-            if valid and st.button(f"Import {valid} {label.lower()}",
-                                   type="primary", key=f"{kind}_import_btn"):
-                try:
-                    with get_session() as s:
-                        res = contact_import.import_rows(s, kind, df)
-                except ValueError as e:
-                    st.error(str(e)); return
-                msg = f"Imported {res['created']} {label.lower()}"
-                if res["skipped"]:
-                    msg += f" · {res['skipped']} skipped (duplicate codes)"
-                ui.flash(msg + ".")
-                for e in res["errors"][:8]:
-                    st.caption("• " + e)
-                st.rerun()
-    st.divider()
 
 
 with tab_co:
@@ -121,7 +76,8 @@ with tab_cu:
     st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
 
     st.divider()
-    _bulk_import("customer", "Customers")
+    ui.bulk_import_expander("customer", "Customers")
+    st.divider()
 
     st.subheader("Add a customer")
     with st.form("cust"):
@@ -147,7 +103,8 @@ with tab_su:
     st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
 
     st.divider()
-    _bulk_import("supplier", "Suppliers")
+    ui.bulk_import_expander("supplier", "Suppliers")
+    st.divider()
 
     st.subheader("Add a supplier")
     with st.form("sup"):

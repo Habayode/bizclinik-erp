@@ -60,6 +60,8 @@ with tab_coa:
     st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
 
     st.divider()
+    ui.bulk_import_expander("account", "Accounts")
+    st.divider()
     st.subheader("Add account")
     with st.form("acct"):
         code = st.text_input("Code")

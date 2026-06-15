@@ -73,6 +73,8 @@ with tab_prods:
     st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
 
     st.divider()
+    ui.bulk_import_expander("product", "Products")
+    st.divider()
     st.subheader("Add product")
     with st.form("new_product"):
         sku = st.text_input("SKU")

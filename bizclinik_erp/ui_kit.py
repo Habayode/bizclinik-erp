@@ -277,6 +277,53 @@ def money_col(label: str):
     return st.column_config.NumberColumn(label, format="localized")
 
 
+_XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
+def bulk_import_expander(kind: str, label: str) -> None:
+    """Reusable '📥 Bulk import from Excel' widget: download template, upload a
+    filled file, preview, import. ``kind`` is a key in services.bulk_import.SPECS
+    (customer/supplier/product/employee/account)."""
+    from .db import get_session
+    from .services import bulk_import
+    with st.expander(f"📥 Bulk import {label.lower()} from Excel "
+                     "(migrate your existing list at once)"):
+        st.markdown(
+            f"**Faster than one-by-one:** download the template, fill one row "
+            f"per {kind}, then upload it here. The first sheet is where you fill "
+            "your data — the **Instructions** sheet explains every column.")
+        st.download_button(
+            f"⬇ Download {kind} template (.xlsx)",
+            data=bulk_import.template_bytes(kind),
+            file_name=f"Trakit365_{label.lower().replace(' ', '_')}_template.xlsx",
+            mime=_XLSX_MIME, key=f"{kind}_tpl_dl")
+        up = st.file_uploader("Upload your filled template", type=["xlsx"],
+                              key=f"{kind}_upload")
+        if up is not None:
+            try:
+                df = pd.read_excel(up)
+            except Exception as e:   # noqa: BLE001
+                st.error(f"Couldn't read that file: {e}")
+                return
+            valid = int(df["name"].notna().sum()) if "name" in df.columns else 0
+            st.caption(f"{valid} row(s) with a name found. Preview:")
+            st.dataframe(df.head(20), hide_index=True, width="stretch")
+            if valid and st.button(f"Import {valid} {label.lower()}",
+                                   type="primary", key=f"{kind}_import_btn"):
+                try:
+                    with get_session() as s:
+                        res = bulk_import.import_rows(s, kind, df)
+                except ValueError as e:
+                    st.error(str(e)); return
+                msg = f"Imported {res['created']} {label.lower()}"
+                if res["skipped"]:
+                    msg += f" · {res['skipped']} skipped"
+                flash(msg + ".")
+                for e in res["errors"][:8]:
+                    st.caption("• " + e)
+                st.rerun()
+
+
 def pick_row(df, *, key: str, column_config=None, height=None):
     """Render a single-row-selectable dataframe; return the selected row
     (as a pandas Series) or None. Replaces the old 'type the id' pattern."""

@@ -67,6 +67,9 @@ with tab_list:
         st.caption("No employees yet — add one in the next tab.")
 
 with tab_add:
+    ui.bulk_import_expander("employee", "Employees")
+    st.divider()
+    st.subheader("Add one employee")
     with st.form("new_emp"):
         c1, c2, c3 = st.columns(3)
         name = c1.text_input("Full name *")

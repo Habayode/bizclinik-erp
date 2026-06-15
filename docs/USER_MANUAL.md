@@ -132,7 +132,7 @@ A new business is set up once. Here's GreenLeaf's setup (all under **Settings**,
 4. **Customers** — C001 Sunrise Restaurant, C002 Mama Tobi Kitchen, C003 Adeyemi Household, C004 Global Imports LLC (US, invoiced in USD).
 5. **Suppliers** — S001 FreshFarm Produce, S002 PackRight Supplies, S003 Lagos Properties.
 
-   > **Migrating an existing list?** Under **Settings → Customers** (or **Suppliers**) open **📥 Bulk import**, download the Excel template, fill one row per contact (only *name* is required — *code* auto-generates if blank), and upload it to add them all at once instead of one by one. Re-uploading is safe — existing codes are skipped.
+   > **Migrating existing data?** Most master-data screens have a **📥 Bulk import from Excel** option: download a template, fill one row per record, and upload to add them all at once instead of one by one. Available for **Customers & Suppliers** (Settings), **Products** (Inventory), **Employees** (HR → Employees → Add), and the **Chart of Accounts** (General Ledger). Only *name* is required; *code* auto-generates if blank (except account codes, which you supply). Re-uploading is safe — existing codes are skipped, and the Instructions sheet in each template explains every column.
 6. **Products** — RICE50, OIL25, CARTON (stockable) and DELIV (service).
 7. **Employees** — E001 Chioma (₦250k), E002 Bola (₦180k), E003 Emeka (₦120k).
 8. **Bank account** — Primary Bank (GL 1120). A Cash account is also seeded.
