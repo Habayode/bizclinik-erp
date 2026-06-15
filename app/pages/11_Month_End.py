@@ -22,6 +22,7 @@ st.set_page_config(page_title="Month-End Close · Trakit365 ERP", layout="wide",
                     page_icon="📆")
 ui.inject_brand()
 auth.require_login()
+auth.require_perm("close.period")
 ui.hero("Month-End Close", "Adjusting entries + close checklist", badge="MC",
          right_label="Module", right_value="Period close")
 

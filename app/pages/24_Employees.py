@@ -19,6 +19,7 @@ st.set_page_config(page_title="Employees · Trakit365 ERP", layout="wide",
                     page_icon="🧑‍💼")
 ui.inject_brand()
 auth.require_login()
+auth.require_perm("manage.employees")
 ui.hero("Employees", "Staff directory", badge="EM",
         right_label="Module", right_value="HR")
 

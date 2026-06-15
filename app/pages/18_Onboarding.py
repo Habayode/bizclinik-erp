@@ -23,6 +23,7 @@ st.set_page_config(page_title="Onboarding · Trakit365 ERP", layout="wide",
                     page_icon="🚀")
 ui.inject_brand()
 auth.require_login()
+auth.require_perm("manage.company")
 ui.hero("Onboarding", "Set up your business in a few steps",
          badge="ON", right_label="Module", right_value="Getting started")
 

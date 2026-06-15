@@ -28,6 +28,7 @@ st.set_page_config(page_title="Fixed Assets · Trakit365 ERP", layout="wide",
                     page_icon="🏭")
 ui.inject_brand()
 auth.require_login()
+auth.require_perm("manage.assets")
 ui.hero("Fixed Assets", "Register · depreciation · disposal",
          badge="FA", right_label="Module", right_value="Asset accounting")
 

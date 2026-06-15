@@ -24,6 +24,7 @@ st.set_page_config(page_title="FIRS E-Invoice · Trakit365 ERP", layout="wide",
                     page_icon="🧾")
 ui.inject_brand()
 auth.require_login()
+auth.require_perm("post.invoice")
 from bizclinik_erp import gate as _gate; _gate.require_feature("firs_einvoice", "FIRS E-Invoice")
 ui.hero("FIRS E-Invoice", "Generate FIRS-compliant e-invoices", badge="FI",
         right_label="Module", right_value="Tax compliance")

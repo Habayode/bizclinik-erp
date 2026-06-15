@@ -25,6 +25,7 @@ st.set_page_config(page_title="Settings · Trakit365 ERP", layout="wide",
                     page_icon="⚙️")
 ui.inject_brand()
 auth.require_login()
+auth.require_any_perm(["manage.company", "manage.settings", "manage.customers", "manage.suppliers", "manage.banks"])
 ui.hero("Settings", "Company profile · customers · suppliers · banks",
          badge="ST", right_label="Module", right_value="Master data")
 

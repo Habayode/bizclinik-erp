@@ -26,6 +26,7 @@ st.set_page_config(page_title="General Ledger · Trakit365 ERP", layout="wide",
                     page_icon="📒")
 ui.inject_brand()
 auth.require_login()
+auth.require_perm("post.journal")
 ui.hero("General Ledger", "Trial balance · journal entries · account inquiry",
          badge="GL", right_label="Module", right_value="Bookkeeping", compact=True)
 

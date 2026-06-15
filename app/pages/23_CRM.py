@@ -21,6 +21,7 @@ from bizclinik_erp import ui_kit as ui
 st.set_page_config(page_title="CRM · Trakit365 ERP", layout="wide", page_icon="🤝")
 ui.inject_brand()
 auth.require_login()
+auth.require_perm("manage.customers")
 from bizclinik_erp import gate as _gate; _gate.require_feature("crm", "CRM")
 ui.hero("CRM", "Leads · pipeline · follow-ups", badge="CR",
         right_label="Module", right_value="Sales")

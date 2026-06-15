@@ -20,6 +20,7 @@ st.set_page_config(page_title="Data · Trakit365 ERP", layout="wide",
                     page_icon="💾")
 ui.inject_brand()
 auth.require_login()
+auth.require_perm("import.data")
 ui.hero("Data Management", "Import legacy workbooks · reset · maintenance",
          badge="DT", right_label="Module", right_value="Admin")
 
@@ -73,7 +74,7 @@ st.subheader("Dangerous: wipe the DB")
 st.caption("Drops all tables and recreates them empty. Confirms via a typed "
             "string so it can't be triggered by accident.")
 confirm = st.text_input("Type DELETE to confirm")
-if st.button("Reset database", type="secondary", disabled=confirm != "DELETE"):
+if auth.has_perm("reset.db") and st.button("Reset database", type="secondary", disabled=confirm != "DELETE"):
     reset_db()
     st.success("Database reset.")
 

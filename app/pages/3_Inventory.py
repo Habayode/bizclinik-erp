@@ -21,6 +21,7 @@ st.set_page_config(page_title="Inventory · Trakit365 ERP", layout="wide",
                     page_icon="📦")
 ui.inject_brand()
 auth.require_login()
+auth.require_perm("manage.products")
 ui.hero("Inventory", "Weighted-average cost · stock cards · adjustments",
          badge="IN", right_label="Module", right_value="Stock")
 

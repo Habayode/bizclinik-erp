@@ -21,6 +21,7 @@ st.set_page_config(page_title="Approvals · Trakit365 ERP", layout="wide",
                     page_icon="✅")
 ui.inject_brand()
 auth.require_login()
+auth.require_perm("post.journal")
 ui.hero("Approvals", "Authorisation limits & approval queue", badge="AP",
         right_label="Module", right_value="Controls")
 

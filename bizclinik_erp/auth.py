@@ -89,6 +89,15 @@ def require_perm(perm: str, *, error: str = "You don't have permission to access
         st.stop()
 
 
+def require_any_perm(perms, *, error: str = "You don't have permission to access this.") -> None:
+    """Gate a page that serves several roles (e.g. Settings: company profile is
+    admin, but customers/suppliers/banks belong to other roles). Allowed if the
+    user holds ANY of `perms`."""
+    if not any(has_perm(p) for p in perms):
+        st.error(error)
+        st.stop()
+
+
 # ---- lock screen ----------------------------------------------------------
 
 

@@ -22,6 +22,7 @@ st.set_page_config(page_title="Payroll · Trakit365 ERP", layout="wide",
                     page_icon="👥")
 ui.inject_brand()
 auth.require_login()
+auth.require_perm("run.payroll")
 ui.hero("Payroll", "Employees · runs · payslips",
          badge="PR", right_label="Module", right_value="HR")
 

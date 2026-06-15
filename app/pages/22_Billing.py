@@ -16,6 +16,7 @@ st.set_page_config(page_title="Billing · Trakit365 ERP", layout="wide",
                     page_icon="💳")
 ui.inject_brand()
 auth.require_login()
+auth.require_perm("manage.settings")
 ui.hero("Billing", "Subscription plan & payment status", badge="$",
         right_label="Module", right_value="Subscriptions")
 

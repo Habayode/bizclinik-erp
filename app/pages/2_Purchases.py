@@ -32,6 +32,7 @@ st.set_page_config(page_title="Purchases · Trakit365 ERP", layout="wide",
                     page_icon="📥")
 ui.inject_brand()
 auth.require_login()
+auth.require_perm("post.bill")
 ui.hero("Purchases", "Purchase orders · Bills · Payments",
          badge="PU", right_label="Module", right_value="AP cycle")
 

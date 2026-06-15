@@ -20,6 +20,7 @@ st.set_page_config(page_title="Recruitment · Trakit365 ERP", layout="wide",
                     page_icon="🧲")
 ui.inject_brand()
 auth.require_login()
+auth.require_perm("manage.employees")
 ui.hero("Recruitment", "Openings · candidates · pipeline", badge="RC",
         right_label="Module", right_value="HR")
 

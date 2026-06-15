@@ -29,6 +29,7 @@ st.set_page_config(page_title="Recurring · Trakit365 ERP", layout="wide",
                    page_icon="🔁")
 ui.inject_brand()
 auth.require_login()
+auth.require_perm("post.journal")
 from bizclinik_erp import gate as _gate; _gate.require_feature("recurring", "Recurring Transactions")
 ui.hero("Recurring Transactions",
         "Rent · subscriptions · standing orders · payroll-like JEs",
