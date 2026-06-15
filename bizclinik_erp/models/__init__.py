@@ -23,6 +23,7 @@ from .einvoice import EInvoiceSubmission, EInvoiceStatus
 from .txn import (
     Bill,
     BillLine,
+    DocCounter,
     DocStatus,
     JournalEntry,
     JournalLine,
@@ -68,7 +69,7 @@ __all__ = [
     "AccountType", "Account", "BankAccount", "Company", "Customer",
     "Employee", "Product", "Supplier", "TaxCode", "Warehouse",
     # txn
-    "DocStatus", "JournalEntry", "JournalLine",
+    "DocCounter", "DocStatus", "JournalEntry", "JournalLine",
     "Quotation", "QuotationLine", "SalesOrder", "SalesOrderLine",
     "SalesInvoice", "SalesInvoiceLine", "Receipt",
     "PurchaseOrder", "PurchaseOrderLine", "Bill", "BillLine", "Payment",

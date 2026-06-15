@@ -30,6 +30,16 @@ class DocStatus(str, enum.Enum):
     CANCELLED = "CANCELLED"
 
 
+class DocCounter(Base):
+    """Atomic per-(doc kind, year) sequence backing services.numbering. One row
+    per key such as 'INV-2026'. next_number() does an atomic
+    ``UPDATE ... SET value = value + 1 RETURNING value`` so two concurrent posts
+    can never read the same max() and collide on a document number."""
+    __tablename__ = "doc_counter"
+    key: Mapped[str] = mapped_column(String(32), primary_key=True)
+    value: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+
 # ---- General Ledger -------------------------------------------------------
 
 
