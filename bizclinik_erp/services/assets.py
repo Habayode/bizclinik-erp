@@ -13,6 +13,7 @@ invariant (sum DR == sum CR) is preserved.
 from __future__ import annotations
 
 import calendar
+import math
 from datetime import date
 from typing import Optional
 
@@ -131,12 +132,20 @@ def _months_to_post(asset: FixedAsset, as_of: date) -> list[date]:
         months.append(_end_of_month(cursor))
         cursor = _add_one_month(cursor)
 
-    # Don't go past useful life.
-    already_booked_months = 0
+    # Cap the list by the VALUE still to depreciate, not a rounded month count.
+    # Deriving the bound from int(round(accumulated / monthly)) truncates one
+    # month too early when the accumulated depreciation isn't an exact multiple
+    # of the monthly charge (e.g. an NBV-derived figure carried in on import),
+    # which would strand value above salvage forever. ceil() keeps the final
+    # partial month; run_depreciation's per-charge cap then sizes it exactly.
     monthly = monthly_depreciation_amount(asset)
-    if monthly > 0:
-        already_booked_months = int(round(asset.accumulated_depreciation / monthly))
-    remaining_months = max(0, asset.useful_life_months - already_booked_months)
+    if monthly <= 0:
+        return []
+    remaining_value = round(
+        (asset.cost - asset.salvage_value) - asset.accumulated_depreciation, 2)
+    if remaining_value <= 0:
+        return []
+    remaining_months = math.ceil(remaining_value / monthly - 1e-9)
     if remaining_months < len(months):
         months = months[:remaining_months]
     return months

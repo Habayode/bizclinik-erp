@@ -44,8 +44,8 @@ def _load_accounts(session, *, code_like: str | None = None, code_eq: str | None
     return session.execute(q.order_by(Account.code)).scalars().all()
 
 
-tab_reg, tab_add, tab_run, tab_disp, tab_hist = st.tabs(
-    ["📋 Register", "➕ Add asset", "🔄 Run depreciation",
+tab_reg, tab_add, tab_imp, tab_run, tab_disp, tab_hist = st.tabs(
+    ["📋 Register", "➕ Add asset", "📥 Import register", "🔄 Run depreciation",
      "💰 Dispose asset", "📜 Asset JE history"]
 )
 
@@ -121,6 +121,50 @@ with tab_add:
                                 f"₦{assets_svc.monthly_depreciation_amount(a):,.2f}")
                 except Exception as e:
                     st.error(f"Failed: {e}")
+
+
+# ---- Import register -------------------------------------------------------
+with tab_imp:
+    from bizclinik_erp.services import asset_import as asset_imp
+    st.subheader("Import / migrate fixed-asset register")
+    st.caption("Bring an existing fixed-asset register in from Excel, or "
+                "bulk-add new assets. Download the template, fill one row per "
+                "asset, and upload. This creates the asset records only — it "
+                "posts **no** journal entry, so make sure each asset's cost and "
+                "accumulated depreciation are already in your books (via opening "
+                "balances or the original purchase).")
+    st.download_button("⬇ Download fixed-asset template (.xlsx)",
+                        data=asset_imp.template_bytes(),
+                        file_name="Trakit365_fixed_assets_template.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument."
+                             "spreadsheetml.sheet", key="fa_tpl")
+    up = st.file_uploader("Upload your filled register", type=["xlsx"],
+                          key="fa_upload")
+    if up is not None:
+        try:
+            df_up = pd.read_excel(up)
+        except Exception as e:   # noqa: BLE001
+            st.error(f"Couldn't read that file: {e}")
+            df_up = None
+        if df_up is not None:
+            st.caption("Preview:")
+            st.dataframe(df_up.head(30), hide_index=True, width="stretch")
+            if st.button("Import assets", type="primary", key="fa_import"):
+                try:
+                    with get_session() as s:
+                        res = asset_imp.import_assets(s, df_up)
+                    if res["errors"]:
+                        st.success(f"Imported {res['created']} asset(s); "
+                                    f"{res['skipped']} skipped.")
+                        st.warning("These rows were skipped — fix and re-upload "
+                                    "just those:")
+                        st.dataframe(pd.DataFrame({"issue": res["errors"]}),
+                                     hide_index=True, width="stretch")
+                    else:
+                        ui.flash(f"Imported {res['created']} asset(s).")
+                        st.rerun()
+                except ValueError as e:
+                    st.error(str(e))
 
 
 # ---- Run depreciation ------------------------------------------------------

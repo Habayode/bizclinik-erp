@@ -199,6 +199,8 @@ GreenLeaf's May run (3 staff, ₦550,000 gross): **Salaries ₦550,000**, **PAYE
 **Flow:** **Add Asset** (cost, useful life, salvage, the asset/accum-dep/expense accounts) → run **Depreciation** at month-end (straight-line). Depreciation begins the **month after** acquisition, so GreenLeaf's freezer (acquired 3 May) starts depreciating in June — May shows ₦0, which is correct.
 GreenLeaf asset: **FA-001 Cold-room Freezer**, ₦1,800,000, 60 months, ₦300,000 salvage → ₦25,000/month from June.
 
+> **Migrating an existing register?** Use **Fixed Assets → 📥 Import register** to upload your whole asset list from an Excel template (one row per asset). It creates the asset records only — it posts **no** journal entry, since the cost and accumulated depreciation are already in your books (via opening balances or the original purchase). For an asset that's already part-depreciated, fill **accumulated_depreciation** *and* **depreciation_through** (the month-end booked so far) so depreciation resumes from the next month instead of re-posting the past. Asset GL accounts default by category (Equipment→1210, Furniture→1220) or are auto-created for any other category.
+
 ## 4.7 Multi-currency & FX
 Invoice/bill in any currency; the ledger posts in ₦ at the rate. On settlement, the difference vs the booking rate is a **realized FX gain/loss**. At month-end, open foreign balances can be **revalued** (unrealized).
 GreenLeaf's USD export ($250 @ ₦1,550 = ₦387,500). With the rate rising to ₦1,600 by 31 May, the **unrealized FX gain = ₦12,500** (Currencies → Run revaluation).
