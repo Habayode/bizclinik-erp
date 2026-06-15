@@ -105,6 +105,18 @@ def test_paid_plan_checkout_then_confirm(control_env, monkeypatch):
     assert 29 <= days <= 31
 
 
+def test_confirm_is_idempotent_on_replay(control_env, monkeypatch):
+    from bizclinik_erp.services import billing, payments
+    monkeypatch.setattr(payments, "get_provider", lambda name=None: FakeProvider())
+    res = billing.start_subscription("acme", "starter", email="a@b.com")
+    c1 = billing.confirm_by_reference(res["reference"])
+    assert c1["activated"] is True
+    c2 = billing.confirm_by_reference(res["reference"])   # webhook/replay
+    assert c2["activated"] is False and c2["status"] == "already_paid"
+    sub = billing.current_subscription("acme")
+    assert sub and sub["status"] == "active"
+
+
 def test_annual_checkout_charges_10x_and_runs_a_year(control_env, monkeypatch):
     from bizclinik_erp.services import billing, payments
     monkeypatch.setattr(payments, "get_provider", lambda name=None: FakeProvider())

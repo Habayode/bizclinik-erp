@@ -119,6 +119,16 @@ def reverse_journal(session: Session, entry: JournalEntry, on: date,
     """Post a reversing entry (debits and credits swapped) for an existing JE."""
     if entry.status != DocStatus.POSTED:
         raise ValueError("Only POSTED entries can be reversed.")
+    prior = session.execute(
+        select(JournalEntry).where(
+            JournalEntry.source_kind == "REVERSAL",
+            JournalEntry.source_id == entry.id,
+            JournalEntry.status == DocStatus.POSTED,
+        )
+    ).scalars().first()
+    if prior is not None:
+        raise ValueError(
+            f"{entry.entry_no} has already been reversed ({prior.entry_no}).")
     lines = [JELine(account_id=l.account_id, debit=l.credit, credit=l.debit,
                     memo=l.memo, customer_id=l.customer_id, supplier_id=l.supplier_id)
              for l in entry.lines]

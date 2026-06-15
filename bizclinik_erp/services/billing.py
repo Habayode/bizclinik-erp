@@ -273,7 +273,7 @@ def confirm_by_reference(reference: str, *, provider_name: Optional[str] = None)
             raise ValueError(f"No charge for reference {reference!r}.")
         if charge.status == "paid":
             return {"reference": reference, "status": "already_paid",
-                    "tenant_slug": charge.tenant_slug}
+                    "tenant_slug": charge.tenant_slug, "activated": False}
         prov = payments.get_provider(provider_name or charge.provider)
         status = prov.verify(reference)
         if status.status != "success":
@@ -285,8 +285,18 @@ def confirm_by_reference(reference: str, *, provider_name: Optional[str] = None)
         interval = ("yearly" if charge.amount_ngn >= plan.annual_price_ngn - 0.5
                     else "monthly")
         start = _now()
-        charge.status = "paid"
-        charge.paid_at = start
+        # Atomically claim the charge (pending -> paid). On a concurrent webhook
+        # replay only one caller flips the row; the loser updates 0 rows and
+        # does not re-activate the subscription.
+        claimed = s.query(BillingCharge).filter(
+            BillingCharge.reference == reference,
+            BillingCharge.status == "pending",
+        ).update({"status": "paid", "paid_at": start},
+                 synchronize_session=False)
+        if not claimed:
+            s.commit()
+            return {"reference": reference, "status": "already_paid",
+                    "tenant_slug": charge.tenant_slug, "activated": False}
         _upsert_subscription(s, tenant_slug=charge.tenant_slug,
                              plan_code=charge.plan_code, status="active",
                              period_start=start,
