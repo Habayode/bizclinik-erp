@@ -97,23 +97,22 @@ def _collect_wht_rows(
                 wht_amount += (line.debit + line.credit)
 
         wht_lines_subtotal = 0.0
-        max_rate = 0.0
         if wht_amount == 0:
             for line in bill.lines:
                 if abs(line.tax_rate - wht_rate) < 0.001 and line.tax_rate > 0:
                     wht_lines_subtotal += line.subtotal
-                    if line.tax_rate > max_rate:
-                        max_rate = line.tax_rate
-            if wht_lines_subtotal > 0:
-                wht_amount = round(wht_lines_subtotal * max_rate, 2)
+                    # WHT is computed per line at that line's own rate — never
+                    # pool the subtotals and apply a single (max) rate, which
+                    # mis-states the amount on a statutory certificate.
+                    wht_amount += round(line.subtotal * line.tax_rate, 2)
 
         if wht_amount == 0:
             continue
 
-        # Derive a gross + rate for the certificate row.
+        # Derive a gross + effective rate for the certificate row.
         if wht_lines_subtotal > 0:
             gross = wht_lines_subtotal
-            rate = max_rate
+            rate = round(wht_amount / wht_lines_subtotal, 4)
         else:
             gross = bill.subtotal
             rate = round(wht_amount / gross, 4) if gross else wht_rate
