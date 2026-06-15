@@ -122,6 +122,79 @@ def test_create_invoice_isolated_to_tenant(api_env):
     assert tb["balanced"] is True
 
 
+def test_viewer_key_can_read_but_not_write(api_env):
+    """A VIEWER-scoped key reads fine but is blocked (403) from posting — the
+    service-layer authz enforces the key's role end-to-end through the API."""
+    from bizclinik_erp import tenancy
+    from bizclinik_erp.db import get_session
+    from bizclinik_erp.models import Customer, Product
+
+    tenancy.create_tenant("acme", "Acme", admin_password="pw")
+    _activate_business("acme")
+    tenancy.set_active("acme")
+    with get_session() as s:
+        s.add(Customer(code="CUST", name="Acme Buyer"))
+        s.add(Product(sku="SKU1", name="Thing", standard_price=500, is_stockable=False))
+    tenancy.set_active(None)
+
+    viewer = tenancy.create_api_key("acme", "reporting", role="VIEWER")
+    admin = tenancy.create_api_key("acme", "ops", role="ADMIN")
+    c = _client()
+    payload = {"customer_code": "CUST", "invoice_date": "2026-06-01",
+               "lines": [{"sku": "SKU1", "qty": 1, "unit_price": 500, "tax_rate": 0.0}]}
+
+    # VIEWER: read OK, write forbidden.
+    assert c.get("/api/v1/customers", headers={"X-API-Key": viewer}).status_code == 200
+    r = c.post("/api/v1/invoices", headers={"X-API-Key": viewer}, json=payload)
+    assert r.status_code == 403, r.text
+
+    # ADMIN key on the same tenant can write.
+    r = c.post("/api/v1/invoices", headers={"X-API-Key": admin}, json=payload)
+    assert r.status_code == 201, r.text
+
+
+def test_viewer_key_blocked_on_writes_across_modules(api_env):
+    """Every mutating REST endpoint must reject a VIEWER key (403): bank
+    statements, CRM lead create, billing subscribe, and statement email — not
+    just invoices. An ADMIN key still succeeds."""
+    from sqlalchemy import select
+    from bizclinik_erp import tenancy
+    from bizclinik_erp.db import get_session
+    from bizclinik_erp.models import Customer, BankAccount
+
+    tenancy.create_tenant("acme", "Acme", admin_password="pw")
+    _activate_business("acme")
+    tenancy.set_active("acme")
+    with get_session() as s:
+        s.add(Customer(code="CUST", name="Buyer"))
+        s.flush()
+        bank_id = s.execute(select(BankAccount.id)).scalars().first()  # a seeded bank
+    tenancy.set_active(None)
+
+    viewer = tenancy.create_api_key("acme", "ro", role="VIEWER")
+    admin = tenancy.create_api_key("acme", "ops", role="ADMIN")
+    c = _client()
+    hv = {"X-API-Key": viewer}
+
+    assert c.post("/api/v1/crm/leads", headers=hv,
+                  json={"name": "Lead Co"}).status_code == 403
+    assert c.post("/api/v1/billing/subscribe", headers=hv,
+                  json={"tenant_slug": "acme", "plan_code": "business",
+                        "email": "a@b.com"}).status_code == 403
+    assert c.post("/api/v1/customers/statement/email", headers=hv,
+                  json={"customer_code": "CUST", "period_start": "2026-01-01",
+                        "period_end": "2026-12-31"}).status_code == 403
+    assert c.post("/api/v1/bank/statements", headers=hv,
+                  json={"bank_account_id": bank_id, "period_start": "2026-01-01",
+                        "period_end": "2026-01-31",
+                        "lines": [{"txn_date": "2026-01-05", "description": "x",
+                                   "amount": 100.0}]}).status_code == 403
+
+    # ADMIN key still works.
+    assert c.post("/api/v1/crm/leads", headers={"X-API-Key": admin},
+                  json={"name": "Lead Co"}).status_code == 201
+
+
 def test_legacy_env_key_uses_default_db(api_env, monkeypatch):
     monkeypatch.setenv("BIZCLINIK_API_KEY", "legacy-secret")
     # Bootstrap the default DB

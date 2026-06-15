@@ -21,6 +21,7 @@ from typing import Iterable
 from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session
 
+from .. import authz
 from ..models import (
     BankAccount,
     BankStatement,
@@ -46,6 +47,7 @@ def create_statement(
     source_file: str,
 ) -> BankStatement:
     """Create a DRAFT statement for the given bank + period."""
+    authz.require_perm("manage.banks")
     bank = session.get(BankAccount, bank_account_id)
     if not bank:
         raise ValueError(f"Bank account {bank_account_id} not found.")
@@ -70,6 +72,7 @@ def import_statement_lines(
     session: Session, statement_id: int, rows: Iterable[dict],
 ) -> int:
     """Bulk-insert rows as BankStatementLine records. Returns row count."""
+    authz.require_perm("manage.banks")
     stmt = session.get(BankStatement, statement_id)
     if not stmt:
         raise ValueError(f"Statement {statement_id} not found.")

@@ -13,6 +13,7 @@ from typing import Optional
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from .. import authz
 from ..models import (
     Activity, ActivityKind, Customer, Deal, DealStage, Lead, LeadStatus,
 )
@@ -31,6 +32,7 @@ def create_lead(session: Session, *, name: str, company: Optional[str] = None,
                 email: Optional[str] = None, phone: Optional[str] = None,
                 source: Optional[str] = None, owner_user_id: Optional[int] = None,
                 notes: Optional[str] = None) -> Lead:
+    authz.require_perm("manage.customers")
     if not (name or "").strip():
         raise ValueError("Lead name is required.")
     lead = Lead(name=name.strip(), company=(company or None), email=(email or None),
@@ -76,6 +78,7 @@ def convert_lead(session: Session, lead_id: int, *,
     Optionally opens a Deal for the new customer. Returns
     ``{"customer_id", "lead_id", "deal_id"|None}``.
     """
+    authz.require_perm("manage.customers")
     lead = session.get(Lead, lead_id)
     if not lead:
         raise ValueError(f"Lead {lead_id} not found.")

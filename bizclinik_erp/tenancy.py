@@ -54,6 +54,9 @@ class ApiKey(ControlBase):
     key_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
     tenant_slug: Mapped[Optional[str]] = mapped_column(String(64), index=True)
     label: Mapped[str] = mapped_column(String(128), default="")
+    # Role the key acts as (permission matrix). Defaults to ADMIN so existing
+    # keys keep full access; create a scoped key (e.g. VIEWER) to limit it.
+    role: Mapped[str] = mapped_column(String(16), default="ADMIN", nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     last_used_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
@@ -96,6 +99,38 @@ def _control_db_path() -> Path:
     return Path(get_settings().db_path).parent / "control.db"
 
 
+def _ensure_control_columns(eng: Engine) -> None:
+    """Additive migration for the control DB: ALTER TABLE ADD COLUMN for any
+    ControlBase column missing on an existing table (e.g. api_key.role, added
+    after the table first existed). Best-effort — never blocks startup."""
+    from sqlalchemy import inspect, text
+    insp = inspect(eng)
+    existing = set(insp.get_table_names())
+    with eng.begin() as conn:
+        for table in ControlBase.metadata.sorted_tables:
+            if table.name not in existing:
+                continue
+            live = {c["name"] for c in insp.get_columns(table.name)}
+            for col in table.columns:
+                if col.name in live:
+                    continue
+                ddl = (f'ALTER TABLE "{table.name}" ADD COLUMN '
+                       f'"{col.name}" {col.type.compile(eng.dialect)}')
+                d = col.default
+                if d is not None and getattr(d, "is_scalar", False):
+                    v = d.arg
+                    if isinstance(v, bool):
+                        ddl += f" DEFAULT {1 if v else 0}"
+                    elif isinstance(v, (int, float)):
+                        ddl += f" DEFAULT {v}"
+                    elif isinstance(v, str):
+                        ddl += " DEFAULT '" + v.replace("'", "''") + "'"
+                try:
+                    conn.execute(text(ddl))
+                except Exception:   # pragma: no cover - defensive
+                    pass
+
+
 def _control_factory():
     from .dbbackend import is_sqlite, make_url
     path = str(_control_db_path())
@@ -108,6 +143,7 @@ def _control_factory():
         else:
             eng = create_engine(url, future=True, pool_pre_ping=True)
         ControlBase.metadata.create_all(eng)
+        _ensure_control_columns(eng)
         _control_engines[path] = eng
         fac = sessionmaker(bind=eng, expire_on_commit=False, future=True)
         _control_factories[path] = fac
@@ -227,18 +263,25 @@ def _hash_key(plaintext: str) -> str:
     return hashlib.sha256(plaintext.encode("utf-8")).hexdigest()
 
 
-def create_api_key(tenant_slug: Optional[str], label: str = "") -> str:
-    """Create an API key bound to a tenant (or None = default DB). Returns the
-    plaintext key ONCE — only its hash is stored."""
+def create_api_key(tenant_slug: Optional[str], label: str = "",
+                   role: str = "ADMIN") -> str:
+    """Create an API key bound to a tenant (or None = default DB) that acts as
+    `role` (permission matrix). Returns the plaintext key ONCE — only its hash
+    is stored."""
     if tenant_slug:
         tenant_slug = tenant_slug.strip().lower()
         if not get_tenant(tenant_slug):
             raise ValueError(f"Tenant {tenant_slug!r} not found.")
+    from .models.users import Role
+    try:
+        role = Role(role).value
+    except ValueError:
+        raise ValueError(f"Unknown role {role!r} for an API key.")
     plaintext = "bzk_" + secrets.token_urlsafe(32)
     fac = _control_factory()
     with fac() as s:
         s.add(ApiKey(key_hash=_hash_key(plaintext), tenant_slug=tenant_slug,
-                     label=label or ""))
+                     label=label or "", role=role))
         s.commit()
     return plaintext
 
@@ -259,14 +302,14 @@ def resolve_api_key(plaintext: str) -> Optional[dict]:
             return None
         k.last_used_at = datetime.utcnow()
         s.commit()
-        return {"tenant_slug": k.tenant_slug, "label": k.label}
+        return {"tenant_slug": k.tenant_slug, "label": k.label, "role": k.role}
 
 
 def list_api_keys() -> list[dict]:
     fac = _control_factory()
     with fac() as s:
         return [{"id": k.id, "tenant_slug": k.tenant_slug, "label": k.label,
-                 "is_active": k.is_active,
+                 "role": k.role, "is_active": k.is_active,
                  "created_at": str(k.created_at)[:19],
                  "last_used_at": str(k.last_used_at)[:19] if k.last_used_at else ""}
                 for k in s.execute(select(ApiKey).order_by(ApiKey.id)).scalars()]

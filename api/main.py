@@ -24,9 +24,11 @@ from datetime import date
 from typing import Iterator, Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
+from bizclinik_erp import authz
 from bizclinik_erp import db as _db
 from bizclinik_erp import tenancy
 from bizclinik_erp.db import get_session
@@ -57,6 +59,12 @@ app = FastAPI(
 )
 
 
+@app.exception_handler(authz.PermissionDenied)
+async def _permission_denied(request: Request, exc: "authz.PermissionDenied"):
+    """A key whose role lacks a permission gets a clean 403, not a 500."""
+    return JSONResponse(status_code=403, content={"detail": str(exc)})
+
+
 # ---- auth (tenant-aware) ----------------------------------------------------
 
 
@@ -73,16 +81,18 @@ async def require_api_key(x_api_key: Optional[str] = Header(default=None)):
 
     tenant_slug: Optional[str] = None
     matched = False
+    actor_role = "ADMIN"
 
     env_key = os.environ.get("BIZCLINIK_API_KEY")
     if env_key and hmac.compare_digest(x_api_key, env_key):
         matched = True
-        tenant_slug = None  # legacy / default DB
+        tenant_slug = None  # legacy / default DB — master key acts as ADMIN
     else:
         res = tenancy.resolve_api_key(x_api_key)
         if res:
             matched = True
             tenant_slug = res.get("tenant_slug")
+            actor_role = res.get("role") or "ADMIN"
 
     if not matched:
         raise HTTPException(status_code=401, detail="Invalid or missing API key")
@@ -104,11 +114,11 @@ async def require_api_key(x_api_key: Optional[str] = Header(default=None)):
 
     from bizclinik_erp import authz
     token = _db._active_db_path.set(db_path)
-    # API keys are full-access service credentials -> act as ADMIN. (Per-key
-    # roles can be layered on later via an ApiKey.role column.)
-    authz.set_actor_role("ADMIN")
+    # The key acts as its stored role (the matrix is then enforced in the
+    # services). The env/master key and legacy keys default to ADMIN.
+    authz.set_actor_role(actor_role)
     try:
-        yield {"tenant": tenant_slug}
+        yield {"tenant": tenant_slug, "role": actor_role}
     finally:
         _db._active_db_path.reset(token)
         authz.clear_actor()

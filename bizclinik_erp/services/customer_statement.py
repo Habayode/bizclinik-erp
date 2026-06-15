@@ -12,6 +12,7 @@ from typing import Optional
 from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 
+from .. import authz
 from ..models import (
     Account,
     Customer,
@@ -172,6 +173,7 @@ def email_statement(
     missing recipient or unconfigured SMTP — it reports the reason so callers
     (UI/API) can show a friendly message.
     """
+    authz.require_perm("manage.customers")
     import tempfile
     from pathlib import Path
 

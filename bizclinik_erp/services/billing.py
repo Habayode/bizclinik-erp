@@ -26,6 +26,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 from . import payments
+from .. import authz
 from .. import tenancy
 
 
@@ -216,6 +217,7 @@ def start_subscription(tenant_slug: str, plan_code: str, *, email: str,
     tenant/plan/interval, and RuntimeError if a paid plan is requested with no
     provider configured.
     """
+    authz.require_perm("manage.settings")
     if not tenancy.get_tenant(tenant_slug):
         raise ValueError(f"Unknown tenant '{tenant_slug}'.")
     plan = get_plan(plan_code)

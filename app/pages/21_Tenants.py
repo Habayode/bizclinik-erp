@@ -103,26 +103,34 @@ if submit:
 st.divider()
 st.subheader("REST API keys")
 st.caption("A key scoped to a tenant lets external systems read/write only that "
-            "tenant's books via https://api.hagai.online. The key is shown once.")
+            "tenant's books via https://api.hagai.online. Pick a **role** to "
+            "limit what the key can do (VIEWER = read-only). The key is shown once.")
 
 key_rows = [{"id": k["id"], "tenant": k["tenant_slug"] or "(default DB)",
-             "label": k["label"], "active": k["is_active"],
+             "label": k["label"], "role": k.get("role", "ADMIN"),
+             "active": k["is_active"],
              "created": k["created_at"], "last_used": k["last_used_at"]}
             for k in tenancy.list_api_keys()]
 if key_rows:
     st.dataframe(pd.DataFrame(key_rows), hide_index=True, width="stretch")
 
 with st.form("new_key"):
+    from bizclinik_erp.models.users import Role
     tenants_for_key = ["(default DB)"] + [t["slug"] for t in tenancy.list_tenants()]
-    c1, c2 = st.columns(2)
+    c1, c2, c3 = st.columns(3)
     key_tenant = c1.selectbox("Scope (tenant)", tenants_for_key)
     key_label = c2.text_input("Label", placeholder="e.g. POS integration")
+    key_role = c3.selectbox(
+        "Role", [r.value for r in Role],
+        help="What this key may do. VIEWER = read-only reports/lookups; "
+             "SALES/AP = post invoices/bills only; ADMIN = full access.")
     submit_key = st.form_submit_button("Generate API key", type="primary")
 if submit_key:
     slug_arg = None if key_tenant == "(default DB)" else key_tenant
     try:
-        plaintext = tenancy.create_api_key(slug_arg, key_label or "")
-        st.success("API key created — copy it now, it won't be shown again:")
+        plaintext = tenancy.create_api_key(slug_arg, key_label or "", role=key_role)
+        st.success(f"{key_role} API key created — copy it now, it won't be "
+                   "shown again:")
         st.code(plaintext, language="text")
         st.caption(f"Use header  X-API-Key: {plaintext[:12]}…  against "
                    f"https://api.hagai.online")
