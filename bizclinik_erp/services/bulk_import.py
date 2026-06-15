@@ -16,14 +16,14 @@ from __future__ import annotations
 import io
 import math
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Callable, Optional
 
 import pandas as pd
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from ..models import (Account, AccountType, Customer, Employee, Product,
-                      Supplier)
+from ..models import (Account, AccountType, BankAccount, Customer, Employee,
+                      Product, Supplier)
 
 
 # --------------------------------------------------------------------------- #
@@ -56,6 +56,9 @@ class Spec:
     fields: list = field(default_factory=list)   # excludes the code col; 'name' first
     enum_type: Optional[type] = None
     example: Optional[list] = None
+    # Optional hook(session, kwargs, row) -> kwargs, for special resolution
+    # (e.g. linking a bank to its GL account). May raise ValueError per row.
+    finalize: Optional[Callable] = None
 
 
 SPECS: dict[str, Spec] = {
@@ -140,9 +143,57 @@ SPECS: dict[str, Spec] = {
                   help="yes/no — can entries post directly to it? Blank = yes."),
         ],
         example=["4200", "Service Revenue", "INCOME", "4000", "yes"]),
+
+    "bank": Spec(
+        BankAccount, "Bank accounts", "Bank account", "bank account",
+        code_prefix="BANK",
+        code_help="Your code for this account. Blank = auto-generate (BANK0001…).",
+        fields=[
+            Field("name", required=True, help="Account label, e.g. 'GTBank — Operating'."),
+            Field("bank", help="Bank name, e.g. GTBank."),
+            Field("account_number", help="Account number (kept as text)."),
+            Field("gl_account_code", "ext",
+                  help="Existing asset GL account code to post cash to. Blank = "
+                       "a new GL account is created automatically under 1120 Bank."),
+        ],
+        example=["BANK1", "GTBank — Operating", "GTBank", "0123456789", "1120"]),
 }
 
 KINDS = {k: s.sheet for k, s in SPECS.items()}
+
+
+def _create_bank_gl(session: Session, label: str) -> int:
+    """Auto-create an asset GL account for a bank, under 1120 'Bank' if present."""
+    parent_id = session.execute(
+        select(Account.id).where(Account.code == "1120")).scalar()
+    existing = {c for (c,) in session.execute(select(Account.code)).all()}
+    code = 1121
+    while str(code) in existing and code < 1200:
+        code += 1
+    acct = Account(code=str(code), name=f"Bank — {label}"[:255],
+                   type=AccountType.ASSET, parent_id=parent_id, is_postable=True)
+    session.add(acct)
+    session.flush()
+    return acct.id
+
+
+def _bank_finalize(session: Session, kwargs: dict, row) -> dict:
+    code = _clean(row.get("gl_account_code"))
+    if code:
+        aid = session.execute(
+            select(Account.id).where(Account.code == code)).scalar()
+        if aid is None:
+            raise ValueError(
+                f"GL account '{code}' not found — create it first, or leave "
+                "the column blank to auto-create one.")
+        kwargs["gl_account_id"] = aid
+    else:
+        kwargs["gl_account_id"] = _create_bank_gl(
+            session, kwargs.get("name") or kwargs.get("code") or "Bank")
+    return kwargs
+
+
+SPECS["bank"].finalize = _bank_finalize
 
 
 # --------------------------------------------------------------------------- #
@@ -294,6 +345,14 @@ def import_rows(session: Session, kind: str, df: pd.DataFrame) -> dict:
                     if pid is None:
                         errors.append(f"Row {rno}: parent '{pc}' not found — set to none.")
                 kwargs[f.key] = pid
+            elif f.kind == "ext":
+                pass    # handled by spec.finalize below
+        if not bad and spec.finalize is not None:
+            try:
+                kwargs = spec.finalize(session, kwargs, row)
+            except ValueError as e:
+                errors.append(f"Row {rno}: {e}")
+                bad = True
         if bad:
             skipped += 1
             continue

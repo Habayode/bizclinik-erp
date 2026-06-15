@@ -29,9 +29,9 @@ auth.require_login()
 ui.hero("General Ledger", "Trial balance · journal entries · account inquiry",
          badge="GL", right_label="Module", right_value="Bookkeeping", compact=True)
 
-tab_tb, tab_coa, tab_je, tab_inq, tab_journals = st.tabs(
-    ["⚖️ Trial Balance", "📚 Chart of Accounts", "➕ New journal",
-     "🔍 Account inquiry", "📋 Journals"]
+tab_tb, tab_coa, tab_open, tab_je, tab_inq, tab_journals = st.tabs(
+    ["⚖️ Trial Balance", "📚 Chart of Accounts", "🏁 Opening balances",
+     "➕ New journal", "🔍 Account inquiry", "📋 Journals"]
 )
 
 
@@ -79,6 +79,67 @@ with tab_coa:
                            parent_id=parents.get(parent) if parent else None,
                            is_postable=postable))
         st.success(f"Added {code}")
+
+
+with tab_open:
+    from bizclinik_erp.services import opening_balance as ob
+    st.subheader("Opening balances")
+    st.caption("Going live with an existing business? Upload your closing "
+               "**trial balance** and Trakit365 posts it as one balanced "
+               "opening journal — so your books start with real figures.")
+    with get_session() as s:
+        already = ob.existing_opening(s)
+        plug_opts = {f"{a.code} — {a.name}": a.code for a in s.execute(
+            select(Account).where(Account.type == AccountType.EQUITY,
+                                  Account.is_postable == True)  # noqa: E712
+            .order_by(Account.code)).scalars()}
+    if already is not None:
+        st.info(f"✓ Opening balances already posted as **{already.entry_no}**. "
+                "Void that journal (Journals tab → void) to re-import.")
+    else:
+        oc1, oc2 = st.columns(2)
+        as_of = oc1.date_input("Balances as at", value=date.today(),
+                               help="Usually the day before you start using the app.")
+        plug_default = next((i for i, c in enumerate(plug_opts.values())
+                             if c == ob.DEFAULT_PLUG_CODE), 0)
+        plug_label = oc2.selectbox(
+            "Balancing account (if totals don't tie)",
+            list(plug_opts.keys()) or ["—"], index=plug_default,
+            help="A small debit/credit difference is posted here — usually "
+                 "Retained Earnings / Opening Balance Equity.")
+        st.download_button("⬇ Download trial-balance template (.xlsx)",
+                           data=ob.template_bytes(),
+                           file_name="Trakit365_opening_balances_template.xlsx",
+                           mime="application/vnd.openxmlformats-officedocument."
+                                "spreadsheetml.sheet", key="ob_tpl")
+        up = st.file_uploader("Upload your filled trial balance", type=["xlsx"],
+                              key="ob_upload")
+        if up is not None:
+            try:
+                df = pd.read_excel(up)
+            except Exception as e:   # noqa: BLE001
+                st.error(f"Couldn't read that file: {e}")
+                df = None
+            if df is not None:
+                st.caption("Preview:")
+                st.dataframe(df.head(30), hide_index=True, width="stretch")
+                if st.button("Post opening balances", type="primary",
+                             key="ob_post"):
+                    try:
+                        with get_session() as s:
+                            res = ob.import_trial_balance(
+                                s, df, as_of=as_of,
+                                plug_account_code=plug_opts.get(plug_label),
+                                user_id=auth.current_user_id())
+                        msg = (f"Opening balances posted as {res['je_no']} — "
+                               f"DR ₦{res['total_debit']:,.2f} = CR "
+                               f"₦{res['total_credit']:,.2f}.")
+                        if res["balancing_amount"]:
+                            msg += (f" Balanced ₦{res['balancing_amount']:,.2f} "
+                                    f"to {res['balancing_account']}.")
+                        ui.flash(msg); st.rerun()
+                    except ValueError as e:
+                        st.error(str(e))
 
 
 with tab_je:

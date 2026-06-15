@@ -131,6 +131,8 @@ with tab_ba:
     st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
 
     st.divider()
+    ui.bulk_import_expander("bank", "Bank accounts")
+    st.divider()
     st.subheader("Add bank account")
     with get_session() as s:
         asset_opts = {f"{a.code} — {a.name}": a.id
