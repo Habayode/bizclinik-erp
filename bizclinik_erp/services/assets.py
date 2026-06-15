@@ -20,6 +20,7 @@ from typing import Optional
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from .. import authz
 from ..models import (
     Account,
     AssetStatus,
@@ -69,6 +70,7 @@ def add_asset(
 ) -> FixedAsset:
     """Insert a new FixedAsset. Does NOT post the acquisition JE — that is
     captured separately when the supplier bill or cash payment is recorded."""
+    authz.require_perm("manage.assets")
     if cost <= 0:
         raise ValueError("Asset cost must be positive.")
     if useful_life_months <= 0:
@@ -156,6 +158,7 @@ def run_depreciation(session: Session, *, as_of: date) -> list[JournalEntry]:
     as_of month. Posts one JE per asset per missed month. Returns the list of
     JEs created (possibly empty).
     """
+    authz.require_perm("run.depreciation")
     assets = session.execute(
         select(FixedAsset).where(FixedAsset.status == AssetStatus.ACTIVE)
     ).scalars().all()

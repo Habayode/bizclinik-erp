@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from ..models.fiscal import FiscalPeriod, PeriodStatus
 from .audit import record
 from ..models.audit import AuditAction
+from .. import authz
 
 
 # ---- exception ------------------------------------------------------------
@@ -83,6 +84,7 @@ def check_open(session: Session, entry_date: date, *, allow_override: bool = Fal
 
 def close_period(session: Session, year: int, month: int, *,
                   user_id: Optional[int] = None, notes: Optional[str] = None) -> FiscalPeriod:
+    authz.require_perm("close.period")
     p = get_or_create_period(session, year, month)
     if p.status == PeriodStatus.LOCKED:
         raise ValueError(f"Cannot close a LOCKED period ({year}-{month:02d}).")
@@ -100,6 +102,7 @@ def close_period(session: Session, year: int, month: int, *,
 
 def lock_period(session: Session, year: int, month: int, *,
                  user_id: Optional[int] = None) -> FiscalPeriod:
+    authz.require_perm("lock.period")
     p = get_or_create_period(session, year, month)
     p.status = PeriodStatus.LOCKED
     p.locked_at = datetime.utcnow()
@@ -118,6 +121,7 @@ def reopen_period(session: Session, year: int, month: int, *,
                    user_id: Optional[int] = None, reason: str) -> FiscalPeriod:
     """Reopen a CLOSED (not LOCKED) period. ADMIN-only; the caller must check
     permissions before invoking. Writes a strong audit-log entry."""
+    authz.require_perm("reopen.period")
     if not reason or len(reason.strip()) < 5:
         raise ValueError("A non-trivial reason is required to reopen a period.")
     p = get_or_create_period(session, year, month)

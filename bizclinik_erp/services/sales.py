@@ -14,6 +14,7 @@ from typing import Iterable, Optional
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from .. import authz
 from ..models import (
     Account,
     BankAccount,
@@ -171,6 +172,7 @@ def issue_invoice(
     if not customer:
         raise ValueError(f"Customer {customer_id} not found.")
 
+    authz.require_perm("post.invoice")
     lines = list(lines)
     if not lines:
         raise ValueError("An invoice needs at least one line.")
@@ -323,6 +325,7 @@ def record_receipt(
     if not bank:
         raise ValueError(f"Bank account {bank_account_id} not found.")
 
+    authz.require_perm("post.receipt")
     # Idempotency: a repeated (customer, reference) is a retry/replay, not a new
     # receipt. Return the existing one rather than double-posting the cash JE.
     if reference:

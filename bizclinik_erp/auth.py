@@ -22,6 +22,8 @@ from typing import Optional
 
 import streamlit as st
 
+from . import authz
+
 
 _PASSWORD_ENV = "BIZCLINIK_APP_PASSWORD"
 _LEGACY_KEY = "_bizclinik_authed"
@@ -312,14 +314,19 @@ def require_login() -> None:
 
     if _any_users_configured():
         if st.session_state.get(_USER_KEY):
+            # Bind the actor so service-layer authz enforces this user's role.
+            authz.set_actor_role(st.session_state.get(_ROLE_KEY))
             return
+        authz.clear_actor()
         _user_login_screen()
         return
 
     if _expected_password() is None:
-        return
+        return                       # dev: no auth configured -> unrestricted
     if st.session_state.get(_LEGACY_KEY):
+        authz.set_actor_role("ADMIN")   # legacy single-password = implicit admin
         return
+    authz.clear_actor()
     _legacy_password_screen()
 
 

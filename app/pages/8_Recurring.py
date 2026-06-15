@@ -266,6 +266,11 @@ with tab_run:
             f"Materialised {result['materialized']} txn(s) — "
             f"{result['skipped']} skipped."
         )
+        if result.get("skipped_details"):
+            st.warning("Some templates were skipped (not lost — they'll run "
+                       "once the issue is cleared):")
+            st.dataframe(pd.DataFrame(result["skipped_details"]),
+                         hide_index=True, width="stretch")
         if result["docs"]:
             st.write("Documents posted:")
             for d in result["docs"]:

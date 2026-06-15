@@ -33,6 +33,7 @@ import pandas as pd
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from .. import authz
 from ..models import (Account, AccountType, AssetStatus, DepreciationMethod,
                       FixedAsset)
 
@@ -256,6 +257,7 @@ def import_assets(session: Session, df: pd.DataFrame) -> dict:
     """Create FixedAsset rows from a filled template. Per-row validation:
     bad rows are skipped with an error message; good rows are inserted. Posts
     no journal entry. Returns {created, skipped, errors}."""
+    authz.require_perm("manage.assets")
     df = df.rename(columns={c: str(c).strip().lower() for c in df.columns})
     if "code" not in df.columns:
         raise ValueError("The file has no 'code' column — use the template.")

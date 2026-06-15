@@ -19,6 +19,7 @@ from typing import Iterable, Optional
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from .. import authz
 from ..models import (
     Account,
     BankAccount,
@@ -100,6 +101,7 @@ def receive_bill(
     if not supplier:
         raise ValueError(f"Supplier {supplier_id} not found.")
 
+    authz.require_perm("post.bill")
     lines = list(lines)
     if not lines:
         raise ValueError("A bill needs at least one line.")
@@ -209,6 +211,7 @@ def record_payment(
     if not bank:
         raise ValueError(f"Bank account {bank_account_id} not found.")
 
+    authz.require_perm("post.payment")
     # Idempotency: a repeated (supplier, reference) is a retry/replay, not a new
     # payment. Return the existing one rather than double-posting the cash JE.
     if reference:

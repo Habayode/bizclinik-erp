@@ -252,15 +252,30 @@ def run_due(session: Session, *, as_of: date) -> dict:
     Skipped count includes templates whose materialisation raised — the
     template's `next_run_date` is left untouched so the run can be retried.
     """
+    from .fiscal import PeriodClosedError
     docs: list[str] = []
     materialized = 0
     skipped = 0
+    skipped_details: list[dict] = []
 
     for tpl in due_templates(session, as_of=as_of):
+        label = getattr(tpl, "name", None) or f"template #{tpl.id}"
         try:
             doc = _materialise(session, tpl, on=tpl.next_run_date)
-        except Exception:
+        except PeriodClosedError:
+            # Don't silently drop it: surface the reason and leave next_run_date
+            # untouched so it posts once the period is reopened (admin) or rolls
+            # into an open one.
             skipped += 1
+            skipped_details.append({
+                "template": label, "due": str(tpl.next_run_date),
+                "reason": "fiscal period is closed — reopen it (admin) then re-run"})
+            continue
+        except Exception as exc:  # noqa: BLE001
+            skipped += 1
+            skipped_details.append({
+                "template": label, "due": str(tpl.next_run_date),
+                "reason": str(exc)})
             continue
         tpl.last_run_at = datetime.now()
         tpl.last_run_doc = doc
@@ -269,4 +284,5 @@ def run_due(session: Session, *, as_of: date) -> dict:
         docs.append(doc)
         session.flush()
 
-    return {"materialized": materialized, "skipped": skipped, "docs": docs}
+    return {"materialized": materialized, "skipped": skipped, "docs": docs,
+            "skipped_details": skipped_details}

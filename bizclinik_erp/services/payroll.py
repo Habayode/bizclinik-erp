@@ -26,6 +26,7 @@ from ..models import (
 from .ledger import JELine, post_journal
 from .numbering import next_number
 from .paye import compute_paye_monthly
+from .. import authz
 
 
 @dataclass
@@ -56,6 +57,7 @@ def run_payroll(
     bank_account_id: int,
     notes: Optional[str] = None,
 ) -> PayrollRun:
+    authz.require_perm("run.payroll")
     accts = _accts(session)
     bank = session.get(BankAccount, bank_account_id)
     if not bank:

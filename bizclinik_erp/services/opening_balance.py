@@ -23,6 +23,7 @@ import pandas as pd
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from .. import authz
 from ..models import Account, JournalEntry
 from .ledger import JELine, post_journal
 
@@ -111,6 +112,7 @@ def import_trial_balance(session: Session, df: pd.DataFrame, *, as_of: date,
     """Validate a trial balance and post it as one opening journal. All-or-
     nothing: raises ValueError (without posting) on any problem so the caller
     can show it and let the user fix the sheet."""
+    authz.require_perm("post.journal")
     existing = existing_opening(session)
     if existing is not None:
         raise ValueError(

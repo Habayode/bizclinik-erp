@@ -102,11 +102,16 @@ async def require_api_key(x_api_key: Optional[str] = Header(default=None)):
                 detail="API access requires the Business plan. Upgrade on the "
                        "Billing page to use the REST API.")
 
+    from bizclinik_erp import authz
     token = _db._active_db_path.set(db_path)
+    # API keys are full-access service credentials -> act as ADMIN. (Per-key
+    # roles can be layered on later via an ApiKey.role column.)
+    authz.set_actor_role("ADMIN")
     try:
         yield {"tenant": tenant_slug}
     finally:
         _db._active_db_path.reset(token)
+        authz.clear_actor()
 
 
 # ---- request / response schemas --------------------------------------------

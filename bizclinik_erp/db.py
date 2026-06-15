@@ -137,6 +137,7 @@ def init_db() -> None:
 
 def reset_db() -> None:
     """DROP + recreate all tables on the active DB. Destructive."""
-    from . import models  # noqa: F401
+    from . import authz, models  # noqa: F401
+    authz.require_perm("reset.db")
     Base.metadata.drop_all(get_engine())
     Base.metadata.create_all(get_engine())
