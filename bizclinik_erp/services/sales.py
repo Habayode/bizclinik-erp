@@ -171,6 +171,10 @@ def issue_invoice(
     if not customer:
         raise ValueError(f"Customer {customer_id} not found.")
 
+    lines = list(lines)
+    if not lines:
+        raise ValueError("An invoice needs at least one line.")
+
     currency_code = (currency_code or "NGN").upper()
     rate = fx_svc.resolve_rate(session, currency_code, fx_rate=fx_rate,
                                 as_of=invoice_date)
@@ -223,9 +227,16 @@ def issue_invoice(
             rev_lines.append(JELine(account_id=acct_id, credit=_ngn(amt),
                                     memo=f"Revenue — invoice {invoice.number}"))
     if invoice.tax_total:
-        rev_lines.append(JELine(account_id=accts["VAT_OUT"].id,
-                                credit=_ngn(invoice.tax_total),
-                                memo=f"Output VAT — invoice {invoice.number}"))
+        # Sign-aware: a negative tax total (e.g. a tax credit line) is a debit
+        # reversal of output VAT, not a negative credit (which post_journal
+        # rejects). Keeps every debit/credit non-negative.
+        tax_ngn = _ngn(invoice.tax_total)
+        tax_line = (JELine(account_id=accts["VAT_OUT"].id, credit=tax_ngn,
+                           memo=f"Output VAT — invoice {invoice.number}")
+                    if tax_ngn >= 0 else
+                    JELine(account_id=accts["VAT_OUT"].id, debit=-tax_ngn,
+                           memo=f"Output VAT (reversal) — invoice {invoice.number}"))
+        rev_lines.append(tax_line)
     rev_je = post_journal(
         session, invoice_date,
         f"Sales invoice {invoice.number} to {customer.name}",

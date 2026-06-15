@@ -100,6 +100,10 @@ def receive_bill(
     if not supplier:
         raise ValueError(f"Supplier {supplier_id} not found.")
 
+    lines = list(lines)
+    if not lines:
+        raise ValueError("A bill needs at least one line.")
+
     currency_code = (currency_code or "NGN").upper()
     rate = fx_svc.resolve_rate(session, currency_code, fx_rate=fx_rate,
                                 as_of=bill_date)
@@ -149,8 +153,15 @@ def receive_bill(
         je_lines.append(JELine(account_id=acct_id, debit=_ngn(amt),
                                 memo=f"Bill {bill.number} from {supplier.name}"))
     if bill.tax_total:
-        je_lines.append(JELine(account_id=accts["VAT_IN"].id, debit=_ngn(bill.tax_total),
-                                memo=f"Input VAT — bill {bill.number}"))
+        # Sign-aware: a negative tax total reverses Input VAT with a credit
+        # rather than a negative debit (which post_journal rejects).
+        tax_ngn = _ngn(bill.tax_total)
+        je_lines.append(
+            JELine(account_id=accts["VAT_IN"].id, debit=tax_ngn,
+                   memo=f"Input VAT — bill {bill.number}")
+            if tax_ngn >= 0 else
+            JELine(account_id=accts["VAT_IN"].id, credit=-tax_ngn,
+                   memo=f"Input VAT (reversal) — bill {bill.number}"))
     ap_acct = supplier.payable_account_id or accts["AP"].id
     je_lines.append(JELine(account_id=ap_acct, credit=_ngn(bill.grand_total),
                             memo=f"AP — {supplier.name}", supplier_id=supplier.id))
