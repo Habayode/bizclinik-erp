@@ -1,4 +1,4 @@
-"""Data: import BizClinik xlsx, reset DB, view DB info."""
+"""Data: import a legacy accounting workbook, reset DB, view DB info."""
 from __future__ import annotations
 
 import sys
@@ -32,11 +32,12 @@ c2.text_input("Currency", value=f"{settings.currency_code} ({settings.currency_s
                disabled=True)
 
 st.divider()
-st.subheader("Import BizClinik workbook")
-st.caption("Pulls in master data (customers, suppliers, products) and posts a "
-            "bill for every supplier row, an invoice for every customer row, "
-            "and an opex bill for every operating-module row. Existing master "
-            "records are reused by name.")
+st.subheader("Import legacy workbook")
+st.caption("Migrate an existing business in from its original BizClinik-format "
+            "accounting spreadsheet. Pulls in master data (customers, suppliers, "
+            "products) and posts a bill for every supplier row, an invoice for "
+            "every customer row, and an opex bill for every operating-module row. "
+            "Existing master records are reused by name.")
 source = st.radio("Source", ["Upload file", "Local path"], horizontal=True)
 xlsx_path = None
 if source == "Upload file":
@@ -46,8 +47,8 @@ if source == "Upload file":
         tmp.write_bytes(f.getvalue())
         xlsx_path = tmp
 else:
-    p = st.text_input("Path",
-                       value=r"C:\Users\User\Downloads\BizClinik Accounting and Business Software- Wendysrack Luxe Ltd.xlsx")
+    p = st.text_input("Path", value="",
+                       placeholder="/path/to/legacy_workbook.xlsx")
     if p and Path(p).exists():
         xlsx_path = Path(p)
     elif p:

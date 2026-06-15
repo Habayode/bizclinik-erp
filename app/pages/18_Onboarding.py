@@ -171,7 +171,7 @@ with steps[3]:
     st.markdown("**Next steps:**")
     st.markdown(
         "- Add customers & suppliers in **Settings**\n"
-        "- Import a BizClinik workbook in **Data**\n"
+        "- Import a legacy workbook in **Data**\n"
         "- Issue your first invoice in **Sales**\n"
         "- Create staff logins in **Admin**"
     )
