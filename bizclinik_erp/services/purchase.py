@@ -198,6 +198,16 @@ def record_payment(
     if not bank:
         raise ValueError(f"Bank account {bank_account_id} not found.")
 
+    # Idempotency: a repeated (supplier, reference) is a retry/replay, not a new
+    # payment. Return the existing one rather than double-posting the cash JE.
+    if reference:
+        dup = session.execute(
+            select(Payment).where(Payment.supplier_id == supplier_id,
+                                  Payment.reference == reference)
+        ).scalars().first()
+        if dup is not None:
+            return dup
+
     accts = _resolve_accounts(session)
     ap_acct = supplier.payable_account_id or accts["AP"].id
 

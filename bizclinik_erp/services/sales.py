@@ -312,6 +312,16 @@ def record_receipt(
     if not bank:
         raise ValueError(f"Bank account {bank_account_id} not found.")
 
+    # Idempotency: a repeated (customer, reference) is a retry/replay, not a new
+    # receipt. Return the existing one rather than double-posting the cash JE.
+    if reference:
+        dup = session.execute(
+            select(Receipt).where(Receipt.customer_id == customer_id,
+                                  Receipt.reference == reference)
+        ).scalars().first()
+        if dup is not None:
+            return dup
+
     accts = _resolve_accounts(session)
     ar_account_id = customer.receivable_account_id or accts["AR"].id
 

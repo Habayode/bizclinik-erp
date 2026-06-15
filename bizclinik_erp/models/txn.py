@@ -12,6 +12,7 @@ from sqlalchemy import (
     Enum,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
@@ -248,6 +249,14 @@ class SalesInvoiceLine(Base):
 class Receipt(Base):
     """Cash received from a customer, optionally against an invoice."""
     __tablename__ = "receipt"
+    # Idempotency: a (customer, reference) pair is unique when a reference is
+    # given. NULL references stay distinct (SQL NULL semantics), so reference-
+    # less receipts are unaffected; a repeated reference (retry/replay) is
+    # rejected at the DB as a backstop to the service-level guard.
+    __table_args__ = (
+        Index("ix_receipt_customer_reference", "customer_id", "reference",
+              unique=True),
+    )
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     number: Mapped[str] = mapped_column(String(32), unique=True, nullable=False)
     receipt_date: Mapped[date] = mapped_column(Date, nullable=False)
@@ -369,6 +378,11 @@ class BillLine(Base):
 class Payment(Base):
     """Cash paid to a supplier, optionally against a bill."""
     __tablename__ = "payment"
+    # Idempotency backstop, mirroring Receipt — see note there.
+    __table_args__ = (
+        Index("ix_payment_supplier_reference", "supplier_id", "reference",
+              unique=True),
+    )
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     number: Mapped[str] = mapped_column(String(32), unique=True, nullable=False)
     payment_date: Mapped[date] = mapped_column(Date, nullable=False)

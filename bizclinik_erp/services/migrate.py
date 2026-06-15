@@ -68,4 +68,21 @@ def ensure_schema(engine: Optional[Engine] = None) -> list[str]:
                     applied.append(ddl)
                 except Exception as exc:  # pragma: no cover - defensive
                     applied.append(f"-- FAILED: {ddl}  ({exc})")
+
+        # Create any indexes declared on the models but missing on existing
+        # tables (e.g. the receipt/payment idempotency indexes added later).
+        # Best-effort: a pre-existing duplicate would make a UNIQUE index fail,
+        # which must not break the deploy — the service-level guard still holds.
+        for table in Base.metadata.sorted_tables:
+            if table.name not in existing_tables:
+                continue
+            live_idx = {ix["name"] for ix in insp.get_indexes(table.name)}
+            for index in table.indexes:
+                if index.name in live_idx:
+                    continue
+                try:
+                    index.create(bind=conn, checkfirst=True)
+                    applied.append(f"CREATE INDEX {index.name}")
+                except Exception as exc:  # pragma: no cover - defensive
+                    applied.append(f"-- FAILED INDEX {index.name}  ({exc})")
     return applied
