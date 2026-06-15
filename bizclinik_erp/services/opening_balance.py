@@ -127,8 +127,10 @@ def import_trial_balance(session: Session, df: pd.DataFrame, *, as_of: date,
     for idx, row in df.iterrows():
         rno = int(idx) + 2
         code = _clean(row.get("account_code"))
-        dr = _num(row.get("debit"))
-        cr = _num(row.get("credit"))
+        # Round at the source so the totals (and the plug derived from them)
+        # match the rounded line amounts post_journal re-sums and re-checks.
+        dr = round(_num(row.get("debit")), 2)
+        cr = round(_num(row.get("credit")), 2)
         if not code and dr == 0 and cr == 0:
             continue
         if not code:
@@ -147,8 +149,7 @@ def import_trial_balance(session: Session, df: pd.DataFrame, *, as_of: date,
             continue
         if dr == 0 and cr == 0:
             continue
-        lines.append(JELine(account_id=acct.id, debit=round(dr, 2),
-                            credit=round(cr, 2),
+        lines.append(JELine(account_id=acct.id, debit=dr, credit=cr,
                             memo=f"Opening balance — {acct.name}"))
         total_dr += dr
         total_cr += cr

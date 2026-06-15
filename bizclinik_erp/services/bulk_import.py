@@ -167,10 +167,12 @@ def _create_bank_gl(session: Session, label: str) -> int:
     parent_id = session.execute(
         select(Account.id).where(Account.code == "1120")).scalar()
     existing = {c for (c,) in session.execute(select(Account.code)).all()}
-    code = 1121
-    while str(code) in existing and code < 1200:
-        code += 1
-    acct = Account(code=str(code), name=f"Bank — {label}"[:255],
+    code = next((str(n) for n in range(1121, 1200) if str(n) not in existing), None)
+    if code is None:
+        raise ValueError(
+            "Ran out of auto-numbered bank GL codes (1121–1199). Put an existing "
+            "asset account code in the 'gl_account_code' column instead.")
+    acct = Account(code=code, name=f"Bank — {label}"[:255],
                    type=AccountType.ASSET, parent_id=parent_id, is_postable=True)
     session.add(acct)
     session.flush()

@@ -144,3 +144,47 @@ def test_template_is_valid_xlsx():
     assert "Trial Balance" in xl.sheet_names and "Instructions" in xl.sheet_names
     assert list(xl.parse("Trial Balance").columns) == [
         "account_code", "account_name", "debit", "credit"]
+
+
+def test_fractional_kobo_balances_under_plug(fresh_db):
+    """Sub-kobo line amounts must not push the posted JE past post_journal's
+    0.01 tolerance — totals are rounded at source so the plug closes exactly."""
+    from bizclinik_erp.db import get_session
+    from bizclinik_erp.services import opening_balance as ob
+    from bizclinik_erp.services.ledger import trial_balance
+    df = _tb([
+        {"account_code": "1120", "debit": "1000000.005", "credit": ""},
+        {"account_code": "1130", "debit": "250000.004", "credit": ""},
+        {"account_code": "3100", "debit": "", "credit": "1200000.007"},
+    ])
+    with get_session() as s:
+        # post_journal raises if DR != CR within 0.01 — a clean post is the proof.
+        res = ob.import_trial_balance(s, df, as_of=date(2026, 1, 1),
+                                     plug_account_code="3200")
+        assert res["je_no"].startswith("JE-")
+    with get_session() as s:
+        tb = trial_balance(s)
+        assert round(sum(r["debit"] for r in tb), 2) == \
+               round(sum(r["credit"] for r in tb), 2)
+
+
+def test_bank_autocreate_exhaustion_skips_gracefully(fresh_db):
+    """When the 1121–1199 auto-number band is full, a blank-GL bank row is
+    skipped with a clear error rather than crashing on a duplicate code."""
+    from bizclinik_erp.db import get_session
+    from bizclinik_erp.services import bulk_import
+    from bizclinik_erp.models import Account, AccountType
+    with get_session() as s:
+        parent = s.query(Account.id).filter(Account.code == "1120").scalar()
+        present = {c for (c,) in s.query(Account.code).all()}
+        for n in range(1121, 1200):
+            if str(n) not in present:
+                s.add(Account(code=str(n), name=f"Filler {n}",
+                              type=AccountType.ASSET, parent_id=parent,
+                              is_postable=True))
+        s.flush()
+        df = pd.DataFrame([{"code": "NEWBANK", "name": "Overflow Bank",
+                            "bank": "X", "gl_account_code": ""}])
+        res = bulk_import.import_rows(s, "bank", df)
+        assert res["created"] == 0 and res["skipped"] == 1
+        assert any("Ran out" in e for e in res["errors"])
