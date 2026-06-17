@@ -20,16 +20,31 @@ from bizclinik_erp import auth
 from bizclinik_erp import ui_kit as ui
 
 
-# Canonical per-tenant login URL. One level under the apex
-# (acme-erp.hagai.online) so it's covered by the free *.hagai.online TLS cert;
-# the app auto-selects the tenant from the host. Override the template when you
-# move to a dedicated domain (e.g. "https://{slug}.bizclinik.app").
+# Shared login host — every tenant signs in here and picks its business. Always
+# live.
+_SHARED_LOGIN_URL = os.environ.get("BIZCLINIK_LOGIN_URL", "https://erp.hagai.online")
+
+# Vanity per-tenant subdomain template (acme-erp.hagai.online) — auto-selects
+# the tenant and skips the picker, BUT only works once its Cloudflare DNS +
+# tunnel ingress are provisioned (deploy/linux/add-tenant-subdomain.sh <slug>).
 _TENANT_URL_TEMPLATE = os.environ.get(
     "BIZCLINIK_TENANT_URL_TEMPLATE", "https://{slug}-erp.hagai.online")
 
+# Slugs whose vanity subdomain is actually wired. Others fall back to the shared
+# host so the page never advertises a link that 404s. Set the env var (comma-
+# separated) to switch more on at commercial launch — no code change needed.
+_WIRED_SUBDOMAINS = {s.strip() for s in os.environ.get(
+    "BIZCLINIK_WIRED_SUBDOMAINS", "wendysrack").split(",") if s.strip()}
+
+
+def _subdomain_url(slug: str) -> str:
+    return _TENANT_URL_TEMPLATE.format(slug=slug)
+
 
 def _login_url(slug: str) -> str:
-    return _TENANT_URL_TEMPLATE.format(slug=slug)
+    """The URL that actually works today: the vanity subdomain if it's wired,
+    otherwise the shared host (business picker)."""
+    return _subdomain_url(slug) if slug in _WIRED_SUBDOMAINS else _SHARED_LOGIN_URL
 
 
 st.set_page_config(page_title="Tenants · Trakit365 ERP", layout="wide",
@@ -55,6 +70,8 @@ if cur:
 
 st.subheader("Registered tenants")
 rows = [{"slug": t["slug"], "name": t["name"], "login url": _login_url(t["slug"]),
+         "sign in via": ("direct subdomain" if t["slug"] in _WIRED_SUBDOMAINS
+                          else "shared link + pick business"),
          "active": t["is_active"], "created": str(t.get("created_at") or "")[:19]}
         for t in tenancy.list_tenants(active_only=False)]
 if rows:
@@ -62,10 +79,14 @@ if rows:
         pd.DataFrame(rows), hide_index=True, width="stretch",
         column_config={"login url": st.column_config.LinkColumn("login url")},
     )
+    n_wired = sum(1 for t in tenancy.list_tenants(active_only=False)
+                  if t["slug"] in _WIRED_SUBDOMAINS)
     st.caption(
-        "Each business signs in at its own **login url** — the link auto-selects "
-        "that tenant (no business picker). Wiring a new tenant's subdomain on the "
-        "server is one command: `deploy/linux/add-tenant-subdomain.sh <slug>`."
+        f"Everyone signs in at the shared **{_SHARED_LOGIN_URL}** and picks their "
+        f"business. A tenant with a provisioned subdomain ({n_wired} so far) "
+        "instead gets a **direct subdomain** link that skips the picker — wire "
+        "one with `deploy/linux/add-tenant-subdomain.sh <slug>` (planned at "
+        "commercial launch)."
     )
 else:
     st.caption("No tenants yet — single-tenant mode.")
@@ -90,11 +111,13 @@ if submit:
                 f"Created tenant **{t['name']}** ({t['slug']}). Admin login is "
                 f"username `admin` with the password you set."
             )
-            st.markdown(f"**Login URL:** {_login_url(t['slug'])}")
+            st.markdown(
+                f"**Sign in now:** {_SHARED_LOGIN_URL} — pick **{t['name']}** "
+                "and log in as `admin`.")
             st.caption(
-                "To activate that subdomain on the server, run "
-                f"`deploy/linux/add-tenant-subdomain.sh {t['slug']}` once. "
-                "Until then, sign in via the business picker at the main URL."
+                f"A direct subdomain ({_subdomain_url(t['slug'])}) can be wired "
+                f"later with `deploy/linux/add-tenant-subdomain.sh {t['slug']}` "
+                "— planned at commercial launch."
             )
         except ValueError as e:
             st.error(str(e))
