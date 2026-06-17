@@ -70,6 +70,23 @@ from .school import (
     StudentFeeSchedule,
     Term,
 )
+from .school_enrol import (
+    Student,
+    StudentEnrolment,
+    StudentStatus,
+)
+from .school_fees import (
+    StudentFeeBilling,
+)
+from .school_ops import (
+    Attendance,
+    AttendanceStatus,
+    StudentResult,
+)
+from .school_staff import (
+    StaffType,
+    TeacherProfile,
+)
 
 __all__ = [
     # master
@@ -110,4 +127,12 @@ __all__ = [
     "ApprovalLimit", "ApprovalRequest", "ApprovalStatus",
     # School (Phase 0 scaffolding)
     "AcademicSession", "Term", "SchoolClass", "FeeType", "StudentFeeSchedule",
+    # School (Phase 1 — students + enrolment)
+    "Student", "StudentEnrolment", "StudentStatus",
+    # School (Phase 2 — fee billing)
+    "StudentFeeBilling",
+    # School (Phase 4 — attendance + results, GL-free)
+    "Attendance", "AttendanceStatus", "StudentResult",
+    # School (Phase 5 — teaching staff profiles, GL-free)
+    "StaffType", "TeacherProfile",
 ]

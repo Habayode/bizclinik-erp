@@ -91,6 +91,11 @@ NAV = {
     ],
     "School": [
         _page("pages/30_School_Setup.py", "School Setup", "🏫"),
+        _page("pages/32_School_Students.py", "Students", "🎓"),
+        _page("pages/33_School_Fees.py", "School Fees", "💰"),
+        _page("pages/34_School_Attendance.py", "Attendance", "🗓"),
+        _page("pages/35_School_Results.py", "Results", "📝"),
+        _page("pages/36_School_Teachers.py", "Teachers and Dashboard", "👩‍🏫"),
     ],
     "CRM": [
         _page("pages/23_CRM.py", "CRM", "🤝"),
