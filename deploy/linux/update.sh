@@ -61,6 +61,19 @@ else
   echo "(PDF build failed — the in-app download keeps the previous copy)"
 fi
 
+# School-specific manual (served to school tenants). Non-fatal.
+if [ -f "$APP_DIR/docs/USER_MANUAL_SCHOOL.md" ]; then
+  if sudo -u bizclinik env PYTHONPATH="$APP_DIR" \
+       PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright \
+       "$APP_DIR/venv/bin/python" "$APP_DIR/scripts/manual_to_pdf.py" \
+       "$APP_DIR/docs/USER_MANUAL_SCHOOL.md" \
+       "$APP_DIR/Trakit365_School_ERP_User_Manual.pdf"; then
+    echo "School manual PDF rebuilt."
+  else
+    echo "(School PDF build failed — keeps previous copy)"
+  fi
+fi
+
 echo "==> Restarting services"
 systemctl restart bizclinik-erp
 systemctl restart bizclinik-api 2>/dev/null || echo "(bizclinik-api not present — skipped)"

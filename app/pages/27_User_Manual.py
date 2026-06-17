@@ -9,20 +9,35 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 import streamlit as st
 
-from bizclinik_erp import auth
+from bizclinik_erp import auth, manuals
 from bizclinik_erp import ui_kit as ui
 
 st.set_page_config(page_title="User Manual · Trakit365 ERP", layout="wide",
                     page_icon="📖")
 ui.inject_brand()
 auth.require_login()
-ui.hero("User Manual", "The complete illustrated guide", badge="UM",
+
+
+def _vertical() -> str:
+    """The active tenant's vertical — picks the school manual for schools."""
+    try:
+        from bizclinik_erp.db import get_session
+        from bizclinik_erp.models import Company
+        with get_session() as s:
+            co = s.query(Company).first()
+            return (co.vertical or "general") if co else "general"
+    except Exception:
+        return "general"
+
+
+spec = manuals.manual_for(_vertical())
+ui.hero(spec["title"], spec["subtitle"], badge="UM",
         right_label="Module", right_value="Help")
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 DOCS = ROOT / "docs"
-MD = DOCS / "USER_MANUAL.md"
-PDF = ROOT / "Trakit365_ERP_User_Manual.pdf"
+MD = spec["md"]
+PDF = spec["pdf"]
 
 if not MD.exists():
     st.warning("The user manual file isn't available on this server.")
@@ -35,7 +50,7 @@ md_text = MD.read_text(encoding="utf-8")
 cols = st.columns([1, 1, 3])
 cols[0].download_button(
     "⬇ Download (Markdown)", data=md_text.encode("utf-8"),
-    file_name="Trakit365_ERP_User_Manual.md", mime="text/markdown",
+    file_name=spec["md_name"], mime="text/markdown",
     width="stretch")
 if PDF.exists():
     cols[1].download_button(
