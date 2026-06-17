@@ -223,3 +223,33 @@ def test_api_requires_business_plan(api_env):
     _activate_business("freeco")
     r = c.get("/api/v1/customers", headers={"X-API-Key": key})
     assert r.status_code == 200, r.text
+
+
+def test_billing_endpoints_reject_cross_tenant(api_env):
+    """A tenant-scoped key may read/modify only its OWN subscription. Passing
+    another tenant's slug must 403 (was a cross-tenant leak)."""
+    from bizclinik_erp import tenancy
+    tenancy.create_tenant("alpha", "Alpha Co", admin_password="pw")
+    tenancy.create_tenant("beta", "Beta Co", admin_password="pw")
+    _activate_business("alpha")
+    _activate_business("beta")
+    tenancy.set_active(None)
+    key_a = tenancy.create_api_key("alpha", "alpha key")
+    c = _client()
+
+    # alpha's key reading its OWN status: allowed.
+    own = c.get("/api/v1/billing/status?tenant_slug=alpha",
+                headers={"X-API-Key": key_a})
+    assert own.status_code == 200, own.text
+
+    # alpha's key probing beta's status: forbidden.
+    cross = c.get("/api/v1/billing/status?tenant_slug=beta",
+                  headers={"X-API-Key": key_a})
+    assert cross.status_code == 403, cross.text
+
+    # alpha's key trying to change beta's plan: forbidden.
+    sub = c.post("/api/v1/billing/subscribe",
+                 headers={"X-API-Key": key_a},
+                 json={"tenant_slug": "beta", "plan_code": "business",
+                       "email": "x@example.com"})
+    assert sub.status_code == 403, sub.text

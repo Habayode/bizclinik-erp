@@ -51,8 +51,10 @@ st.set_page_config(page_title="Tenants · Trakit365 ERP", layout="wide",
                     page_icon="🏬")
 ui.inject_brand()
 auth.require_login()
-auth.require_perm("manage.users",
-                   error="Admins only — sign in with an admin account.")
+# Operator-only: this console lists and manages EVERY business on the platform.
+# Gating before any tenancy.list_* read so a tenant admin can't enumerate other
+# businesses even by hitting the page URL directly. (Nav-hiding is cosmetic.)
+auth.require_platform_admin()
 ui.hero("Tenants", "Register and isolate multiple businesses",
          badge="TN", right_label="Module", right_value="Multi-tenant")
 

@@ -26,6 +26,7 @@ from . import authz
 
 
 _PASSWORD_ENV = "BIZCLINIK_APP_PASSWORD"
+_PLATFORM_ADMINS_ENV = "BIZCLINIK_PLATFORM_ADMINS"
 _LEGACY_KEY = "_bizclinik_authed"
 _USER_KEY = "_bizclinik_user_id"
 _USERNAME_KEY = "_bizclinik_username"
@@ -96,6 +97,81 @@ def require_any_perm(perms, *, error: str = "You don't have permission to access
     admin, but customers/suppliers/banks belong to other roles). Allowed if the
     user holds ANY of `perms`."""
     if not any(has_perm(p) for p in perms):
+        st.error(error)
+        st.stop()
+
+
+# ---- platform operator (manages ALL tenants, vs a tenant-level admin) ------
+
+
+def _platform_principals() -> list[str]:
+    """Allow-listed operator principals from BIZCLINIK_PLATFORM_ADMINS — comma
+    separated, each either ``slug:username`` (the tenant the operator signs into
+    + their username) or a bare ``username`` (only honoured in single-tenant
+    mode). Empty when unset."""
+    raw = os.environ.get(_PLATFORM_ADMINS_ENV, "")
+    return [p.strip() for p in raw.split(",") if p.strip()]
+
+
+def evaluate_platform_admin(*, principals: list[str], active_tenant: Optional[str],
+                            username: Optional[str], role: Optional[str],
+                            logged_in: bool, has_tenants: bool) -> bool:
+    """Pure decision (no Streamlit) so it is unit-testable.
+
+    Rules, designed so a tenant's bootstrap ``admin`` (which is handed to the
+    client) can NEVER become a platform operator unless explicitly allow-listed
+    under the operator's OWN tenant slug:
+
+      * Allow-list set → operator iff a principal matches. ``slug:username`` must
+        match BOTH the signed-into tenant and the username. Bare ``username``
+        entries are honoured ONLY in single-tenant mode (no tenants registered),
+        never when tenants exist.
+      * Allow-list empty → in multi-tenant mode NOBODY is an operator (fail
+        closed); in single-tenant/legacy mode the lone signed-in ADMIN is the
+        operator (there is no registry to leak).
+    """
+    if not logged_in:
+        return False
+    if not principals:
+        return (not has_tenants) and role == "ADMIN"
+    for p in principals:
+        if ":" in p:
+            slug, uname = (x.strip() for x in p.split(":", 1))
+            if slug and uname and active_tenant == slug and username == uname:
+                return True
+        elif (not has_tenants) and active_tenant is None and username == p:
+            return True
+    return False
+
+
+def is_platform_admin() -> bool:
+    """True only for the platform operator (manages all tenants) — never for an
+    ordinary tenant admin. Evaluate only AFTER require_login()/_apply_tenant()
+    has resolved the active tenant. See evaluate_platform_admin for the rules."""
+    from . import tenancy
+    u = current_user()
+    if u:
+        username, role, logged_in = u.get("username"), u.get("role"), True
+    elif st.session_state.get(_LEGACY_KEY) and not _any_users_configured():
+        # Legacy single-password mode: the implicit single user is admin.
+        username, role, logged_in = "admin", "ADMIN", True
+    else:
+        username, role, logged_in = None, None, False
+    try:
+        has = tenancy.has_tenants()
+    except Exception:
+        has = False
+    return evaluate_platform_admin(
+        principals=_platform_principals(), active_tenant=active_tenant(),
+        username=username, role=role, logged_in=logged_in, has_tenants=has)
+
+
+def require_platform_admin(*, error: str = (
+        "Platform operators only. This console manages every business on the "
+        "platform and isn't available to individual tenant accounts.")) -> None:
+    """Gate a control-plane page (e.g. Tenants). Stops before any cross-tenant
+    data is read/rendered."""
+    if not is_platform_admin():
         st.error(error)
         st.stop()
 
@@ -341,6 +417,7 @@ def require_login() -> None:
         if st.session_state.get(_USER_KEY):
             # Bind the actor so service-layer authz enforces this user's role.
             authz.set_actor_role(st.session_state.get(_ROLE_KEY))
+            authz.set_platform_admin(is_platform_admin())
             return
         authz.clear_actor()
         _user_login_screen()
@@ -350,6 +427,7 @@ def require_login() -> None:
         return                       # dev: no auth configured -> unrestricted
     if st.session_state.get(_LEGACY_KEY):
         authz.set_actor_role("ADMIN")   # legacy single-password = implicit admin
+        authz.set_platform_admin(is_platform_admin())
         return
     authz.clear_actor()
     _legacy_password_screen()

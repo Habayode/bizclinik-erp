@@ -9,6 +9,18 @@ from pathlib import Path
 import pytest
 
 
+@pytest.fixture(autouse=True)
+def _reset_authz_actor():
+    """Clear the service-layer actor before and after every test. The actor role
+    lives in a contextvar that would otherwise leak across tests in the same
+    process — and a leaked tenant actor now (correctly) blocks control-plane
+    calls like tenancy.create_tenant via authz.require_platform()."""
+    from bizclinik_erp import authz
+    authz.clear_actor()
+    yield
+    authz.clear_actor()
+
+
 @pytest.fixture
 def fresh_db(monkeypatch):
     """Point BIZCLINIK_DB_PATH at a brand-new sqlite file, clear all cached

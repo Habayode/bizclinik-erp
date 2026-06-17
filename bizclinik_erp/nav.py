@@ -26,20 +26,34 @@ _HR_PAGES = [
     _p("pages/5_Payroll.py", "Payroll", "💷"),
 ]
 
+# The Tenants console manages EVERY business on the platform, so it is shown
+# only to the platform operator (see auth.is_platform_admin) — never to an
+# ordinary tenant admin, who would otherwise enumerate other tenants. Hiding it
+# here is cosmetic; the real gate is auth.require_platform_admin() at the top of
+# the page itself.
+_TENANTS_PATH = "pages/21_Tenants.py"
+
 _SYSTEM_PAGES = [
     _p("pages/18_Onboarding.py", "Onboarding", "🚀"),
     _p("pages/17_Settings.py", "Settings", "⚙️"),
     _p("pages/19_Admin.py", "Admin", "🛡️"),
     _p("pages/14_Notifications.py", "Notifications", "🔔"),
     _p("pages/16_Data.py", "Data", "🗄️"),
-    _p("pages/21_Tenants.py", "Tenants", "🏢"),
+    _p(_TENANTS_PATH, "Tenants", "🏢"),
     _p("pages/22_Billing.py", "Billing", "💳"),
     _p("pages/27_User_Manual.py", "User Manual", "📖"),
 ]
 
 
+def _system_pages(platform_admin: bool) -> list:
+    """System group, minus the operator-only Tenants console for non-operators."""
+    return [p for p in _SYSTEM_PAGES
+            if platform_admin or p["path"] != _TENANTS_PATH]
+
+
 def build_nav_spec(vertical: str = "general",
-                   appr_title: str = "Approvals") -> list[tuple]:
+                   appr_title: str = "Approvals", *,
+                   platform_admin: bool = False) -> list[tuple]:
     approvals = _p("pages/28_Approvals.py", appr_title, "✅",
                    url_path="approvals-queue")
     # Shared finance pages, in display order.
@@ -81,7 +95,7 @@ def build_nav_spec(vertical: str = "general",
                 assets, recurring, gl, budgets, monthend, statements, reports,
                 approvals]),
             ("HR", list(_HR_PAGES)),
-            ("System", list(_SYSTEM_PAGES)),
+            ("System", _system_pages(platform_admin)),
         ]
 
     # General accounting ERP (the School group is not shown).
@@ -92,5 +106,5 @@ def build_nav_spec(vertical: str = "general",
             firs, currencies, gl, budgets, monthend, statements, reports, approvals]),
         ("CRM", [_p("pages/23_CRM.py", "CRM", "🤝")]),
         ("HR", list(_HR_PAGES)),
-        ("System", list(_SYSTEM_PAGES)),
+        ("System", _system_pages(platform_admin)),
     ]

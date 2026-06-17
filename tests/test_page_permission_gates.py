@@ -26,7 +26,9 @@ GATED_PAGES = {
                        "manage.suppliers", "manage.banks"],
     "18_Onboarding.py": ["manage.company"],
     "19_Admin.py": ["manage.users"],
-    "21_Tenants.py": ["manage.users"],
+    # Operator-only console: stronger than any tenant role permission, so it is
+    # gated by require_platform_admin() rather than require_perm().
+    "21_Tenants.py": ["require_platform_admin"],
     "22_Billing.py": ["manage.settings"],
     "23_CRM.py": ["manage.customers"],
     "24_Employees.py": ["manage.employees"],
@@ -36,12 +38,15 @@ GATED_PAGES = {
 }
 
 
+_GATE_CALLS = ("require_perm", "require_any_perm", "require_platform_admin")
+
+
 def test_every_mutating_page_enforces_a_permission():
     missing = []
     for fn, perms in GATED_PAGES.items():
         src = (PAGES / fn).read_text(encoding="utf-8")
-        if "require_perm" not in src and "require_any_perm" not in src:
-            missing.append(f"{fn}: no require_perm/require_any_perm call")
+        if not any(g in src for g in _GATE_CALLS):
+            missing.append(f"{fn}: no {'/'.join(_GATE_CALLS)} call")
             continue
         if not any(p in src for p in perms):
             missing.append(f"{fn}: gated, but none of {perms} referenced")

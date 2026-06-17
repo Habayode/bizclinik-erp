@@ -28,6 +28,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
 from .config import get_settings
+from . import authz
 from . import db as _db
 
 
@@ -199,6 +200,7 @@ def has_tenants() -> bool:
 def create_tenant(slug: str, name: str, *, admin_password: str) -> dict:
     """Register a tenant and bootstrap its isolated database (schema + seed +
     admin user). Idempotent on the bootstrap; raises if the slug exists."""
+    authz.require_platform()
     slug = (slug or "").strip().lower()
     if not _SLUG_RE.match(slug):
         raise ValueError(
@@ -236,6 +238,7 @@ def create_tenant(slug: str, name: str, *, admin_password: str) -> dict:
 
 
 def deactivate_tenant(slug: str) -> None:
+    authz.require_platform()
     fac = _control_factory()
     with fac() as s:
         t = s.execute(select(Tenant).where(Tenant.slug == slug)).scalar_one_or_none()
@@ -268,6 +271,7 @@ def create_api_key(tenant_slug: Optional[str], label: str = "",
     """Create an API key bound to a tenant (or None = default DB) that acts as
     `role` (permission matrix). Returns the plaintext key ONCE — only its hash
     is stored."""
+    authz.require_platform()
     if tenant_slug:
         tenant_slug = tenant_slug.strip().lower()
         if not get_tenant(tenant_slug):
@@ -316,6 +320,7 @@ def list_api_keys() -> list[dict]:
 
 
 def revoke_api_key(key_id: int) -> None:
+    authz.require_platform()
     fac = _control_factory()
     with fac() as s:
         k = s.get(ApiKey, key_id)
@@ -331,6 +336,7 @@ def adopt_db_as_tenant(slug: str, name: str, source_db_path: str) -> dict:
     """Register a tenant whose database is a COPY of an existing DB. Used to
     migrate the original single-tenant books into a named tenant without
     losing anything. The source DB is left untouched."""
+    authz.require_platform()
     slug = (slug or "").strip().lower()
     if not _SLUG_RE.match(slug):
         raise ValueError("Invalid slug (lowercase letters/digits/hyphens, 2-41).")

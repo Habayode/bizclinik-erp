@@ -77,8 +77,14 @@ _appr_title = f"Approvals ({_n_pending})" if _n_pending else "Approvals"
 # --------------------------------------------------------------------------- #
 from bizclinik_erp.nav import build_nav_spec
 
+try:
+    _is_operator = auth.is_platform_admin()
+except Exception:
+    _is_operator = False
+
 NAV = {}
-for _group, _pages in build_nav_spec(_vertical(), _appr_title):
+for _group, _pages in build_nav_spec(_vertical(), _appr_title,
+                                     platform_admin=_is_operator):
     NAV[_group] = [
         st.Page(p["path"], title=p["title"], icon=p["icon"],
                 default=p["default"],

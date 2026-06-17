@@ -467,17 +467,30 @@ async def billing_plans() -> dict:
     return {"plans": billing.list_plans()}
 
 
-@app.get("/api/v1/billing/status", dependencies=[Depends(require_api_key)])
-async def billing_status(tenant_slug: str) -> dict:
+def _enforce_tenant_scope(ctx: dict, requested: str) -> None:
+    """A tenant-scoped API key may only act on its OWN tenant. The master/env
+    key (ctx['tenant'] is None) is the operator's and may act on any tenant."""
+    scope = ctx.get("tenant")
+    if scope is not None and requested != scope:
+        raise HTTPException(
+            status_code=403,
+            detail="This API key is not authorized for that tenant.")
+
+
+@app.get("/api/v1/billing/status")
+async def billing_status(tenant_slug: str,
+                         ctx: dict = Depends(require_api_key)) -> dict:
     from bizclinik_erp.services import billing
+    _enforce_tenant_scope(ctx, tenant_slug)
     sub = billing.current_subscription(tenant_slug)
     return sub or {"tenant_slug": tenant_slug, "status": "none", "is_active": False}
 
 
-@app.post("/api/v1/billing/subscribe", status_code=201,
-          dependencies=[Depends(require_api_key)])
-async def billing_subscribe(payload: SubscribeIn) -> dict:
+@app.post("/api/v1/billing/subscribe", status_code=201)
+async def billing_subscribe(payload: SubscribeIn,
+                            ctx: dict = Depends(require_api_key)) -> dict:
     from bizclinik_erp.services import billing
+    _enforce_tenant_scope(ctx, payload.tenant_slug)
     try:
         return billing.start_subscription(
             payload.tenant_slug, payload.plan_code, email=payload.email,
