@@ -87,6 +87,12 @@ from .school_staff import (
     StaffType,
     TeacherProfile,
 )
+from .school_notify import (
+    NotifyChannel,
+    NotifyKind,
+    NotifyStatus,
+    ParentNotification,
+)
 
 __all__ = [
     # master
@@ -135,4 +141,6 @@ __all__ = [
     "Attendance", "AttendanceStatus", "StudentResult",
     # School (Phase 5 — teaching staff profiles, GL-free)
     "StaffType", "TeacherProfile",
+    # School (parent notifications, GL-free)
+    "ParentNotification", "NotifyChannel", "NotifyKind", "NotifyStatus",
 ]

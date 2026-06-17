@@ -96,6 +96,7 @@ NAV = {
         _page("pages/34_School_Attendance.py", "Attendance", "🗓"),
         _page("pages/35_School_Results.py", "Results", "📝"),
         _page("pages/36_School_Teachers.py", "Teachers and Dashboard", "👩‍🏫"),
+        _page("pages/37_School_Notifications.py", "Parent Notifications", "📣"),
     ],
     "CRM": [
         _page("pages/23_CRM.py", "CRM", "🤝"),
