@@ -26,10 +26,10 @@ GATED_PAGES = {
                        "manage.suppliers", "manage.banks"],
     "18_Onboarding.py": ["manage.company"],
     "19_Admin.py": ["manage.users"],
-    # Operator-only console: stronger than any tenant role permission, so it is
-    # gated by require_platform_admin() rather than require_perm().
+    # Operator-only consoles: stronger than any tenant role permission, so they
+    # are gated by require_platform_admin() rather than require_perm().
     "21_Tenants.py": ["require_platform_admin"],
-    "22_Billing.py": ["manage.settings"],
+    "22_Billing.py": ["require_platform_admin"],
     "23_CRM.py": ["manage.customers"],
     "24_Employees.py": ["manage.employees"],
     "25_Recruitment.py": ["manage.employees"],

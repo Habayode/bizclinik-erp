@@ -16,7 +16,9 @@ st.set_page_config(page_title="Billing · Trakit365 ERP", layout="wide",
                     page_icon="💳")
 ui.inject_brand()
 auth.require_login()
-auth.require_perm("manage.settings")
+# Operator-only: subscriptions/plans are managed centrally by the platform
+# operator, not by individual tenants. (Nav-hiding is cosmetic; this is the gate.)
+auth.require_platform_admin()
 ui.hero("Billing", "Subscription plan & payment status", badge="$",
         right_label="Module", right_value="Subscriptions")
 

@@ -26,12 +26,15 @@ _HR_PAGES = [
     _p("pages/5_Payroll.py", "Payroll", "💷"),
 ]
 
-# The Tenants console manages EVERY business on the platform, so it is shown
-# only to the platform operator (see auth.is_platform_admin) — never to an
-# ordinary tenant admin, who would otherwise enumerate other tenants. Hiding it
-# here is cosmetic; the real gate is auth.require_platform_admin() at the top of
-# the page itself.
+# Operator-only System pages. The Tenants console manages EVERY business on the
+# platform; Billing/subscriptions are managed centrally by the operator, not by
+# individual tenants. Both are shown only to the platform operator (see
+# auth.is_platform_admin) — never to an ordinary tenant admin. Hiding them here
+# is cosmetic; the real gate is auth.require_platform_admin() at the top of each
+# page.
 _TENANTS_PATH = "pages/21_Tenants.py"
+_BILLING_PATH = "pages/22_Billing.py"
+_OPERATOR_ONLY = {_TENANTS_PATH, _BILLING_PATH}
 
 _SYSTEM_PAGES = [
     _p("pages/18_Onboarding.py", "Onboarding", "🚀"),
@@ -40,15 +43,16 @@ _SYSTEM_PAGES = [
     _p("pages/14_Notifications.py", "Notifications", "🔔"),
     _p("pages/16_Data.py", "Data", "🗄️"),
     _p(_TENANTS_PATH, "Tenants", "🏢"),
-    _p("pages/22_Billing.py", "Billing", "💳"),
+    _p(_BILLING_PATH, "Billing", "💳"),
     _p("pages/27_User_Manual.py", "User Manual", "📖"),
 ]
 
 
 def _system_pages(platform_admin: bool) -> list:
-    """System group, minus the operator-only Tenants console for non-operators."""
+    """System group, minus the operator-only pages (Tenants, Billing) for
+    non-operators."""
     return [p for p in _SYSTEM_PAGES
-            if platform_admin or p["path"] != _TENANTS_PATH]
+            if platform_admin or p["path"] not in _OPERATOR_ONLY]
 
 
 def build_nav_spec(vertical: str = "general",

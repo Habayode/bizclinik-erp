@@ -85,23 +85,30 @@ def _paths(spec):
     return [p["path"] for _, pages in spec for p in pages]
 
 
+_OPERATOR_ONLY = ["21_Tenants", "22_Billing"]
+
+
 @pytest.mark.parametrize("vertical", ["general", "school"])
-def test_tenants_hidden_for_non_operator(vertical):
-    assert not any("21_Tenants" in p
+@pytest.mark.parametrize("page", _OPERATOR_ONLY)
+def test_operator_pages_hidden_for_non_operator(vertical, page):
+    assert not any(page in p
                    for p in _paths(build_nav_spec(vertical, platform_admin=False)))
 
 
 @pytest.mark.parametrize("vertical", ["general", "school"])
-def test_tenants_visible_for_operator(vertical):
-    assert any("21_Tenants" in p
+@pytest.mark.parametrize("page", _OPERATOR_ONLY)
+def test_operator_pages_visible_for_operator(vertical, page):
+    assert any(page in p
                for p in _paths(build_nav_spec(vertical, platform_admin=True)))
 
 
-def test_tenants_hidden_by_default():
-    # Safe default: omitting the flag must NOT expose the operator console.
-    assert not any("21_Tenants" in p for p in _paths(build_nav_spec("general")))
-    # Billing (per-tenant, legitimate) stays for everyone.
-    assert any("22_Billing" in p for p in _paths(build_nav_spec("general")))
+def test_operator_pages_hidden_by_default():
+    # Safe default: omitting the flag must NOT expose the operator consoles.
+    paths = _paths(build_nav_spec("general"))
+    for page in _OPERATOR_ONLY:
+        assert not any(page in p for p in paths)
+    # A normal tenant page (User Manual) still shows for everyone.
+    assert any("27_User_Manual" in p for p in paths)
 
 
 # --------------------------------------------------------------------------- #
