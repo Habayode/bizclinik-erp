@@ -55,7 +55,11 @@ def profit_and_loss(
             continue
         row = {"code": a.code, "name": a.name, "amount": bal}
         if a.type == AccountType.INCOME:
-            if a.code.startswith("41"):
+            # Operating revenue: 41xx (sales/service/food/beverage) and 44xx
+            # (school fees: tuition, exam, uniform, transport, levies, …). The
+            # rest of INCOME — 42xx interest/commission, 43xx FX, 49xx disposal
+            # gains — is non-operating "other income".
+            if a.code.startswith(("41", "44")):
                 revenue.append(row)
             else:
                 other_income.append(row)

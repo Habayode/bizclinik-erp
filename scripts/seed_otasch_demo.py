@@ -140,31 +140,41 @@ def seed() -> dict:
                 students.append((stu.id, ccode))
                 k += 1
 
-        # 7. Bill Term 1 (incl. annual one-offs) + a payment mix
+        # 7. Bill all three terms of 2025/2026 + a payment mix per term. Annual
+        #    one-offs (registration, uniform, levy) ride on Term 1 only. Term 1
+        #    is FY2025; Terms 2 & 3 are FY2026, so the current-year dashboard
+        #    shows real revenue instead of zero.
         bank_id = s.execute(select(BankAccount.id).order_by(BankAccount.id)).scalars().first()
+        # term, invoice_date, due_date, include_annual, full-pay date, part-pay date
+        _TERMS = [
+            (1, date(2025, 9, 15), date(2025, 9, 30), True,  date(2025, 9, 20), date(2025, 9, 25)),
+            (2, date(2026, 1, 12), date(2026, 1, 31), False, date(2026, 1, 18), date(2026, 1, 25)),
+            (3, date(2026, 4, 28), date(2026, 5, 15), False, date(2026, 5, 6),  date(2026, 5, 12)),
+        ]
         billed = paid_full = paid_part = unpaid = 0
-        for idx, (sid, _ccode) in enumerate(students):
-            b = school_billing.bill_student(
-                s, student_id=sid, academic_session_id=sess.id, term_number=1,
-                invoice_date=BILL_DATE, include_annual=True, due_date=date(2025, 9, 30))
-            if b is None:
-                continue
-            billed += 1
-            bucket = idx % 10
-            if bucket < 4:        # ~40% pay in full
-                school_billing.record_fee_payment(
-                    s, student_id=sid, sales_invoice_id=b.sales_invoice_id,
-                    amount=b.total_amount, payment_date=date(2025, 9, 20),
-                    bank_account_id=bank_id, reference=f"DEMO-PAY-{idx}")
-                paid_full += 1
-            elif bucket < 7:      # ~30% partial
-                school_billing.record_fee_payment(
-                    s, student_id=sid, sales_invoice_id=b.sales_invoice_id,
-                    amount=round(b.total_amount * 0.6, 2), payment_date=date(2025, 9, 25),
-                    bank_account_id=bank_id, reference=f"DEMO-PAY-{idx}")
-                paid_part += 1
-            else:                 # ~30% unpaid (defaulters)
-                unpaid += 1
+        for term, bdate, due, annual, dfull, dpart in _TERMS:
+            for idx, (sid, _ccode) in enumerate(students):
+                b = school_billing.bill_student(
+                    s, student_id=sid, academic_session_id=sess.id, term_number=term,
+                    invoice_date=bdate, include_annual=annual, due_date=due)
+                if b is None:
+                    continue
+                billed += 1
+                bucket = (idx + term) % 10
+                if bucket < 5:        # ~50% pay in full
+                    school_billing.record_fee_payment(
+                        s, student_id=sid, sales_invoice_id=b.sales_invoice_id,
+                        amount=b.total_amount, payment_date=dfull,
+                        bank_account_id=bank_id, reference=f"DEMO-PAY-T{term}-{idx}")
+                    paid_full += 1
+                elif bucket < 8:      # ~30% partial
+                    school_billing.record_fee_payment(
+                        s, student_id=sid, sales_invoice_id=b.sales_invoice_id,
+                        amount=round(b.total_amount * 0.6, 2), payment_date=dpart,
+                        bank_account_id=bank_id, reference=f"DEMO-PAY-T{term}-{idx}")
+                    paid_part += 1
+                else:                 # ~20% unpaid (defaulters)
+                    unpaid += 1
 
         # 8. Attendance for JSS1A on one day
         jss1a = [sid for sid, cc in students if cc == "JSS1A"]

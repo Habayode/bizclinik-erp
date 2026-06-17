@@ -106,6 +106,25 @@ def test_defaulters_lists_then_drops_after_payment(fresh_db):
         assert school_billing.defaulters(s, academic_session_id=sess.id) == []
 
 
+def test_school_fees_count_as_revenue_in_pnl(fresh_db):
+    """Regression: 44xx school-fee income must land in P&L Revenue, not 'other
+    income'. Bug was profit_and_loss only treating 41xx as revenue, so the
+    dashboard Revenue card read zero for schools."""
+    from bizclinik_erp.db import get_session
+    from bizclinik_erp.services import school_billing, reports
+    with get_session() as s:
+        sess, cls, ft, student = _setup(s)
+        school_billing.bill_student(
+            s, student_id=student.id, academic_session_id=sess.id,
+            term_number=1, invoice_date=date(2026, 1, 10))
+        pnl = reports.profit_and_loss(s, period_start=date(2026, 1, 1),
+                                      period_end=date(2026, 12, 31))
+        rev_codes = {r["code"] for r in pnl["revenue"]}
+        assert "4400" in rev_codes, pnl
+        assert pnl["total_revenue"] == 50000.0
+        assert "4400" not in {r["code"] for r in pnl["other_income"]}
+
+
 def test_defaulters_sorted_by_outstanding_desc(fresh_db):
     """Two billed students with different balances sort highest-first."""
     from bizclinik_erp.db import get_session
