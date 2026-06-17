@@ -121,3 +121,82 @@ def test_promote_appends_enrolment_and_updates_current_class(fresh_db):
         enrols = s.execute(select(StudentEnrolment).where(
             StudentEnrolment.student_id == st_.id)).scalars().all()
         assert len(enrols) == 2
+
+
+# --------------------------------------------------------------------------- #
+# Bulk student import                                                         #
+# --------------------------------------------------------------------------- #
+
+def test_bulk_import_enrols_with_class_and_billing(fresh_db):
+    import pandas as pd
+    from sqlalchemy import select, func
+    from bizclinik_erp.db import get_session
+    from bizclinik_erp.services import school, school_enrol
+    from bizclinik_erp.models import Student, StudentEnrolment, Customer
+    with get_session() as s:
+        sess, cls = _setup_class_and_session(s)
+        school.create_school_class(s, class_code="PRY3", name="Primary 3")
+        df = pd.DataFrame([
+            {"first_name": "Ada", "last_name": "Okeke",
+             "class_code": cls.class_code, "guardian_phone": "08030001111"},
+            {"first_name": "Emeka", "last_name": "Bello", "class_code": "PRY3",
+             "admission_no": "OTA/2025/014"},
+        ])
+        res = school_enrol.import_students(s, df, academic_session_id=sess.id)
+        assert res["created"] == 2 and res["skipped"] == 0 and not res["errors"]
+        assert s.execute(select(func.count()).select_from(Student)).scalar_one() == 2
+        assert s.execute(select(func.count()).select_from(StudentEnrolment)).scalar_one() == 2
+        emeka = s.execute(select(Student).where(Student.last_name == "Bello")).scalar_one()
+        assert emeka.admission_no == "OTA/2025/014"
+        assert s.get(Customer, emeka.customer_id).code == "OTA/2025/014"   # billing record
+        ada = s.execute(select(Student).where(Student.last_name == "Okeke")).scalar_one()
+        assert ada.admission_no.startswith("STU-")     # auto-numbered
+
+
+def test_bulk_import_skips_bad_class_and_missing_name(fresh_db):
+    import pandas as pd
+    from sqlalchemy import select, func
+    from bizclinik_erp.db import get_session
+    from bizclinik_erp.services import school_enrol
+    from bizclinik_erp.models import Student
+    with get_session() as s:
+        sess, cls = _setup_class_and_session(s)
+        df = pd.DataFrame([
+            {"first_name": "Good", "last_name": "Kid", "class_code": cls.class_code},
+            {"first_name": "No", "last_name": "Class", "class_code": "ZZZ"},
+            {"first_name": "", "last_name": "NoName", "class_code": cls.class_code},
+        ])
+        res = school_enrol.import_students(s, df, academic_session_id=sess.id)
+        assert res["created"] == 1 and res["skipped"] == 2 and len(res["errors"]) == 2
+        assert s.execute(select(func.count()).select_from(Student)).scalar_one() == 1
+
+
+def test_bulk_import_duplicate_admission_skipped(fresh_db):
+    import pandas as pd
+    from sqlalchemy import select, func
+    from bizclinik_erp.db import get_session
+    from bizclinik_erp.services import school_enrol
+    from bizclinik_erp.models import Student
+    with get_session() as s:
+        sess, cls = _setup_class_and_session(s)
+        df = pd.DataFrame([
+            {"first_name": "A", "last_name": "One", "class_code": cls.class_code,
+             "admission_no": "DUP-1"},
+            {"first_name": "B", "last_name": "Two", "class_code": cls.class_code,
+             "admission_no": "DUP-1"},
+        ])
+        res = school_enrol.import_students(s, df, academic_session_id=sess.id)
+        assert res["created"] == 1 and res["skipped"] == 1
+        assert s.execute(select(func.count()).select_from(Student)).scalar_one() == 1
+
+
+def test_student_template_is_valid_xlsx():
+    import io
+    import pandas as pd
+    from bizclinik_erp.services import school_enrol
+    data = school_enrol.student_template_bytes()
+    assert data[:2] == b"PK"
+    xl = pd.ExcelFile(io.BytesIO(data))
+    assert "Students" in xl.sheet_names and "Instructions" in xl.sheet_names
+    cols = list(xl.parse("Students").columns)
+    assert {"first_name", "last_name", "class_code", "admission_no"} <= set(cols)

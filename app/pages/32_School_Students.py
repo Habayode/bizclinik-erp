@@ -30,7 +30,8 @@ auth.require_perm("manage.school")
 ui.hero("School Students", "The roll · directory · enrolment",
          badge="ST", right_label="Module", right_value="School")
 
-tab_dir, tab_enrol = st.tabs(["📋 Directory", "🎓 Enrol"])
+tab_dir, tab_enrol, tab_bulk = st.tabs(
+    ["📋 Directory", "🎓 Enrol", "📥 Bulk import"])
 
 
 # ---- Directory -------------------------------------------------------------
@@ -102,6 +103,60 @@ with tab_enrol:
                     ui.flash(msg); st.rerun()
                 except ValueError as e:
                     st.error(str(e))
+
+
+# ---- Bulk import -----------------------------------------------------------
+with tab_bulk:
+    st.caption("Enrol a whole roster at once. Download the template, fill one "
+               "row per student, pick the session, and upload — each row creates "
+               "the student, their class enrolment **and** billing record. "
+               "Class codes must already exist in **School Setup → Classes**.")
+    with get_session() as s:
+        sess_opts = {x.session_code: x.id for x in s.execute(
+            select(AcademicSession).where(AcademicSession.is_active == True)  # noqa: E712
+            .order_by(AcademicSession.session_code)).scalars()}
+        cur = s.execute(select(AcademicSession).where(
+            AcademicSession.is_current == True)).scalars().first()  # noqa: E712
+    if not sess_opts:
+        st.info("Add an academic session first (School Setup → Sessions).")
+    else:
+        keys = list(sess_opts.keys())
+        idx = keys.index(cur.session_code) if cur and cur.session_code in keys else 0
+        bsess = st.selectbox("Enrol into session", keys, index=idx, key="bulk_sess")
+        st.download_button(
+            "⬇ Download student template (.xlsx)",
+            data=school_enrol.student_template_bytes(),
+            file_name="Trakit365_students_template.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key="stu_tpl")
+        up = st.file_uploader("Upload your filled roster", type=["xlsx"],
+                              key="stu_upload")
+        if up is not None:
+            try:
+                df_up = pd.read_excel(up)
+            except Exception as e:   # noqa: BLE001
+                st.error(f"Couldn't read that file: {e}")
+                df_up = None
+            if df_up is not None:
+                st.caption("Preview:")
+                st.dataframe(df_up.head(30), hide_index=True, width="stretch")
+                if st.button("Enrol all", type="primary", key="stu_import"):
+                    try:
+                        with get_session() as s:
+                            res = school_enrol.import_students(
+                                s, df_up, academic_session_id=sess_opts[bsess])
+                        if res["errors"]:
+                            st.success(f"Enrolled {res['created']}; "
+                                       f"{res['skipped']} skipped.")
+                            st.warning("These rows were skipped — fix and "
+                                       "re-upload just those:")
+                            st.dataframe(pd.DataFrame({"issue": res["errors"]}),
+                                         hide_index=True, width="stretch")
+                        else:
+                            ui.flash(f"Enrolled {res['created']} student(s).")
+                            st.rerun()
+                    except ValueError as e:
+                        st.error(str(e))
 
 
 auth.render_logout_in_sidebar()
