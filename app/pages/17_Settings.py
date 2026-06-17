@@ -26,12 +26,16 @@ st.set_page_config(page_title="Settings · Trakit365 ERP", layout="wide",
 ui.inject_brand()
 auth.require_login()
 auth.require_any_perm(["manage.company", "manage.settings", "manage.customers", "manage.suppliers", "manage.banks"])
-ui.hero("Settings", "Company profile · customers · suppliers · banks",
+_school = ui.school_mode()
+ui.hero("Settings",
+         ("School profile · students/parents · suppliers · banks" if _school
+          else "Company profile · customers · suppliers · banks"),
          badge="ST", right_label="Module", right_value="Master data")
 
 tab_co, tab_cu, tab_su, tab_ba, tab_tpl = st.tabs(
-    ["🏢 Company", "👥 Customers", "🚚 Suppliers", "🏦 Bank accounts",
-     "🎨 Invoice template"]
+    ["🏫 School profile" if _school else "🏢 Company",
+     "🎓 Students / Parents" if _school else "👥 Customers",
+     "🚚 Suppliers", "🏦 Bank accounts", "🎨 Invoice template"]
 )
 
 
@@ -69,6 +73,11 @@ with tab_co:
 
 
 with tab_cu:
+    if _school:
+        st.caption("These are your fee-paying **students/parents**. They're "
+                   "created automatically when you enrol a student under "
+                   "**School → Students**; listed here as the billing records "
+                   "behind fee invoices and statements.")
     with get_session() as s:
         rows = [{"id": c.id, "code": c.code, "name": c.name,
                   "email": c.email, "phone": c.phone, "address": c.address,

@@ -269,6 +269,19 @@ def flash(text: str, icon: str = "✅") -> None:
     st.session_state["_ui_flash"] = {"text": text, "icon": icon}
 
 
+def school_mode() -> bool:
+    """True when the active tenant is a school (Company.vertical == 'school').
+    Lets shared screens use school-friendly labels. Fails safe to False."""
+    try:
+        from .db import get_session
+        from .models import Company
+        with get_session() as s:
+            co = s.query(Company).first()
+            return bool(co and (co.vertical or "general") == "school")
+    except Exception:
+        return False
+
+
 def money_col(label: str):
     """Consistent ₦ column for st.dataframe/data_editor column_config —
     thousands separators via the 'localized' preset, ₦ carried in the label."""

@@ -19,16 +19,6 @@ def _p(path: str, title: str, icon: str, *, default: bool = False,
 
 DASHBOARD = _p("pages/0_Dashboard.py", "Dashboard", "📊", default=True)
 
-SCHOOL_PAGES = [
-    _p("pages/30_School_Setup.py", "School Setup", "🏫"),
-    _p("pages/32_School_Students.py", "Students", "🎓"),
-    _p("pages/33_School_Fees.py", "School Fees", "💰"),
-    _p("pages/34_School_Attendance.py", "Attendance", "🗓"),
-    _p("pages/35_School_Results.py", "Results", "📝"),
-    _p("pages/36_School_Teachers.py", "Teachers and Dashboard", "👩‍🏫"),
-    _p("pages/37_School_Notifications.py", "Parent Notifications", "📣"),
-]
-
 _HR_PAGES = [
     _p("pages/24_Employees.py", "Employees", "🧑‍💼"),
     _p("pages/25_Recruitment.py", "Recruitment", "🧲"),
@@ -69,14 +59,27 @@ def build_nav_spec(vertical: str = "general",
     reports = _p("pages/15_Reports.py", "Reports", "📈")
 
     if vertical == "school":
-        # School-first: School group up top; bursary/accounts below. Hide the
-        # school-irrelevant modules (CRM, FIRS e-invoice, multi-currency).
+        # School-first: a School Dashboard is the landing, the School group is
+        # up top, the accounting modules sit under "Bursary", and the
+        # school-irrelevant modules (CRM, FIRS e-invoice, multi-currency) are
+        # hidden. The generic financial dashboard stays as "Finance Dashboard".
+        school_group = [
+            _p("pages/29_School_Dashboard.py", "School Dashboard", "📊", default=True),
+            _p("pages/30_School_Setup.py", "School Setup", "🏫"),
+            _p("pages/32_School_Students.py", "Students", "🎓"),
+            _p("pages/33_School_Fees.py", "School Fees", "💰"),
+            _p("pages/34_School_Attendance.py", "Attendance", "🗓"),
+            _p("pages/35_School_Results.py", "Results", "📝"),
+            _p("pages/36_School_Teachers.py", "Teachers", "👩‍🏫"),
+            _p("pages/37_School_Notifications.py", "Parent Notifications", "📣"),
+        ]
+        finance_dash = _p("pages/0_Dashboard.py", "Finance Dashboard", "📊")
         return [
-            ("Overview", [DASHBOARD]),
-            ("School", list(SCHOOL_PAGES)),
-            ("Accounts & Finance", [
-                sales, purchases, inventory, banking, bankrec, assets, recurring,
-                gl, budgets, monthend, statements, reports, approvals]),
+            ("School", school_group),
+            ("Bursary", [
+                finance_dash, sales, purchases, inventory, banking, bankrec,
+                assets, recurring, gl, budgets, monthend, statements, reports,
+                approvals]),
             ("HR", list(_HR_PAGES)),
             ("System", list(_SYSTEM_PAGES)),
         ]

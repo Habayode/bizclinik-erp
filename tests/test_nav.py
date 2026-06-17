@@ -12,19 +12,24 @@ def _paths(spec):
 def test_school_vertical_is_school_first_and_curated():
     spec = build_nav_spec("school")
     groups = [g for g, _ in spec]
-    assert "School" in groups
-    # School sits above the accounting group.
-    assert groups.index("School") < groups.index("Accounts & Finance")
+    # School is the very first group; accounting lives under "Bursary".
+    assert groups[0] == "School"
+    assert "Bursary" in groups and groups.index("School") < groups.index("Bursary")
     paths = _paths(spec)
+    assert any("29_School_Dashboard" in p for p in paths)   # the school landing
     assert any("30_School_Setup" in p for p in paths)
     assert any("37_School_Notifications" in p for p in paths)
     # School-irrelevant modules are hidden.
     assert not any("23_CRM" in p for p in paths)
     assert not any("9_FIRS" in p for p in paths)
     assert not any("20_Currencies" in p for p in paths)
-    # Bursary essentials remain.
+    # Bursary essentials remain (incl. the generic finance dashboard).
     assert any("10_General_Ledger" in p for p in paths)
     assert any("4_Banking" in p for p in paths)
+    assert any("0_Dashboard" in p for p in paths)
+    # The default landing is the School Dashboard, not the finance one.
+    default = [p for _, pages in spec for p in pages if p["default"]][0]
+    assert "29_School_Dashboard" in default["path"]
 
 
 def test_general_vertical_hides_school_keeps_full_finance():
