@@ -10,8 +10,10 @@ fees, attendance, results, teachers, parent notifications — and the bursary
 > you in the background; this guide tells you which button to press and what
 > happens when you do.
 
-Throughout, we follow one example school — **Sunrise Academy** — through a full
-term so every step has a concrete picture.
+Throughout, we follow your school — **OTASCH School**, Ota, Ogun State — through a
+full term so every step has a concrete picture. The classes and fees used in the
+examples are the ones set up in your system; change any amount whenever your real
+figures differ.
 
 ---
 
@@ -141,7 +143,9 @@ The **🏷️ Classes** tab.
    employee first).
 5. Click **Add class**.
 
-Sunrise Academy adds: `KG1`, `PRY3`, `JSS1A` and `SSS1A`.
+OTASCH uses five classes: `KG1` (Kindergarten 1), `PRY3` (Primary 3), `JSS1A`
+(Junior Secondary 1A), `JSS2A` (Junior Secondary 2A) and `SSS1A` (Senior
+Secondary 1A).
 
 ## 3.4 Fee types
 
@@ -156,8 +160,10 @@ to the income account where its money should land.
    (tuition); untick for optional ones (transport, boarding).
 5. Click **Add fee type**.
 
-Sunrise sets up: Tuition, Registration, Examination, Uniform, Books, Transport,
-Boarding and PTA Levy.
+OTASCH sets up: **Tuition**, **Registration & Admission**, **Examination**,
+**Uniform** and **PTA / Development Levy** as the standard charges, plus
+**Transport / Bus**, **Boarding & Feeding** and **Books & Stationery** as
+optional fee types for ad-hoc billing.
 
 ## 3.5 Fee schedule (the price grid)
 
@@ -177,9 +183,11 @@ This is the heart of billing.
 > **Mixed cadences are fine.** Tuition can be per-term while registration is
 > annual — just choose the right **Applies to** for each line.
 
-Example for Sunrise's JSS1A: Tuition `₦120,000` for each of Term 1/2/3;
-Registration `₦15,000` as **Annual / one-off**; PTA Levy `₦5,000` set on
-**All classes** as **Annual**.
+Example for OTASCH's JSS1A: Tuition `₦70,000` for each of Term 1/2/3 and
+Examination `₦5,000` per term; Registration & Admission `₦20,000` and Uniform
+`₦15,000` as **Annual / one-off**; PTA / Development Levy `₦10,000` set on
+**All classes** as **Annual**. Tuition varies by class — KG1 `₦40,000`, PRY3
+`₦50,000`, JSS1A `₦70,000`, JSS2A `₦75,000`, SSS1A `₦95,000` per term.
 
 ---
 
@@ -482,13 +490,15 @@ manage logins under **System → Admin**.
 
 ---
 
-# 13. A term at Sunrise Academy (worked example)
+# 13. A term at OTASCH School (worked example)
 
 1. **Set up the year.** Add session **2025/2026** (set current) and **Terms 1–3**.
-   Add classes **KG1, PRY3, JSS1A, SSS1A**. Create fee types (Tuition, Exam,
-   Registration, PTA Levy, …) wired to their income accounts. Enter the price grid
-   — tuition per term, registration and levy annual.
-2. **Load students.** Download the template, fill 240 pupils across the classes,
+   Add classes **KG1, PRY3, JSS1A, JSS2A, SSS1A**. Create fee types (Tuition,
+   Examination, Registration & Admission, Uniform, PTA / Development Levy, …)
+   wired to their income accounts. Enter the price grid — tuition per term (KG1
+   `₦40,000` … SSS1A `₦95,000`), examination per term, and registration, uniform
+   and levy as annual one-offs.
+2. **Load students.** Download the template, fill the pupils across the classes,
    **Enrol all**. Each gets an admission number and a billing record.
 3. **Bill Term 1.** **School Fees → Bulk issue**, pick JSS1A, **Term 1**, tick
    **Also include annual / one-off fees** (to add registration + levy), **Generate
