@@ -83,7 +83,7 @@ with tab_cu:
                   "email": c.email, "phone": c.phone, "address": c.address,
                   "active": c.is_active}
                  for c in s.execute(select(Customer).order_by(Customer.code)).scalars()]
-    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+    ui.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
 
     st.divider()
     ui.bulk_import_expander("customer", "Students" if _school else "Customers",
@@ -111,7 +111,7 @@ with tab_su:
                   "email": x.email, "phone": x.phone, "address": x.address,
                   "active": x.is_active}
                  for x in s.execute(select(Supplier).order_by(Supplier.code)).scalars()]
-    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+    ui.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
 
     st.divider()
     ui.bulk_import_expander("supplier", "Suppliers")
@@ -139,7 +139,7 @@ with tab_ba:
                   "gl_account": b.gl_account.code if b.gl_account else "",
                   "active": b.is_active}
                  for b in s.execute(select(BankAccount).order_by(BankAccount.code)).scalars()]
-    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+    ui.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
 
     st.divider()
     ui.bulk_import_expander("bank", "Bank accounts")

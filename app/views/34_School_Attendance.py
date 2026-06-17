@@ -105,7 +105,7 @@ with tab_summary:
         m3.metric("Late", summ["late"])
         m4.metric("Excused", summ["excused"])
         m5.metric("Total", summ["total"])
-        st.dataframe(pd.DataFrame([summ]), hide_index=True, width="stretch")
+        ui.dataframe(pd.DataFrame([summ]), hide_index=True, width="stretch")
 
 
 auth.render_logout_in_sidebar()

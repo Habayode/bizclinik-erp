@@ -130,12 +130,12 @@ with tab_bill:
                     Payment.bill_id == b.id)).scalars()]
                 je = s.get(JournalEntry, b.je_id) if b.je_id else None
                 je_no = je.entry_no if je else None
-            st.dataframe(pd.DataFrame(line_rows), hide_index=True,
+            ui.dataframe(pd.DataFrame(line_rows), hide_index=True,
                          width="stretch",
                          column_config={"unit_cost": ui.money_col("unit_cost")})
             if pay_rows:
                 st.markdown("**Payments applied**")
-                st.dataframe(pd.DataFrame(pay_rows), hide_index=True,
+                ui.dataframe(pd.DataFrame(pay_rows), hide_index=True,
                              width="stretch",
                              column_config={"amount": ui.money_col("amount")})
             else:
@@ -249,7 +249,7 @@ with tab_po:
             "supplier": o.supplier.name if o.supplier else "",
             "status": o.status.value,
         } for o in pos]
-    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+    ui.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
 
     st.divider()
     st.subheader("New purchase order")
@@ -328,7 +328,7 @@ with tab_pay:
             "bill": p.bill.number if p.bill else "",
             "amount": p.amount, "method": p.method, "status": p.status.value,
         } for p in pays]
-    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch",
+    ui.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch",
                  column_config={"amount": ui.money_col("amount")})
 
     st.divider()

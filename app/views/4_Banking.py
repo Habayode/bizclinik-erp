@@ -46,7 +46,7 @@ with tab_bal:
                 "gl_balance": bank_svc.bank_balance(s, b.id),
                 "active": b.is_active,
             })
-    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+    ui.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
 
     st.divider()
     st.subheader("Add bank account")

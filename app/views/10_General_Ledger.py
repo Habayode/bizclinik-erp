@@ -44,7 +44,7 @@ with tab_tb:
         df = pd.DataFrame(rows)
         tot_dr = df["debit"].sum()
         tot_cr = df["credit"].sum()
-        st.dataframe(df, hide_index=True, width="stretch")
+        ui.dataframe(df, hide_index=True, width="stretch")
         c1, c2, c3 = st.columns(3)
         c1.metric("Total DR", f"₦{tot_dr:,.2f}")
         c2.metric("Total CR", f"₦{tot_cr:,.2f}")
@@ -58,7 +58,7 @@ with tab_coa:
         accts = s.execute(select(Account).order_by(Account.code)).scalars().all()
         rows = [{"code": a.code, "name": a.name, "type": a.type.value,
                   "postable": a.is_postable, "active": a.is_active} for a in accts]
-    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+    ui.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
 
     st.divider()
     ui.bulk_import_expander("account", "Accounts")
@@ -123,7 +123,7 @@ with tab_open:
                 df = None
             if df is not None:
                 st.caption("Preview:")
-                st.dataframe(df.head(30), hide_index=True, width="stretch")
+                ui.dataframe(df.head(30), hide_index=True, width="stretch")
                 if st.button("Post opening balances", type="primary",
                              key="ob_post"):
                     try:
@@ -206,7 +206,7 @@ with tab_inq:
         with get_session() as s:
             rows = general_ledger(s, opts[sel], period_start=ps, period_end=pe)
         if rows:
-            st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+            ui.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
         else:
             st.caption("No activity in period.")
 
@@ -221,6 +221,6 @@ with tab_journals:
             "DR": j.total_debit, "CR": j.total_credit,
             "balanced": "✅" if j.is_balanced else "❌",
         } for j in jes]
-    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+    ui.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
 
 auth.render_logout_in_sidebar()

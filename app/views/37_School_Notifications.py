@@ -117,7 +117,7 @@ with tab_log:
                  "provider": n.provider, "error": n.error}
                 for n in school_notify.list_notifications(s, limit=300)]
     if rows:
-        st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+        ui.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
     else:
         st.caption("No notifications sent yet.")
 

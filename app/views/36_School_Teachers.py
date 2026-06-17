@@ -49,7 +49,7 @@ with tab_staff:
         emp_opts = {f"{e.code} — {e.name}": e.id for e in s.execute(
             select(Employee).where(Employee.is_active == True)  # noqa: E712
             .order_by(Employee.name)).scalars()}
-    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+    ui.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
     if not emp_opts:
         st.info("Add an employee first (HR · Employees).")
     else:
@@ -105,7 +105,7 @@ with tab_dash:
 
     st.subheader("Enrolment by class")
     if kpi["enrolment_by_class"]:
-        st.dataframe(pd.DataFrame(kpi["enrolment_by_class"]),
+        ui.dataframe(pd.DataFrame(kpi["enrolment_by_class"]),
                      hide_index=True, width="stretch")
     else:
         st.info("No active students enrolled yet.")

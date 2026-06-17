@@ -54,7 +54,7 @@ with tab_users:
             "last_login": u.last_login_at.isoformat(" ", "minutes") if u.last_login_at else "",
             "failed_logins": u.failed_login_count,
         } for u in users]
-    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+    ui.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
 
     st.divider()
     st.subheader("Add user")
@@ -141,7 +141,7 @@ with tab_periods:
             "notes": p.notes or "",
         } for p in periods]
     if rows:
-        st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+        ui.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
     else:
         st.caption("No periods registered for this year yet — they're created on first JE posting.")
 
@@ -210,7 +210,7 @@ with tab_audit:
             "description": l.description or "",
             "source": l.source or "",
         } for l in logs]
-    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch", height=600)
+    ui.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch", height=600)
 
 
 auth.render_logout_in_sidebar()

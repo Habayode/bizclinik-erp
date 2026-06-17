@@ -42,7 +42,7 @@ with tab_emp:
             "pension_employer_rate": e.pension_employer_rate,
             "active": e.is_active,
         } for e in emps]
-    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch",
+    ui.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch",
                  column_config={"monthly_gross": ui.money_col("monthly_gross")})
 
     st.divider()
@@ -147,7 +147,7 @@ with tab_slip:
                 "pension_er": p.pension_employer,
                 "other": p.other_deductions, "net_pay": p.net_pay,
             } for p in slips]
-        st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch",
+        ui.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch",
                      column_config={c: ui.money_col(c) for c in
                                     ("gross", "PAYE", "pension_emp",
                                      "pension_er", "other", "net_pay")})

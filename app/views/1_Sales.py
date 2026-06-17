@@ -122,7 +122,7 @@ with tab_inv:
                     Receipt.invoice_id == inv.id)).scalars()]
                 je = s.get(JournalEntry, inv.je_id) if inv.je_id else None
                 je_no = je.entry_no if je else None
-            st.dataframe(pd.DataFrame(line_rows), hide_index=True,
+            ui.dataframe(pd.DataFrame(line_rows), hide_index=True,
                          width="stretch",
                          column_config={"unit_price": ui.money_col("unit_price"),
                                         "subtotal": ui.money_col("subtotal")})
@@ -130,7 +130,7 @@ with tab_inv:
             with dc1:
                 if rct_rows:
                     st.markdown("**Receipts applied**")
-                    st.dataframe(pd.DataFrame(rct_rows), hide_index=True,
+                    ui.dataframe(pd.DataFrame(rct_rows), hide_index=True,
                                  width="stretch",
                                  column_config={"amount": ui.money_col("amount")})
                 else:
@@ -247,7 +247,7 @@ with tab_quote:
             "customer": q.customer.name if q.customer else "",
             "total": q.grand_total, "status": q.status.value,
         } for q in quos]
-    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+    ui.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
 
     st.divider()
     st.subheader("New quotation")
@@ -303,7 +303,7 @@ with tab_so:
             "customer": o.customer.name if o.customer else "",
             "status": o.status.value,
         } for o in sos]
-    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+    ui.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
 
     st.divider()
     st.subheader("New sales order")
@@ -362,7 +362,7 @@ with tab_rct:
             "amount": r.amount, "method": r.method,
             "reference": r.reference, "status": r.status.value,
         } for r in rcts]
-    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+    ui.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
 
     st.divider()
     st.subheader("Record receipt")

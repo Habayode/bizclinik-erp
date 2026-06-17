@@ -235,11 +235,11 @@ with tab_recon:
         c_left, c_right = st.columns(2)
         with c_left:
             st.subheader("Statement lines")
-            st.dataframe(pd.DataFrame(stmt_rows), hide_index=True,
+            ui.dataframe(pd.DataFrame(stmt_rows), hide_index=True,
                           width="stretch")
         with c_right:
             st.subheader(f"GL lines on {bank.code}")
-            st.dataframe(pd.DataFrame(gl_rows), hide_index=True,
+            ui.dataframe(pd.DataFrame(gl_rows), hide_index=True,
                           width="stretch")
 
         # ---- per-row manual match ----
@@ -297,7 +297,7 @@ with tab_history:
                 "imported_at": st_.imported_at,
             })
     if rows:
-        st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+        ui.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
     else:
         st.info("No statements imported yet.")
 

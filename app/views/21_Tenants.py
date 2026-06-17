@@ -77,7 +77,7 @@ rows = [{"slug": t["slug"], "name": t["name"], "login url": _login_url(t["slug"]
          "active": t["is_active"], "created": str(t.get("created_at") or "")[:19]}
         for t in tenancy.list_tenants(active_only=False)]
 if rows:
-    st.dataframe(
+    ui.dataframe(
         pd.DataFrame(rows), hide_index=True, width="stretch",
         column_config={"login url": st.column_config.LinkColumn("login url")},
     )
@@ -137,7 +137,7 @@ key_rows = [{"id": k["id"], "tenant": k["tenant_slug"] or "(default DB)",
              "created": k["created_at"], "last_used": k["last_used_at"]}
             for k in tenancy.list_api_keys()]
 if key_rows:
-    st.dataframe(pd.DataFrame(key_rows), hide_index=True, width="stretch")
+    ui.dataframe(pd.DataFrame(key_rows), hide_index=True, width="stretch")
 
 with st.form("new_key"):
     from bizclinik_erp.models.users import Role

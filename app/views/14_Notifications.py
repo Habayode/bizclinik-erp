@@ -69,7 +69,7 @@ if overdue:
         "number": "Invoice", "customer": "Customer", "due_date": "Due",
         "days_overdue": "Days overdue", "outstanding": "Outstanding",
     })
-    st.dataframe(df, hide_index=True, width="stretch")
+    ui.dataframe(df, hide_index=True, width="stretch")
 else:
     st.success("No overdue invoices.")
 
@@ -83,7 +83,7 @@ if upcoming:
         "number": "Bill", "supplier": "Supplier", "due_date": "Due",
         "days_until": "Days until", "outstanding": "Outstanding",
     })
-    st.dataframe(df, hide_index=True, width="stretch")
+    ui.dataframe(df, hide_index=True, width="stretch")
 else:
     st.success("No bills due in the next 7 days.")
 
@@ -96,7 +96,7 @@ if low:
         "sku": "SKU", "name": "Product", "qty_on_hand": "On hand",
         "avg_cost": "Avg cost", "value_at_cost": "Value at cost",
     })
-    st.dataframe(df, hide_index=True, width="stretch")
+    ui.dataframe(df, hide_index=True, width="stretch")
 else:
     st.success("All stock above reorder level.")
 
@@ -106,7 +106,7 @@ if cash_accounts:
     df = pd.DataFrame(cash_accounts)
     df["balance"] = df["balance"].map(ui.money)
     df = df.rename(columns={"code": "Code", "name": "Account", "balance": "Balance"})
-    st.dataframe(df, hide_index=True, width="stretch")
+    ui.dataframe(df, hide_index=True, width="stretch")
 else:
     st.caption("(no bank accounts configured)")
 

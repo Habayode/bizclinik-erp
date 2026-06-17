@@ -64,7 +64,7 @@ with tab_list:
     ui.section("All budgets", "Annual plans on file")
     budgets = _load_budgets()
     if budgets:
-        st.dataframe(pd.DataFrame(budgets), hide_index=True, width="stretch")
+        ui.dataframe(pd.DataFrame(budgets), hide_index=True, width="stretch")
     else:
         st.caption("No budgets yet — create one below.")
 
@@ -193,7 +193,7 @@ with tab_va:
             for col in ("budget_total", "actual_total", "variance"):
                 disp[col] = disp[col].map(ui.money)
             disp["variance_pct"] = disp["variance_pct"].map(lambda v: f"{v:.1f}%")
-            st.dataframe(disp, hide_index=True, width="stretch")
+            ui.dataframe(disp, hide_index=True, width="stretch")
 
             # Grouped bar: budget vs actual per account.
             long_df = df.melt(

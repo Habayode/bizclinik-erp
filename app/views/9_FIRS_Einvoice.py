@@ -95,7 +95,7 @@ with tab_subs:
         } for sub in subs]
 
     if rows:
-        st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+        ui.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
     else:
         st.caption("(no submissions yet)")
 

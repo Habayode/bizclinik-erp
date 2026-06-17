@@ -47,7 +47,7 @@ with tab_sess:
     with get_session() as s:
         rows = [{"code": x.session_code, "name": x.name, "current": x.is_current,
                  "start": x.start_date, "end": x.end_date} for x in _sessions(s)]
-    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+    ui.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
     with st.form("sess"):
         code = st.text_input("Session code", placeholder="2025/2026")
         c1, c2 = st.columns(2)
@@ -73,7 +73,7 @@ with tab_term:
                  "name": t.name, "start": t.start_date, "end": t.end_date}
                 for t in s.execute(select(Term).order_by(
                     Term.academic_session_id, Term.term_number)).scalars()]
-    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+    ui.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
     if not sess_opts:
         st.info("Add an academic session first.")
     else:
@@ -104,7 +104,7 @@ with tab_cls:
         tutors = {f"{e.code} — {e.name}": e.id for e in s.execute(
             select(Employee).where(Employee.is_active == True)  # noqa: E712
             .order_by(Employee.name)).scalars()}
-    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+    ui.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
     with st.form("cls"):
         c1, c2 = st.columns(2)
         code = c1.text_input("Class code", placeholder="JSS1A")
@@ -142,7 +142,7 @@ with tab_fee:
             select(Account).where(Account.type == AccountType.INCOME,
                                   Account.is_postable == True)  # noqa: E712
             .order_by(Account.code)).scalars()}
-    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+    ui.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
     with st.form("fee"):
         c1, c2 = st.columns(2)
         code = c1.text_input("Fee code", placeholder="TUI")
@@ -178,7 +178,7 @@ with tab_sched:
                  "amount": r.amount}
                 for r in s.execute(select(StudentFeeSchedule).where(
                     StudentFeeSchedule.is_active == True)).scalars()]  # noqa: E712
-    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+    ui.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
     if not (sess_opts and fee_opts):
         st.info("Add a session and at least one fee type first.")
     else:

@@ -127,7 +127,7 @@ with tab_soa:
         st.markdown("#### Ledger preview")
         if rows:
             df = pd.DataFrame(rows)
-            st.dataframe(df, hide_index=True, width="stretch")
+            ui.dataframe(df, hide_index=True, width="stretch")
         else:
             st.caption("(no postings in window)")
 
@@ -231,7 +231,7 @@ with tab_wht:
         st.markdown("#### Detail preview")
         if rows:
             df = pd.DataFrame(rows)
-            st.dataframe(df, hide_index=True, width="stretch")
+            ui.dataframe(df, hide_index=True, width="stretch")
         else:
             st.caption(
                 "(no WHT-bearing bills in window — try a wider period or post "

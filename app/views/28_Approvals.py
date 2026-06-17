@@ -141,7 +141,7 @@ with tab_hist:
                  "result": r.result_ref or "",
                  "note": r.note or ""} for r in done]
     if rows:
-        st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch",
+        ui.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch",
                      column_config={"amount": ui.money_col("amount")})
     else:
         st.caption("No decisions yet.")
@@ -161,7 +161,7 @@ with tab_limits:
                  "limit": ("Unlimited" if l["unlimited"]
                            else f"₦{l['limit_ngn']:,.0f}")}
                 for l in lims]
-    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+    ui.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
 
     if IS_ADMIN:
         st.markdown("##### Update a limit")

@@ -400,6 +400,28 @@ def money(x: float, symbol: str = "₦") -> str:
     return f"{symbol}{x:,.2f}"
 
 
+def _money_float_cols(df: "pd.DataFrame") -> list:
+    """Float columns of a DataFrame — these hold money/amounts/rates and get
+    thousands-separated for display. Int columns (ids, years, counts, terms,
+    form levels) are left alone so a year like 2025 never becomes '2,025'."""
+    return [c for c in df.columns if pd.api.types.is_float_dtype(df[c])]
+
+
+def dataframe(data, **kwargs):
+    """Drop-in for ``st.dataframe`` that comma-formats numeric columns so money
+    reads ``26,043,000.00`` instead of ``26043000`` — without changing the
+    underlying values (sorting/filtering still work). Only float columns are
+    formatted; if a caller passes its own ``column_config`` we defer to it."""
+    if isinstance(data, pd.DataFrame) and "column_config" not in kwargs:
+        cols = _money_float_cols(data)
+        if cols:
+            try:
+                data = data.style.format({c: "{:,.2f}" for c in cols}, na_rep="—")
+            except Exception:   # noqa: BLE001 — never let formatting break a page
+                pass
+    return st.dataframe(data, **kwargs)
+
+
 def kpi_grid(items: list[dict]) -> None:
     """Render a row of KPI cards. Each item:
         {label, value, delta?, delta_dir?, icon?, color?}

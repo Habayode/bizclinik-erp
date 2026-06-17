@@ -110,7 +110,7 @@ with tab_card:
             card = school_ops.report_card(
                 s, stu_opts[stu], sess_opts[sess], _TERM_OPTS[term_label])
         st.subheader(card["student"] or "—")
-        st.dataframe(pd.DataFrame(card["results"]), hide_index=True,
+        ui.dataframe(pd.DataFrame(card["results"]), hide_index=True,
                      width="stretch")
         st.metric("Average", card["average"])
 

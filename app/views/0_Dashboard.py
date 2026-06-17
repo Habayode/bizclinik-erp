@@ -261,7 +261,7 @@ ui.section("Recent activity", "Last 8 journal entries")
 left, right = st.columns([2, 1])
 with left:
     if recent_rows:
-        st.dataframe(pd.DataFrame(recent_rows), hide_index=True,
+        ui.dataframe(pd.DataFrame(recent_rows), hide_index=True,
                       width='stretch', height=320)
     else:
         st.caption("No journal entries yet.")

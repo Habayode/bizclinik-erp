@@ -77,7 +77,7 @@ with tab_req:
                  "type": r.leave_type.value, "from": r.start_date, "to": r.end_date,
                  "days": r.days, "status": r.status.value} for r in reqs]
     if rows:
-        st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+        ui.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
 
 
 # --------------------------------------------------------------------------- #
@@ -133,7 +133,7 @@ with tab_bal:
                           "taken (annual)": bal["taken"],
                           "remaining": bal["remaining"]})
     if brows:
-        st.dataframe(pd.DataFrame(brows), hide_index=True, width="stretch")
+        ui.dataframe(pd.DataFrame(brows), hide_index=True, width="stretch")
         st.caption("Balance = annual entitlement − APPROVED annual leave taken "
                    "in the selected year. Sick/unpaid/other leave is tracked but "
                    "does not reduce the annual balance.")

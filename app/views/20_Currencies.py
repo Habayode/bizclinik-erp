@@ -39,7 +39,7 @@ with tab_cur:
         rows = [{"code": c.code, "name": c.name, "symbol": c.symbol,
                   "base": c.is_base, "active": c.is_active}
                  for c in s.execute(select(Currency).order_by(Currency.code)).scalars()]
-    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+    ui.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
 
     st.divider()
     st.subheader("Add currency")
@@ -71,7 +71,7 @@ with tab_rates:
                                            ExchangeRate.currency_code).limit(200)
         ).scalars()]
     if rate_rows:
-        st.dataframe(pd.DataFrame(rate_rows), hide_index=True, width="stretch")
+        ui.dataframe(pd.DataFrame(rate_rows), hide_index=True, width="stretch")
     else:
         st.info("No rates yet. Add one below before issuing foreign-currency documents.")
 
@@ -114,7 +114,7 @@ if st.button("Run revaluation", type="primary"):
               delta=("gain" if net > 0 else "loss" if net < 0 else "flat"))
     rows = rep["receivables"] + rep["payables"]
     if rows:
-        st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+        ui.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
     else:
         st.info("No open foreign-currency receivables or payables to revalue.")
     if rep["skipped"]:

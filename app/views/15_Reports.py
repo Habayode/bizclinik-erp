@@ -44,7 +44,7 @@ with tab_pnl:
     def show(title, lines, total):
         st.markdown(f"**{title}** — {money(total)}")
         if lines:
-            st.dataframe(pd.DataFrame(lines), hide_index=True, width="stretch")
+            ui.dataframe(pd.DataFrame(lines), hide_index=True, width="stretch")
         else:
             st.caption("(no entries)")
 
@@ -72,14 +72,14 @@ with tab_bs:
     with a_col:
         st.markdown("#### Assets")
         if r["assets"]:
-            st.dataframe(pd.DataFrame(r["assets"]), hide_index=True, width="stretch")
+            ui.dataframe(pd.DataFrame(r["assets"]), hide_index=True, width="stretch")
     with le_col:
         st.markdown("#### Liabilities")
         if r["liabilities"]:
-            st.dataframe(pd.DataFrame(r["liabilities"]), hide_index=True, width="stretch")
+            ui.dataframe(pd.DataFrame(r["liabilities"]), hide_index=True, width="stretch")
         st.markdown("#### Equity")
         if r["equity"]:
-            st.dataframe(pd.DataFrame(r["equity"]), hide_index=True, width="stretch")
+            ui.dataframe(pd.DataFrame(r["equity"]), hide_index=True, width="stretch")
 
 
 with tab_cf:
@@ -93,7 +93,7 @@ with tab_cf:
         st.markdown(f"### {section.replace('_', ' ').title()}")
         d = cf[section]
         df = pd.DataFrame([{"item": k, "amount": v} for k, v in d.items() if k != "total"])
-        st.dataframe(df, hide_index=True, width="stretch")
+        ui.dataframe(df, hide_index=True, width="stretch")
         st.caption(f"Subtotal: {money(d['total'])}")
     st.markdown(f"## Net change in cash: {money(cf['net_change_in_cash'])}")
 
@@ -104,7 +104,7 @@ with tab_ar:
         rows = reports.ar_aging(s, as_of=as_of)
     if rows:
         df = pd.DataFrame(rows).drop(columns=["customer_id"])
-        st.dataframe(df, hide_index=True, width="stretch")
+        ui.dataframe(df, hide_index=True, width="stretch")
         st.metric("Total outstanding AR", money(df["total"].sum()))
     else:
         st.success("Nothing outstanding.")
@@ -116,7 +116,7 @@ with tab_ap:
         rows = reports.ap_aging(s, as_of=as_of)
     if rows:
         df = pd.DataFrame(rows).drop(columns=["supplier_id"])
-        st.dataframe(df, hide_index=True, width="stretch")
+        ui.dataframe(df, hide_index=True, width="stretch")
         st.metric("Total outstanding AP", money(df["total"].sum()))
     else:
         st.success("Nothing outstanding.")

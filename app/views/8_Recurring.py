@@ -89,7 +89,7 @@ with tab_list:
     if df.empty:
         st.info("No recurring templates yet. Add one on the **New template** tab.")
     else:
-        st.dataframe(df, hide_index=True, width="stretch")
+        ui.dataframe(df, hide_index=True, width="stretch")
 
 
 # ----- New template tab -----------------------------------------------------
@@ -255,7 +255,7 @@ with tab_run:
         } for t in due]
     if due_rows:
         st.write(f"**{len(due_rows)}** template(s) due:")
-        st.dataframe(pd.DataFrame(due_rows), hide_index=True, width="stretch")
+        ui.dataframe(pd.DataFrame(due_rows), hide_index=True, width="stretch")
     else:
         st.info("No templates due as of that date.")
 
@@ -269,7 +269,7 @@ with tab_run:
         if result.get("skipped_details"):
             st.warning("Some templates were skipped (not lost — they'll run "
                        "once the issue is cleared):")
-            st.dataframe(pd.DataFrame(result["skipped_details"]),
+            ui.dataframe(pd.DataFrame(result["skipped_details"]),
                          hide_index=True, width="stretch")
         if result["docs"]:
             st.write("Documents posted:")
@@ -298,7 +298,7 @@ with tab_hist:
             "active": t.is_active,
         } for t in rows]
     if hist:
-        st.dataframe(pd.DataFrame(hist), hide_index=True, width="stretch")
+        ui.dataframe(pd.DataFrame(hist), hide_index=True, width="stretch")
     else:
         st.info("No history yet.")
 

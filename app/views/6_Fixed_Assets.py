@@ -65,7 +65,7 @@ with tab_reg:
         c1.metric("Active assets", len(active))
         c2.metric("Total cost", f"₦{total_cost:,.2f}")
         c3.metric("Total NBV", f"₦{total_nbv:,.2f}")
-        st.dataframe(df, hide_index=True, width="stretch")
+        ui.dataframe(df, hide_index=True, width="stretch")
     else:
         st.info("No fixed assets registered yet.")
 
@@ -149,7 +149,7 @@ with tab_imp:
             df_up = None
         if df_up is not None:
             st.caption("Preview:")
-            st.dataframe(df_up.head(30), hide_index=True, width="stretch")
+            ui.dataframe(df_up.head(30), hide_index=True, width="stretch")
             if st.button("Import assets", type="primary", key="fa_import"):
                 try:
                     with get_session() as s:
@@ -159,7 +159,7 @@ with tab_imp:
                                     f"{res['skipped']} skipped.")
                         st.warning("These rows were skipped — fix and re-upload "
                                     "just those:")
-                        st.dataframe(pd.DataFrame({"issue": res["errors"]}),
+                        ui.dataframe(pd.DataFrame({"issue": res["errors"]}),
                                      hide_index=True, width="stretch")
                     else:
                         ui.flash(f"Imported {res['created']} asset(s).")
@@ -265,7 +265,7 @@ with tab_hist:
                         "memo": line.memo or je.memo,
                     })
         if rows:
-            st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+            ui.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
         else:
             st.caption("No depreciation or disposal JEs yet for this asset.")
 

@@ -50,7 +50,7 @@ with tab_dir:
                  "guardian": st_.guardian_name or "",
                  "phone": st_.guardian_phone or ""}
                 for st_ in students]
-    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+    ui.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
 
 
 # ---- Enrol -----------------------------------------------------------------
@@ -139,7 +139,7 @@ with tab_bulk:
                 df_up = None
             if df_up is not None:
                 st.caption("Preview:")
-                st.dataframe(df_up.head(30), hide_index=True, width="stretch")
+                ui.dataframe(df_up.head(30), hide_index=True, width="stretch")
                 if st.button("Enrol all", type="primary", key="stu_import"):
                     try:
                         with get_session() as s:
@@ -150,7 +150,7 @@ with tab_bulk:
                                        f"{res['skipped']} skipped.")
                             st.warning("These rows were skipped — fix and "
                                        "re-upload just those:")
-                            st.dataframe(pd.DataFrame({"issue": res["errors"]}),
+                            ui.dataframe(pd.DataFrame({"issue": res["errors"]}),
                                          hide_index=True, width="stretch")
                         else:
                             ui.flash(f"Enrolled {res['created']} student(s).")

@@ -46,7 +46,7 @@ with tab_pipe:
     st.markdown("##### By stage")
     stage_rows = [{"stage": k, "count": v["count"], "value (₦)": v["value"]}
                   for k, v in rep["by_stage"].items()]
-    st.dataframe(pd.DataFrame(stage_rows), hide_index=True, width="stretch")
+    ui.dataframe(pd.DataFrame(stage_rows), hide_index=True, width="stretch")
 
     st.divider()
     st.markdown("##### Open deals")

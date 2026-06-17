@@ -34,12 +34,12 @@ with tab_val:
         rows = inv_svc.inventory_valuation(s)
     if rows:
         df = pd.DataFrame(rows)
-        st.dataframe(df, hide_index=True, width="stretch")
+        ui.dataframe(df, hide_index=True, width="stretch")
         st.metric("Total inventory at cost", f"₦{df['value_at_cost'].sum():,.2f}")
         below = df[df["below_reorder"]]
         if not below.empty:
             st.warning(f"{len(below)} product(s) below reorder level:")
-            st.dataframe(below[["sku", "name", "qty_on_hand"]], hide_index=True,
+            ui.dataframe(below[["sku", "name", "qty_on_hand"]], hide_index=True,
                          width="stretch")
     else:
         st.info("No stockable products yet.")
@@ -54,7 +54,7 @@ with tab_card:
         with get_session() as s:
             card = inv_svc.stock_card(s, opts[sel])
         if card:
-            st.dataframe(pd.DataFrame(card), hide_index=True, width="stretch")
+            ui.dataframe(pd.DataFrame(card), hide_index=True, width="stretch")
         else:
             st.caption("No movements yet.")
     else:
@@ -71,7 +71,7 @@ with tab_prods:
             "reorder_level": p.reorder_level, "stockable": p.is_stockable,
             "active": p.is_active,
         } for p in prods]
-    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+    ui.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
 
     st.divider()
     ui.bulk_import_expander("product", "Products")

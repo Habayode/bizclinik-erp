@@ -157,12 +157,12 @@ with tab_status:
                 s, academic_session_id=sess_opts[sess_sel])
         st.subheader(f"Class roll — {cls_sel}")
         if roll:
-            st.dataframe(pd.DataFrame(roll), hide_index=True, width="stretch")
+            ui.dataframe(pd.DataFrame(roll), hide_index=True, width="stretch")
         else:
             st.info("No billed students in this class for the session yet.")
         st.subheader("Defaulters (session)")
         if defs:
-            st.dataframe(pd.DataFrame(defs), hide_index=True, width="stretch")
+            ui.dataframe(pd.DataFrame(defs), hide_index=True, width="stretch")
             st.metric("Total outstanding",
                       f"{sum(d['outstanding'] for d in defs):,.2f}")
         else:
@@ -183,7 +183,7 @@ with tab_log:
                  "billed": b.billing_date}
                 for b in s.execute(select(StudentFeeBilling).order_by(
                     StudentFeeBilling.id.desc())).scalars()]
-    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+    ui.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
 
 
 auth.render_logout_in_sidebar()
