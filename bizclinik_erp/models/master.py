@@ -58,6 +58,9 @@ class Company(Base):
     # until the business is onboarded to the FIRS MBS e-invoicing platform.
     firs_service_id: Mapped[Optional[str]] = mapped_column(String(32))
     fiscal_year_start_month: Mapped[int] = mapped_column(Integer, default=1)
+    # Industry vertical that tailors the UI: "school" gives a school-first,
+    # curated navigation; "general" (default) is the standard accounting ERP.
+    vertical: Mapped[str] = mapped_column(String(24), default="general")
 
 
 class Account(Base):

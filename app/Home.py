@@ -45,8 +45,16 @@ except Exception:
     pass
 
 
-def _page(path: str, title: str, icon: str, default: bool = False):
-    return st.Page(path, title=title, icon=icon, default=default)
+def _vertical() -> str:
+    """The active tenant's industry vertical ('school' tailors the nav)."""
+    try:
+        from bizclinik_erp.db import get_session
+        from bizclinik_erp.models import Company
+        with get_session() as s:
+            co = s.query(Company).first()
+            return (co.vertical or "general") if co else "general"
+    except Exception:
+        return "general"
 
 
 @st.cache_data(ttl=30, show_spinner=False)
@@ -65,59 +73,18 @@ _appr_title = f"Approvals ({_n_pending})" if _n_pending else "Approvals"
 
 
 # --------------------------------------------------------------------------- #
-# Grouped navigation                                                          #
+# Grouped navigation — tailored to the tenant's vertical                      #
 # --------------------------------------------------------------------------- #
-NAV = {
-    "Overview": [
-        _page("pages/0_Dashboard.py", "Dashboard", "📊", default=True),
-    ],
-    "Finance & Accounting": [
-        _page("pages/1_Sales.py", "Sales", "🧾"),
-        _page("pages/2_Purchases.py", "Purchases", "📥"),
-        _page("pages/3_Inventory.py", "Inventory", "📦"),
-        _page("pages/4_Banking.py", "Banking", "🏦"),
-        _page("pages/7_Bank_Reconciliation.py", "Bank Reconciliation", "🔗"),
-        _page("pages/6_Fixed_Assets.py", "Fixed Assets", "🏭"),
-        _page("pages/8_Recurring.py", "Recurring", "🔁"),
-        _page("pages/9_FIRS_Einvoice.py", "FIRS E-Invoice", "🧾"),
-        _page("pages/20_Currencies.py", "Currencies", "💱"),
-        _page("pages/10_General_Ledger.py", "General Ledger", "📚"),
-        _page("pages/13_Budgets.py", "Budgets", "🎯"),
-        _page("pages/11_Month_End.py", "Month-End", "📅"),
-        _page("pages/12_Statements.py", "Statements", "📃"),
-        _page("pages/15_Reports.py", "Reports", "📈"),
-        st.Page("pages/28_Approvals.py", title=_appr_title, icon="✅",
-                url_path="approvals-queue"),
-    ],
-    "School": [
-        _page("pages/30_School_Setup.py", "School Setup", "🏫"),
-        _page("pages/32_School_Students.py", "Students", "🎓"),
-        _page("pages/33_School_Fees.py", "School Fees", "💰"),
-        _page("pages/34_School_Attendance.py", "Attendance", "🗓"),
-        _page("pages/35_School_Results.py", "Results", "📝"),
-        _page("pages/36_School_Teachers.py", "Teachers and Dashboard", "👩‍🏫"),
-        _page("pages/37_School_Notifications.py", "Parent Notifications", "📣"),
-    ],
-    "CRM": [
-        _page("pages/23_CRM.py", "CRM", "🤝"),
-    ],
-    "HR": [
-        _page("pages/24_Employees.py", "Employees", "🧑‍💼"),
-        _page("pages/25_Recruitment.py", "Recruitment", "🧲"),
-        _page("pages/26_Leave.py", "Leave", "🌴"),
-        _page("pages/5_Payroll.py", "Payroll", "💷"),
-    ],
-    "System": [
-        _page("pages/18_Onboarding.py", "Onboarding", "🚀"),
-        _page("pages/17_Settings.py", "Settings", "⚙️"),
-        _page("pages/19_Admin.py", "Admin", "🛡️"),
-        _page("pages/14_Notifications.py", "Notifications", "🔔"),
-        _page("pages/16_Data.py", "Data", "🗄️"),
-        _page("pages/21_Tenants.py", "Tenants", "🏢"),
-        _page("pages/22_Billing.py", "Billing", "💳"),
-        _page("pages/27_User_Manual.py", "User Manual", "📖"),
-    ],
-}
+from bizclinik_erp.nav import build_nav_spec
+
+NAV = {}
+for _group, _pages in build_nav_spec(_vertical(), _appr_title):
+    NAV[_group] = [
+        st.Page(p["path"], title=p["title"], icon=p["icon"],
+                default=p["default"],
+                **({"url_path": p["url_path"]} if p.get("url_path") else {}))
+        for p in _pages
+    ]
 
 pg = st.navigation(NAV, position="sidebar")
 pg.run()
