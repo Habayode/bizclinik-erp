@@ -5,7 +5,22 @@ from __future__ import annotations
 def test_list_templates(fresh_db):
     from bizclinik_erp.services import coa_templates
     keys = {t["key"] for t in coa_templates.list_templates()}
-    assert {"retail", "services", "hospitality", "manufacturing"} <= keys
+    assert {"retail", "services", "hospitality", "manufacturing", "education"} <= keys
+
+
+def test_apply_education_template(fresh_db):
+    from bizclinik_erp.db import get_session
+    from bizclinik_erp.services import coa_templates
+    from bizclinik_erp.models import Account
+    from sqlalchemy import select
+    with get_session() as s:
+        n = coa_templates.apply_template(s, "education")
+        assert n == 13
+    with get_session() as s:
+        tuition = s.execute(select(Account).where(Account.code == "4400")).scalar_one_or_none()
+        assert tuition is not None and "Tuition" in tuition.name
+        # Parent income header exists, so it attaches correctly.
+        assert tuition.parent_id is not None
 
 
 def test_apply_template_adds_accounts(fresh_db):

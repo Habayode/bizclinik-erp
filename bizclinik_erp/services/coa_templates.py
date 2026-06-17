@@ -72,6 +72,29 @@ TEMPLATES: dict[str, dict] = {
             ("6320", "Plant Power / Diesel", AccountType.EXPENSE, "6000", True),
         ],
     },
+    "education": {
+        "label": "Education / School",
+        "description": "Schools, colleges, training centres. Fees income, "
+                       "uniforms/books inventory, levies + school-running costs.",
+        "accounts": [
+            # Income — fees and school sales.
+            ("4400", "Tuition / School Fees", AccountType.INCOME, "4000", True),
+            ("4410", "Registration & Admission Fees", AccountType.INCOME, "4000", True),
+            ("4420", "Examination Fees", AccountType.INCOME, "4000", True),
+            ("4430", "Uniform Sales", AccountType.INCOME, "4000", True),
+            ("4440", "Books & Stationery Sales", AccountType.INCOME, "4000", True),
+            ("4450", "Transport / Bus Fees", AccountType.INCOME, "4000", True),
+            ("4460", "Boarding & Feeding Fees", AccountType.INCOME, "4000", True),
+            ("4470", "Other Levies (PTA / Development)", AccountType.INCOME, "4000", True),
+            # Cost of goods sold for the resale items.
+            ("5300", "Cost of Uniforms Sold", AccountType.EXPENSE, "5000", True),
+            ("5310", "Cost of Books & Stationery Sold", AccountType.EXPENSE, "5000", True),
+            # School-running expenses.
+            ("6800", "Teaching Materials & Supplies", AccountType.EXPENSE, "6000", True),
+            ("6810", "Examination Expenses", AccountType.EXPENSE, "6000", True),
+            ("6820", "Sports & Extracurricular", AccountType.EXPENSE, "6000", True),
+        ],
+    },
 }
 
 
