@@ -9,6 +9,24 @@ def _paths(spec):
     return [p["path"] for _, pages in spec for p in pages]
 
 
+def test_every_nav_path_resolves_to_a_real_file():
+    """Guards the views/ layout: every page st.navigation references must exist
+    on disk, for every vertical and operator/non-operator view. A stale path
+    here would crash Home.py on every page (full outage), so keep it green."""
+    import pathlib
+    app_dir = pathlib.Path(__file__).resolve().parent.parent / "app"
+    seen = set()
+    for vertical in ("school", "general"):
+        for pa in (True, False):
+            for p in _paths(build_nav_spec(vertical, platform_admin=pa)):
+                seen.add(p)
+    missing = [p for p in seen if not (app_dir / p).exists()]
+    assert not missing, f"nav paths with no file under app/: {missing}"
+    # Sanity: the rename took — pages live under views/, not pages/.
+    assert all(p.startswith("views/") for p in seen), \
+        f"unexpected non-views path(s): {[p for p in seen if not p.startswith('views/')]}"
+
+
 def test_school_vertical_is_school_first_and_curated():
     spec = build_nav_spec("school")
     groups = [g for g, _ in spec]

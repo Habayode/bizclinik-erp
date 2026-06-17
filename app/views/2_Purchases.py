@@ -153,7 +153,7 @@ with tab_bill:
         exp_opts = _expense_account_options(s)
     if not sup_opts:
         st.info("No suppliers yet.")
-        st.page_link("pages/17_Settings.py", label="➕ Add your first supplier in Settings", icon="⚙️")
+        st.page_link("views/17_Settings.py", label="➕ Add your first supplier in Settings", icon="⚙️")
     else:
         with get_session() as s:
             from bizclinik_erp.models import Currency
@@ -258,7 +258,7 @@ with tab_po:
         prods = _product_options(s)
     if not sup_opts:
         st.info("No suppliers yet.")
-        st.page_link("pages/17_Settings.py", label="➕ Add a supplier in Settings", icon="⚙️")
+        st.page_link("views/17_Settings.py", label="➕ Add a supplier in Settings", icon="⚙️")
     else:
         with st.form("new_po"):
             sel_sup = st.selectbox("Supplier", list(sup_opts.keys()), key="po_sup")

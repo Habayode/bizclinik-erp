@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import pathlib
 
-PAGES = pathlib.Path(__file__).resolve().parent.parent / "app" / "pages"
+PAGES = pathlib.Path(__file__).resolve().parent.parent / "app" / "views"
 
 # Page -> the permission(s) at least one of which must be required to open it.
 GATED_PAGES = {
@@ -21,7 +21,8 @@ GATED_PAGES = {
     "9_FIRS_Einvoice.py": ["post.invoice"],
     "10_General_Ledger.py": ["post.journal"],
     "11_Month_End.py": ["close.period"],
-    "16_Data.py": ["import.data"],
+    # Operator-only: server DB path + destructive wipe, not tenant-facing.
+    "16_Data.py": ["require_platform_admin"],
     "17_Settings.py": ["manage.company", "manage.settings", "manage.customers",
                        "manage.suppliers", "manage.banks"],
     "18_Onboarding.py": ["manage.company"],

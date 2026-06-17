@@ -17,7 +17,9 @@ st.set_page_config(page_title="Data · Trakit365 ERP", layout="wide",
                     page_icon="💾")
 ui.inject_brand()
 auth.require_login()
-auth.require_perm("import.data")
+# Operator-only: exposes the server DB path and a destructive wipe — not a
+# tenant-facing feature. (Nav-hiding is cosmetic; this is the real gate.)
+auth.require_platform_admin()
 ui.hero("Data Management", "Database info · reset · maintenance",
          badge="DT", right_label="Module", right_value="Admin")
 

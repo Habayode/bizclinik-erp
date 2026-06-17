@@ -85,7 +85,7 @@ def _paths(spec):
     return [p["path"] for _, pages in spec for p in pages]
 
 
-_OPERATOR_ONLY = ["21_Tenants", "22_Billing"]
+_OPERATOR_ONLY = ["21_Tenants", "22_Billing", "16_Data"]
 
 
 @pytest.mark.parametrize("vertical", ["general", "school"])
