@@ -97,10 +97,13 @@ def balance_sheet(session: Session, *, as_of: date,
                   fiscal_year_start: Optional[date] = None) -> dict:
     """Snapshot of A = L + E at a given date.
 
-    Current-year earnings are computed as the cumulative net profit from
-    `fiscal_year_start` (default: 1 Jan of the as_of year) through as_of —
-    so a fresh DB never has an unbalanced retained-earnings closing pass
-    blocking the report.
+    There are no year-end closing entries — income/expense balances accrue
+    across years — so equity must absorb ALL net income earned up to as_of, not
+    just the current year's. We split it for presentation: "Retained Earnings"
+    (everything before `fiscal_year_start`) plus "Current Year Earnings"
+    (fiscal_year_start through as_of). Their sum is the all-time net income,
+    which is what keeps A = L + E. (Default fiscal_year_start: 1 Jan of the
+    as_of year.)
     """
     fy_start = fiscal_year_start or date(as_of.year, 1, 1)
     accts = session.execute(
@@ -122,9 +125,17 @@ def balance_sheet(session: Session, *, as_of: date,
         else:
             equity.append(row)
 
-    # Compute current-year earnings to make equity balance.
-    pnl = profit_and_loss(session, period_start=fy_start, period_end=as_of)
-    ytd_earnings = pnl["net_profit"]
+    # Equity must absorb all net income to date (no year-end close zeroes the
+    # P&L). Prior-year accumulated earnings (everything before fy_start) become
+    # Retained Earnings; the rest is Current Year Earnings.
+    prior_end = date.fromordinal(fy_start.toordinal() - 1)
+    retained = profit_and_loss(session, period_start=date(1900, 1, 1),
+                               period_end=prior_end)["net_profit"]
+    ytd_earnings = profit_and_loss(session, period_start=fy_start,
+                                   period_end=as_of)["net_profit"]
+    if retained != 0:
+        equity.append({"code": "3200", "name": "Retained Earnings (prior years)",
+                        "amount": round(retained, 2)})
     if ytd_earnings != 0:
         equity.append({"code": "3300", "name": "Current Year Earnings",
                         "amount": round(ytd_earnings, 2)})
