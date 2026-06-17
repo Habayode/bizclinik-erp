@@ -110,6 +110,8 @@ the box.
 Nothing here touches the books; you are just describing your school. The page has
 five tabs, and it is easiest to fill them left to right.
 
+![School Setup](school_images/02_school_setup.png)
+
 ## 3.1 Sessions (the academic year)
 
 The **📅 Sessions** tab.
@@ -196,6 +198,8 @@ Examination `₦5,000` per term; Registration & Admission `₦20,000` and Unifor
 **School → Students.** Three tabs: **📋 Directory**, **🎓 Enrol**,
 **📥 Bulk import**.
 
+![School Students](school_images/03_students.png)
+
 ## 4.1 Directory
 
 The roll. Filter by class with **Filter by class**. Each row shows the admission
@@ -260,6 +264,8 @@ The importer is forgiving and safe:
 **💰 Bulk issue**, **💵 Record payment**, **📊 Fee status / defaulters**,
 **📋 Billing log**.
 
+![School Fees](school_images/04_school_fees.png)
+
 ## 5.1 Bill a class for the term (Bulk issue)
 
 The **💰 Bulk issue** tab raises each student's fees for a term as a real
@@ -318,6 +324,8 @@ student, session, term, invoice number, amount and date.
 **School → Attendance.** Daily registers. Nothing here touches the books. Two
 tabs: **✅ Mark attendance** and **📊 Summary**.
 
+![School Attendance](school_images/05_attendance.png)
+
 ## 6.1 Mark attendance
 
 1. Pick the **Class** and the **Date** (defaults to today).
@@ -340,6 +348,8 @@ Excused and Total.
 **School → Results.** Per-subject scores and a report-card preview. Nothing here
 touches the books. Two tabs: **✍️ Enter result** and **🧾 Report card**.
 
+![School Results](school_images/06_results.png)
+
 ## 7.1 Enter a result
 
 1. Pick the **Student**, the **Session**, the **Class** and the **Term**.
@@ -361,6 +371,8 @@ see every subject, the totals and grades, and the **Average** for the term.
 # 8. Teachers
 
 **School → Teachers.** Two tabs: **👩‍🏫 Teaching staff** and **📊 Dashboard**.
+
+![Teachers](school_images/07_teachers.png)
 
 A teacher is one of your **HR employees** with school details added on top — so
 **add the person under HR → Employees first**, then give them a teaching profile
@@ -387,6 +399,8 @@ by class.
 
 **School → Parent Notifications.** Send fee reminders and statements to guardians
 by SMS or email. Three tabs: **🔔 Fee reminders**, **📃 Statements**, **📜 Log**.
+
+![Parent Notifications](school_images/08_parent_notifications.png)
 
 > **A note on sending.** At the top of the page a banner tells you the channel
 > status. Out of the box, **SMS is in log/demo mode** — reminders are *recorded
@@ -423,6 +437,8 @@ listed in the **📜 Log** tab.
 
 **School → School Dashboard** (your home page). A live, read-only snapshot of the
 **current session**:
+
+![School Dashboard](school_images/01_school_dashboard.png)
 
 - **Students enrolled**, **Teaching & staff**, **Fee defaulters**.
 - **Fees billed**, **Fees collected**, **Outstanding**, with a bar showing the
