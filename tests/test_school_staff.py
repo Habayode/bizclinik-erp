@@ -108,6 +108,31 @@ def test_school_dashboard_counts_and_fees(fresh_db):
         assert ebc.get("JSS1A") == 2
 
 
+def test_dashboard_defaulter_counts_students_not_term_invoices(fresh_db):
+    """A student billed (and unpaid) across multiple terms is ONE defaulter, not
+    one per term. Regression for defaulter_count exceeding the student count."""
+    from bizclinik_erp.db import get_session
+    from bizclinik_erp.services import school_staff, school_billing, school
+    with get_session() as s:
+        sess, cls, ft, s1, s2 = _setup_school(s)
+        # add term-2 and term-3 fee cells so multi-term billing has something
+        for term in (2, 3):
+            school.set_fee_schedule(s, academic_session_id=sess.id,
+                                    fee_type_id=ft.id, class_id=cls.id,
+                                    term_number=term, amount=50000)
+        # bill ONLY s1 for all three terms, all unpaid
+        for term in (1, 2, 3):
+            school_billing.bill_student(s, student_id=s1.id,
+                                        academic_session_id=sess.id,
+                                        term_number=term,
+                                        invoice_date=date(2026, 1, 10))
+        kpi = school_staff.school_dashboard(s, academic_session_id=sess.id)
+        # 3 outstanding term-invoices, but exactly ONE defaulting student
+        assert kpi["defaulter_count"] == 1
+        # and it matches the (distinct-student) defaulters list
+        assert len(school_billing.defaulters(s, academic_session_id=sess.id)) == 1
+
+
 def test_school_dashboard_collected_after_payment(fresh_db):
     """A full payment moves the money from outstanding to collected and clears
     the defaulter."""

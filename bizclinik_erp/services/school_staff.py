@@ -97,7 +97,8 @@ def school_dashboard(session: Session,
         session when academic_session_id is given)
       - fees_collected: sum of amount_paid on those billings' invoices
       - fees_outstanding: fees_billed - fees_collected
-      - defaulter_count: number of those billings' invoices still outstanding
+      - defaulter_count: number of distinct students who still owe (a student
+        billed across several terms counts once, not per term)
     """
     # Enrolment by class (active students only).
     enrol_rows = session.execute(
@@ -125,15 +126,18 @@ def school_dashboard(session: Session,
 
     fees_billed = round(sum(b.total_amount for b in billings), 2)
     fees_collected = 0.0
-    defaulter_count = 0
+    outstanding_by_student: dict[int, float] = {}
     for b in billings:
         inv = b.sales_invoice
         if inv is None:
             continue
         fees_collected += inv.amount_paid
-        if inv.outstanding > 0:
-            defaulter_count += 1
+        outstanding_by_student[b.student_id] = round(
+            outstanding_by_student.get(b.student_id, 0.0) + (inv.outstanding or 0.0), 2)
     fees_collected = round(fees_collected, 2)
+    # A defaulter is a STUDENT who still owes — count once even if they owe
+    # across several terms (not one per outstanding term-invoice).
+    defaulter_count = sum(1 for bal in outstanding_by_student.values() if bal > 0.005)
 
     return {
         "enrolment_by_class": enrolment_by_class,
