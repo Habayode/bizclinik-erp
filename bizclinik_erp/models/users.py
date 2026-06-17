@@ -41,14 +41,14 @@ PERMISSIONS: dict[Role, set[str]] = {
         "manage.coa", "manage.products", "manage.customers", "manage.suppliers",
         "manage.banks", "manage.employees", "manage.assets",
         "run.payroll", "run.depreciation", "import.data", "reset.db",
-        "view.reports", "view.audit", "export.pdf",
+        "view.reports", "view.audit", "export.pdf", "manage.school",
     },
     Role.ACCOUNTANT: {
         "view.dashboard", "post.invoice", "post.bill", "post.receipt", "post.payment",
         "post.journal", "void.any", "manage.coa", "manage.products", "manage.customers",
         "manage.suppliers", "manage.banks", "manage.employees", "manage.assets",
         "run.payroll", "run.depreciation", "view.reports", "view.audit", "export.pdf",
-        "import.data",
+        "import.data", "manage.school",
     },
     Role.SALES: {
         "view.dashboard", "post.invoice", "post.receipt", "manage.customers",

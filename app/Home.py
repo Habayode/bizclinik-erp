@@ -89,6 +89,9 @@ NAV = {
         st.Page("pages/28_Approvals.py", title=_appr_title, icon="✅",
                 url_path="approvals-queue"),
     ],
+    "School": [
+        _page("pages/30_School_Setup.py", "School Setup", "🏫"),
+    ],
     "CRM": [
         _page("pages/23_CRM.py", "CRM", "🤝"),
     ],

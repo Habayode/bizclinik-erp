@@ -63,6 +63,13 @@ from .hr import (
     OpeningStatus,
 )
 from .approvals import ApprovalLimit, ApprovalRequest, ApprovalStatus
+from .school import (
+    AcademicSession,
+    FeeType,
+    SchoolClass,
+    StudentFeeSchedule,
+    Term,
+)
 
 __all__ = [
     # master
@@ -101,4 +108,6 @@ __all__ = [
     "ApplicationStage", "LeaveRequest", "LeaveType", "LeaveStatus",
     # Approvals
     "ApprovalLimit", "ApprovalRequest", "ApprovalStatus",
+    # School (Phase 0 scaffolding)
+    "AcademicSession", "Term", "SchoolClass", "FeeType", "StudentFeeSchedule",
 ]
