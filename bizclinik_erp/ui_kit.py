@@ -293,20 +293,22 @@ def money_col(label: str):
 _XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 
-def bulk_import_expander(kind: str, label: str) -> None:
+def bulk_import_expander(kind: str, label: str, noun: Optional[str] = None) -> None:
     """Reusable '📥 Bulk import from Excel' widget: download template, upload a
     filled file, preview, import. ``kind`` is a key in services.bulk_import.SPECS
-    (customer/supplier/product/employee/account)."""
+    (customer/supplier/product/employee/account). ``noun`` overrides the row
+    wording (e.g. 'student / parent') without changing the underlying importer."""
     from .db import get_session
     from .services import bulk_import
+    noun = noun or kind
     with st.expander(f"📥 Bulk import {label.lower()} from Excel "
                      "(migrate your existing list at once)"):
         st.markdown(
             f"**Faster than one-by-one:** download the template, fill one row "
-            f"per {kind}, then upload it here. The first sheet is where you fill "
+            f"per {noun}, then upload it here. The first sheet is where you fill "
             "your data — the **Instructions** sheet explains every column.")
         st.download_button(
-            f"⬇ Download {kind} template (.xlsx)",
+            f"⬇ Download {noun} template (.xlsx)",
             data=bulk_import.template_bytes(kind),
             file_name=f"Trakit365_{label.lower().replace(' ', '_')}_template.xlsx",
             mime=_XLSX_MIME, key=f"{kind}_tpl_dl")

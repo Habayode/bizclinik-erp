@@ -86,10 +86,11 @@ with tab_cu:
     st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
 
     st.divider()
-    ui.bulk_import_expander("customer", "Customers")
+    ui.bulk_import_expander("customer", "Students" if _school else "Customers",
+                            noun="student / parent" if _school else None)
     st.divider()
 
-    st.subheader("Add a customer")
+    st.subheader("Add a student / parent" if _school else "Add a customer")
     with st.form("cust"):
         code = st.text_input("Code")
         name = st.text_input("Name")

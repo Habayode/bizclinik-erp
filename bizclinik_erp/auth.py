@@ -103,12 +103,37 @@ def require_any_perm(perms, *, error: str = "You don't have permission to access
 # ---- lock screen ----------------------------------------------------------
 
 
+def _active_company():
+    """(name, vertical) for the active tenant — used to brand the login card.
+    Fails safe to (None, 'general')."""
+    try:
+        from .db import get_session
+        from .models import Company
+        with get_session() as s:
+            co = s.query(Company).first()
+            return (co.name, (co.vertical or "general")) if co else (None, "general")
+    except Exception:
+        return (None, "general")
+
+
 def _render_brand_card() -> None:
     try:
         from . import ui_kit
         ui_kit.inject_brand()
     except Exception:
         pass
+    # Pre-login screens stop before the custom st.navigation runs, so Streamlit
+    # would otherwise show its raw auto-discovered page list in the sidebar.
+    # Hide the sidebar entirely on the sign-in screens.
+    st.markdown(
+        "<style>section[data-testid='stSidebar']{display:none !important;}"
+        "[data-testid='stSidebarNav']{display:none !important;}</style>",
+        unsafe_allow_html=True)
+    name, vertical = _active_company()
+    if vertical == "school" and name:
+        badge, title, subtitle = "🏫", name, "School portal · sign in to continue"
+    else:
+        badge, title, subtitle = "T3", "Trakit365 ERP", "Sign in to continue"
     st.markdown(
         "<div style='max-width: 380px; margin: 4rem auto 0 auto; "
         "background: white; border: 1px solid #E5E7EB; border-radius: 12px; "
@@ -116,9 +141,9 @@ def _render_brand_card() -> None:
         "<div style='display:flex; align-items:center; gap:10px; margin-bottom: 6px;'>"
         "<div style='width:36px; height:36px; border-radius:8px; "
         "background:#1F3864; color:white; display:flex; align-items:center; "
-        "justify-content:center; font-weight:700;'>T3</div>"
-        "<div><div style='font-weight:700; color:#0F172A;'>Trakit365 ERP</div>"
-        "<div style='font-size:0.8rem; color:#64748B;'>Sign in to continue</div></div>"
+        f"justify-content:center; font-weight:700;'>{badge}</div>"
+        f"<div><div style='font-weight:700; color:#0F172A;'>{title}</div>"
+        f"<div style='font-size:0.8rem; color:#64748B;'>{subtitle}</div></div>"
         "</div>"
         "</div>",
         unsafe_allow_html=True,
