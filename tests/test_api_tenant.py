@@ -253,3 +253,24 @@ def test_billing_endpoints_reject_cross_tenant(api_env):
                  json={"tenant_slug": "beta", "plan_code": "business",
                        "email": "x@example.com"})
     assert sub.status_code == 403, sub.text
+
+
+def test_public_demo_request(api_env):
+    """Public lead capture: no API key, honeypot drops bots, validation enforced,
+    valid lead recorded (Turnstile skipped when TURNSTILE_SECRET unset)."""
+    from bizclinik_erp import tenancy
+    c = _client()
+    # honeypot tripped -> accepted but not recorded
+    assert c.post("/api/v1/demo-request",
+                  json={"name": "Bot", "email": "bot@x.com",
+                        "website": "http://spam"}).status_code == 200
+    # missing name/contact -> 400
+    assert c.post("/api/v1/demo-request",
+                  json={"name": "NoContact"}).status_code == 400
+    # valid -> 200 + recorded
+    r = c.post("/api/v1/demo-request",
+               json={"name": "Jane Lead", "business": "Sunrise",
+                     "email": "jane@example.com", "message": "demo please"})
+    assert r.status_code == 200 and r.json().get("ok") is True
+    names = [d["name"] for d in tenancy.list_demo_requests()]
+    assert "Jane Lead" in names and "Bot" not in names

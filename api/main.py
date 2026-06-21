@@ -25,6 +25,7 @@ from typing import Iterator, Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
@@ -57,6 +58,14 @@ app = FastAPI(
     description="REST + webhooks layer over the Trakit365 ERP services "
                 "(per-tenant API keys).",
 )
+
+# CORS — only the marketing site(s) may call the public endpoints from a browser.
+_cors_origins = [o.strip() for o in os.environ.get(
+    "CORS_ORIGINS",
+    "https://trakit365.hagai.online,https://hagai.online").split(",") if o.strip()]
+app.add_middleware(
+    CORSMiddleware, allow_origins=_cors_origins,
+    allow_methods=["GET", "POST", "OPTIONS"], allow_headers=["*"])
 
 
 @app.exception_handler(authz.PermissionDenied)
@@ -513,6 +522,66 @@ async def billing_webhook(provider: str, request: Request) -> dict:
     if not out.get("verified"):
         raise HTTPException(status_code=401, detail="Webhook signature invalid")
     return out
+
+
+# ---- public: request a demo (no API key; honeypot + Turnstile protected) ----
+
+
+class DemoIn(BaseModel):
+    name: str
+    business: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    message: Optional[str] = None
+    website: Optional[str] = None        # honeypot — bots fill it, humans don't
+    turnstile_token: Optional[str] = None
+
+
+def _verify_turnstile(token: Optional[str], remoteip: Optional[str]) -> bool:
+    """Verify a Cloudflare Turnstile token server-side. If TURNSTILE_SECRET is
+    not set, verification is skipped (the honeypot still applies), so the form
+    works before Turnstile is provisioned and turns on the moment it is."""
+    secret = os.environ.get("TURNSTILE_SECRET", "").strip()
+    if not secret:
+        return True
+    if not token:
+        return False
+    import json as _json
+    from urllib import parse as _p, request as _r
+    data = {"secret": secret, "response": token}
+    if remoteip:
+        data["remoteip"] = remoteip
+    try:
+        req = _r.Request(
+            "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+            data=_p.urlencode(data).encode())
+        with _r.urlopen(req, timeout=8) as resp:
+            return bool(_json.loads(resp.read().decode()).get("success"))
+    except Exception:
+        return False
+
+
+@app.post("/api/v1/demo-request")
+async def public_demo_request(payload: DemoIn, request: Request) -> dict:
+    """Public lead capture for the marketing site — no API key. Protected by a
+    honeypot and (once configured) Cloudflare Turnstile. Records the lead in the
+    control DB, the same queue as the in-app 'Request a demo'."""
+    if (payload.website or "").strip():          # honeypot tripped — drop quietly
+        return {"ok": True}
+    ip = request.headers.get("cf-connecting-ip") or (
+        request.client.host if request.client else None)
+    if not _verify_turnstile(payload.turnstile_token, ip):
+        raise HTTPException(status_code=400,
+                            detail="Verification failed — please retry.")
+    name = (payload.name or "").strip()
+    if not name or not ((payload.email or "").strip()
+                        or (payload.phone or "").strip()):
+        raise HTTPException(status_code=400,
+                            detail="Please provide your name and an email or phone.")
+    tenancy.create_demo_request(
+        name=name, business=payload.business, email=payload.email,
+        phone=payload.phone, message=payload.message)
+    return {"ok": True}
 
 
 # ---- CRM --------------------------------------------------------------------
