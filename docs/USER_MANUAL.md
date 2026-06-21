@@ -31,9 +31,9 @@ Every financial figure in this manual is *real*: it was produced by posting the 
 # 1. Getting started
 
 ## 1.1 Signing in
-Open the app URL in any browser. You'll see the **sign-in card**. Enter your **username** and **password** (your administrator creates user accounts under *Settings → Users*). After five wrong attempts the session locks — refresh to retry.
+Each business has its **own web address**: open `yourbusiness-erp.hagai.online` and it takes you straight to your sign-in — no need to choose a business. If you land on the shared address `erp.hagai.online` instead, type your **Business ID** (e.g. `yourbusiness`) and click **Continue**. Then enter your **username** and **password** (your administrator creates user accounts under *System → Admin*). After five wrong attempts the session locks — refresh to retry.
 
-> On a brand-new install the first sign-in uses the bootstrap admin (`admin`) with the password set during setup.
+> For privacy, the sign-in screen no longer lists businesses — reach yours by its web address or Business ID. On a brand-new install the first sign-in uses the bootstrap admin (`admin`) with the password set during setup.
 
 ## 1.2 The layout
 - **Left sidebar** — navigation, organised into collapsible **groups** so related modules sit together:
@@ -41,7 +41,7 @@ Open the app URL in any browser. You'll see the **sign-in card**. Enter your **u
   - **Finance & Accounting** — Sales, Purchases, Inventory, Banking, Bank Reconciliation, Fixed Assets, Recurring, FIRS E-invoice, Currencies, General Ledger, Budgets, Month-End, Statements, Reports, **Approvals**
   - **CRM** — Leads, pipeline, follow-ups
   - **HR** — Employees, Recruitment, Leave, Payroll
-  - **System** — Onboarding, Settings, Admin, Notifications, Data, Tenants, Billing, **User Manual**
+  - **System** — Onboarding, Settings, Admin, Notifications, **User Manual** (Tenants, Billing and Data are platform-operator tools and don't appear for business users)
 - **Main panel** — the active module.
 - **Plan badge** — the active subscription plan shows in the sidebar; **Sign-out** is at the bottom.
 - **This manual** is also available inside the app under **System → User Manual**.
@@ -356,7 +356,7 @@ Output ₦63,375 − Input ₦222,000 = **₦158,625 creditable**.
 
 # 7. Platform features
 
-- **Plans & access (entitlements).** Three plans gate the premium add-ons; **core accounting is on every plan**. Manage under **System → Billing**, which shows what your plan unlocks and your user cap:
+- **Plans & access (entitlements).** Three plans gate the premium add-ons; **core accounting is on every plan**. Plans and subscriptions are managed centrally by your platform operator; each plan shows what it unlocks and your user cap:
 
   | Plan | Monthly | Annual (2 months free) | Users | Unlocks |
   |------|---------|------------------------|-------|---------|
@@ -367,9 +367,9 @@ Output ₦63,375 − Input ₦222,000 = **₦158,625 creditable**.
   Choose **Monthly or Annual** on the Billing page — annual billing charges 10 months (so **2 months are free**) and runs for a year. Open a locked module and it shows which plan unlocks it; if a subscription lapses you drop to **Free** (core stays usable, premium locks until you renew). Adding users beyond your plan's cap is blocked until you upgrade.
 
 - **Approvals & limits.** Per-role spending limits with a block-until-approved queue for money-out and payroll — see **§4.15**.
-- **Multi-business (multi-tenant).** Run many businesses from one login; each is a fully isolated database with its own subdomain and its own invoice branding. Manage under **System → Tenants**.
+- **Multi-business (multi-tenant).** The platform runs many businesses, each a fully isolated database reached at **its own subdomain** (`<business>-erp.hagai.online`) with its own invoice branding. The Tenants console is an **operator-only** tool; business users only ever see their own data.
 - **REST API + webhooks.** Every core function is reachable via the REST API with a per-business API key (`X-API-Key`): customers, products, invoices, reports, bank feed, CRM, billing. *(Business plan.)*
-- **Billing.** Subscriptions via Paystack / Flutterwave / Moniepoint (switchable), under **Billing**.
+- **Billing.** Subscriptions are taken via Paystack / Flutterwave / Moniepoint (switchable) and managed by the operator.
 - **User Manual in-app.** This guide is available under **System → User Manual** (with a download button).
 - **Backups & recovery.** Nightly, the system `pg_dump`s every database, **encrypts** it, and uploads it off-site. The encryption passphrase is your recovery key — keep it in a password manager. (See the separate operations/secrets reference.)
 - **Security.** No open inbound ports (secured tunnel), per-user roles, audit trail on every change, period locks, and approval limits on spend.
