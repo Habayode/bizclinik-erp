@@ -352,51 +352,13 @@ def _tenant_picker() -> None:
                    "yourbusiness-erp.hagai.online — to sign in straight away.")
 
         st.divider()
-        with st.expander("New here? Request a demo"):
-            with st.form("demo_request"):
-                dn = st.text_input("Your name")
-                dbiz = st.text_input("Business / school name")
-                de = st.text_input("Email")
-                dp = st.text_input("Phone")
-                dmsg = st.text_area("What would you like to see?", height=80)
-                # Honeypot — hidden from humans (CSS below), tempting to bots.
-                hp = st.text_input("Company website", key="demo_hp",
-                                   label_visibility="collapsed")
-                sent = st.form_submit_button("Request a demo", type="primary",
-                                             use_container_width=True)
-            st.markdown("<style>.st-key-demo_hp{display:none !important;}</style>",
-                        unsafe_allow_html=True)
-            if sent and (hp or "").strip():
-                # Honeypot tripped — accept silently, record nothing.
-                st.success("Thanks! We've got your request — the HAG_Ai team "
-                           "will reach out shortly.")
-            elif sent:
-                if not (dn or "").strip() or not ((de or "").strip()
-                                                  or (dp or "").strip()):
-                    st.error("Please add your name and an email or phone so we "
-                             "can reach you.")
-                else:
-                    try:
-                        tenancy.create_demo_request(
-                            name=dn, business=dbiz, email=de, phone=dp,
-                            message=dmsg)
-                        try:
-                            from .services.notifications import (
-                                smtp_configured, send_email_with_attachment)
-                            if smtp_configured():
-                                send_email_with_attachment(
-                                    to_addr=os.environ.get("DEMO_REQUEST_EMAIL",
-                                                           "hello@hagai.online"),
-                                    subject=f"Trakit365 demo request — {dn}",
-                                    body_text=(f"Name: {dn}\nBusiness: {dbiz}\n"
-                                               f"Email: {de}\nPhone: {dp}\n\n{dmsg}"))
-                        except Exception:   # noqa: BLE001 — email is best-effort
-                            pass
-                        st.success("Thanks! We've got your request — the HAG_Ai "
-                                   "team will reach out shortly.")
-                    except Exception:   # noqa: BLE001
-                        st.error("Sorry, we couldn't submit that just now. "
-                                 "Please email hello@hagai.online.")
+        # New visitors are sent to the marketing site to request a demo (the
+        # demo form lives there); the app login is only for existing businesses.
+        st.markdown(
+            "<p style='text-align:center;margin:0.25rem 0 0;'>New to Trakit365? "
+            "<a href='https://trakit365.hagai.online' target='_blank' "
+            "rel='noopener'>See what it does and request a demo &rarr;</a></p>",
+            unsafe_allow_html=True)
     st.stop()
 
 

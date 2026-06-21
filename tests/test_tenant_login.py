@@ -17,24 +17,19 @@ def test_tenant_picker_does_not_list_tenants():
     assert "get_tenant" in src
 
 
-def test_demo_form_has_honeypot():
-    from bizclinik_erp import auth
-    import inspect
-    src = inspect.getsource(auth._tenant_picker)
-    assert "demo_hp" in src and "create_demo_request" in src
-
-
 def test_subdomain_resolution_helpers_exist():
     from bizclinik_erp import auth
     assert hasattr(auth, "_resolve_subdomain_slug")
     assert hasattr(auth, "_subdomain_from_request")
 
 
-def test_login_screen_offers_request_demo():
+def test_login_links_to_marketing_demo():
     import inspect
     from bizclinik_erp import auth
     src = inspect.getsource(auth._tenant_picker)
-    assert "Request a demo" in src and "create_demo_request" in src
+    # New visitors are sent to the marketing site; no in-app demo capture.
+    assert "trakit365.hagai.online" in src
+    assert "create_demo_request" not in src
 
 
 def test_demo_request_roundtrip(tmp_path, monkeypatch):
