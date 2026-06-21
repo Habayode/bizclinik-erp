@@ -17,6 +17,13 @@ def test_tenant_picker_does_not_list_tenants():
     assert "get_tenant" in src
 
 
+def test_demo_form_has_honeypot():
+    from bizclinik_erp import auth
+    import inspect
+    src = inspect.getsource(auth._tenant_picker)
+    assert "demo_hp" in src and "create_demo_request" in src
+
+
 def test_subdomain_resolution_helpers_exist():
     from bizclinik_erp import auth
     assert hasattr(auth, "_resolve_subdomain_slug")

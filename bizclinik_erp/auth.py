@@ -359,9 +359,18 @@ def _tenant_picker() -> None:
                 de = st.text_input("Email")
                 dp = st.text_input("Phone")
                 dmsg = st.text_area("What would you like to see?", height=80)
+                # Honeypot — hidden from humans (CSS below), tempting to bots.
+                hp = st.text_input("Company website", key="demo_hp",
+                                   label_visibility="collapsed")
                 sent = st.form_submit_button("Request a demo", type="primary",
                                              use_container_width=True)
-            if sent:
+            st.markdown("<style>.st-key-demo_hp{display:none !important;}</style>",
+                        unsafe_allow_html=True)
+            if sent and (hp or "").strip():
+                # Honeypot tripped — accept silently, record nothing.
+                st.success("Thanks! We've got your request — the HAG_Ai team "
+                           "will reach out shortly.")
+            elif sent:
                 if not (dn or "").strip() or not ((de or "").strip()
                                                   or (dp or "").strip()):
                     st.error("Please add your name and an email or phone so we "
