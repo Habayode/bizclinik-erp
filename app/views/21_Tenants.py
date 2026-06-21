@@ -170,4 +170,20 @@ if key_rows:
             st.warning(f"Revoked key #{int(rid)}")
 
 
+st.divider()
+st.subheader("Demo requests")
+st.caption("Leads captured from the public sign-in screen (erp.hagai.online → "
+            "“Request a demo”). Follow up, then mark contacted in your CRM.")
+demo_rows = tenancy.list_demo_requests()
+if demo_rows:
+    ui.dataframe(pd.DataFrame([
+        {"when": str(d["created_at"])[:16], "name": d["name"],
+         "business": d["business"] or "", "email": d["email"] or "",
+         "phone": d["phone"] or "", "message": d["message"] or "",
+         "status": d["status"]}
+        for d in demo_rows]), hide_index=True, width="stretch")
+else:
+    st.info("No demo requests yet.")
+
+
 auth.render_logout_in_sidebar()

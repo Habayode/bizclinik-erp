@@ -90,6 +90,47 @@ class BillingCharge(ControlBase):
     paid_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
 
 
+class DemoRequest(ControlBase):
+    """A public 'request a demo' lead captured from the sign-in screen. Lives in
+    the control DB (it predates any tenant selection); never holds business data."""
+    __tablename__ = "demo_request"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    business: Mapped[Optional[str]] = mapped_column(String(160))
+    email: Mapped[Optional[str]] = mapped_column(String(160))
+    phone: Mapped[Optional[str]] = mapped_column(String(40))
+    message: Mapped[Optional[str]] = mapped_column(String(2000))
+    status: Mapped[str] = mapped_column(String(20), default="new")  # new/contacted/closed
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+def create_demo_request(*, name: str, business: Optional[str] = None,
+                        email: Optional[str] = None, phone: Optional[str] = None,
+                        message: Optional[str] = None) -> int:
+    """Record a public demo-request lead in the control DB. Returns its id."""
+    fac = _control_factory()
+    with fac() as s:
+        d = DemoRequest(name=(name or "").strip()[:120],
+                        business=((business or "").strip() or None),
+                        email=((email or "").strip() or None),
+                        phone=((phone or "").strip() or None),
+                        message=((message or "").strip() or None))
+        s.add(d)
+        s.commit()
+        return d.id
+
+
+def list_demo_requests(limit: int = 200) -> list[dict]:
+    """All demo-request leads, newest first (operator view)."""
+    fac = _control_factory()
+    with fac() as s:
+        rows = s.execute(select(DemoRequest).order_by(
+            DemoRequest.id.desc()).limit(limit)).scalars().all()
+        return [{"id": d.id, "created_at": d.created_at, "name": d.name,
+                 "business": d.business, "email": d.email, "phone": d.phone,
+                 "message": d.message, "status": d.status} for d in rows]
+
+
 # ---- control engine (cached per resolved control.db path) -----------------
 
 _control_engines: dict[str, Engine] = {}

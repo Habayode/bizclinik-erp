@@ -296,12 +296,31 @@ def active_tenant() -> Optional[str]:
     return st.session_state.get(_TENANT_KEY)
 
 
+def _slug_candidates(text: str) -> list[str]:
+    """Derive tenant-slug candidates from whatever the user types — a bare ID
+    (``otasch``), the ``-erp`` form (``otasch-erp``), or the full web address
+    (``https://otasch-erp.hagai.online/Dashboard``). Returns ordered candidates
+    to try against the registry; pure (no Streamlit) so it is unit-testable."""
+    s = (text or "").strip().lower()
+    if not s:
+        return []
+    if "://" in s:
+        s = s.split("://", 1)[1]
+    s = s.split("/", 1)[0].split("?", 1)[0].split(":")[0].strip().rstrip(".")
+    label = s.split(".", 1)[0] if "." in s else s   # leftmost DNS label
+    out: list[str] = []
+    for c in (label, label[:-4] if label.endswith("-erp") else None, s):
+        if c and c not in out:
+            out.append(c)
+    return out
+
+
 def _tenant_picker() -> None:
     """Pre-login business entry. We deliberately do NOT list registered
     businesses — a visitor must not be able to enumerate tenants. Each business
     signs in at its own web address (``<id>-erp.hagai.online``, which
     auto-selects the tenant); on the bare domain the user types their business
-    ID. st.stop()s until a valid, active business is chosen."""
+    ID or web address. st.stop()s until a valid, active business is chosen."""
     from . import tenancy
     _render_brand_card()
     col_l, col_c, col_r = st.columns([1, 2, 1])
@@ -309,14 +328,19 @@ def _tenant_picker() -> None:
         st.markdown("#### Sign in to your business")
         with st.form("biz_entry"):
             entered = st.text_input(
-                "Business ID", placeholder="your business code")
+                "Business ID or web address",
+                placeholder="e.g. otasch  ·  or otasch-erp.hagai.online")
             go = st.form_submit_button("Continue", type="primary",
                                        use_container_width=True)
         if go:
-            slug = (entered or "").strip().lower()
-            t = tenancy.get_tenant(slug) if slug else None
-            if t and t.get("is_active", True):
-                st.session_state[_TENANT_KEY] = slug
+            chosen = None
+            for cand in _slug_candidates(entered):
+                t = tenancy.get_tenant(cand)
+                if t and t.get("is_active", True):
+                    chosen = cand
+                    break
+            if chosen:
+                st.session_state[_TENANT_KEY] = chosen
                 # New tenant => drop any prior login state.
                 for k in (_USER_KEY, _USERNAME_KEY, _ROLE_KEY, _TOKEN_KEY, _LEGACY_KEY):
                     st.session_state.pop(k, None)
@@ -326,6 +350,44 @@ def _tenant_picker() -> None:
                          "your business web address to sign in directly.")
         st.caption("Tip: open your business web address — e.g. "
                    "yourbusiness-erp.hagai.online — to sign in straight away.")
+
+        st.divider()
+        with st.expander("New here? Request a demo"):
+            with st.form("demo_request"):
+                dn = st.text_input("Your name")
+                dbiz = st.text_input("Business / school name")
+                de = st.text_input("Email")
+                dp = st.text_input("Phone")
+                dmsg = st.text_area("What would you like to see?", height=80)
+                sent = st.form_submit_button("Request a demo", type="primary",
+                                             use_container_width=True)
+            if sent:
+                if not (dn or "").strip() or not ((de or "").strip()
+                                                  or (dp or "").strip()):
+                    st.error("Please add your name and an email or phone so we "
+                             "can reach you.")
+                else:
+                    try:
+                        tenancy.create_demo_request(
+                            name=dn, business=dbiz, email=de, phone=dp,
+                            message=dmsg)
+                        try:
+                            from .services.notifications import (
+                                smtp_configured, send_email_with_attachment)
+                            if smtp_configured():
+                                send_email_with_attachment(
+                                    to_addr=os.environ.get("DEMO_REQUEST_EMAIL",
+                                                           "hello@hagai.online"),
+                                    subject=f"Trakit365 demo request — {dn}",
+                                    body_text=(f"Name: {dn}\nBusiness: {dbiz}\n"
+                                               f"Email: {de}\nPhone: {dp}\n\n{dmsg}"))
+                        except Exception:   # noqa: BLE001 — email is best-effort
+                            pass
+                        st.success("Thanks! We've got your request — the HAG_Ai "
+                                   "team will reach out shortly.")
+                    except Exception:   # noqa: BLE001
+                        st.error("Sorry, we couldn't submit that just now. "
+                                 "Please email hello@hagai.online.")
     st.stop()
 
 
