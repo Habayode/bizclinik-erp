@@ -297,22 +297,35 @@ def active_tenant() -> Optional[str]:
 
 
 def _tenant_picker() -> None:
-    """Render the business/tenant chooser before login. st.stop()s until one
-    is selected. Only shown when >= 1 tenant is registered."""
+    """Pre-login business entry. We deliberately do NOT list registered
+    businesses — a visitor must not be able to enumerate tenants. Each business
+    signs in at its own web address (``<id>-erp.hagai.online``, which
+    auto-selects the tenant); on the bare domain the user types their business
+    ID. st.stop()s until a valid, active business is chosen."""
     from . import tenancy
     _render_brand_card()
     col_l, col_c, col_r = st.columns([1, 2, 1])
     with col_c:
-        st.markdown("#### Choose a business")
-        tenants = tenancy.list_tenants()
-        labels = {f"{t['name']}  ·  {t['slug']}": t["slug"] for t in tenants}
-        sel = st.selectbox("Business", list(labels.keys()))
-        if st.button("Continue", type="primary", use_container_width=True):
-            st.session_state[_TENANT_KEY] = labels[sel]
-            # New tenant => drop any prior login state.
-            for k in (_USER_KEY, _USERNAME_KEY, _ROLE_KEY, _TOKEN_KEY, _LEGACY_KEY):
-                st.session_state.pop(k, None)
-            st.rerun()
+        st.markdown("#### Sign in to your business")
+        with st.form("biz_entry"):
+            entered = st.text_input(
+                "Business ID", placeholder="your business code")
+            go = st.form_submit_button("Continue", type="primary",
+                                       use_container_width=True)
+        if go:
+            slug = (entered or "").strip().lower()
+            t = tenancy.get_tenant(slug) if slug else None
+            if t and t.get("is_active", True):
+                st.session_state[_TENANT_KEY] = slug
+                # New tenant => drop any prior login state.
+                for k in (_USER_KEY, _USERNAME_KEY, _ROLE_KEY, _TOKEN_KEY, _LEGACY_KEY):
+                    st.session_state.pop(k, None)
+                st.rerun()
+            else:
+                st.error("We couldn't find that business. Check the ID, or open "
+                         "your business web address to sign in directly.")
+        st.caption("Tip: open your business web address — e.g. "
+                   "yourbusiness-erp.hagai.online — to sign in straight away.")
     st.stop()
 
 
