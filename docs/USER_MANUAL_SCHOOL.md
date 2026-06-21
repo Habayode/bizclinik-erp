@@ -35,9 +35,12 @@ figures differ.
 
 ## 1.1 Signing in
 
-Open your school's web address (for example `yourschool-erp.hagai.online`). You
-will see a sign-in card showing **your school's name** and **🏫 School portal**.
-Enter your **Username** and **Password** and click **Sign in**.
+Open your school's web address — **`otasch-erp.hagai.online`** — and you go
+straight to your school's sign-in card (it shows the school's name and
+**🏫 School portal**). Enter your **Username** and **Password** and click
+**Sign in**. If you ever land on the shared address `erp.hagai.online` instead,
+type your Business ID **`otasch`** and click **Continue** — for privacy the
+screen no longer shows a list of schools.
 
 - Your school administrator creates a login for each staff member and gives them
   a **role** that decides what they can do (see [section 12](#12-who-can-do-what-roles)).
@@ -54,7 +57,7 @@ The left sidebar is grouped. A school sees, in order:
 | **School** | The school's day-to-day: Dashboard, Setup, Students, Fees, Attendance, Results, Teachers, Parent Notifications. |
 | **Bursary** | The money side: a finance dashboard, banking, purchases/bills, the general ledger and all financial reports. |
 | **HR** | Staff: Employees, Recruitment, Leave, Payroll. |
-| **System** | Settings, Admin (users), Notifications, Data and this Manual. |
+| **System** | Settings, Admin (users), Notifications, and this Manual. |
 
 The **School Dashboard** is your home page — it opens first when you sign in.
 
