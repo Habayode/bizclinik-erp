@@ -16,7 +16,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from ..db import Base
+from ..db import Base, Money
 
 
 class LeadStatus(str, enum.Enum):
@@ -74,7 +74,7 @@ class Deal(Base):
     lead_id: Mapped[Optional[int]] = mapped_column(ForeignKey("crm_lead.id"))
     customer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("customer.id"))
     stage: Mapped[DealStage] = mapped_column(Enum(DealStage), default=DealStage.LEAD)
-    amount: Mapped[float] = mapped_column(Float, default=0.0)
+    amount: Mapped[float] = mapped_column(Money, default=0.0)
     currency_code: Mapped[str] = mapped_column(String(3), default="NGN")
     expected_close: Mapped[Optional[date]] = mapped_column(Date)
     owner_user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("user.id"))

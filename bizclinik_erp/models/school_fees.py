@@ -18,7 +18,7 @@ from typing import Optional
 from sqlalchemy import Date, Float, ForeignKey, Integer, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from ..db import Base
+from ..db import Base, Money
 
 
 class StudentFeeBilling(Base):
@@ -39,7 +39,7 @@ class StudentFeeBilling(Base):
     due_date: Mapped[Optional[date]] = mapped_column(Date)
     sales_invoice_id: Mapped[int] = mapped_column(
         ForeignKey("sales_invoice.id"), nullable=False)
-    total_amount: Mapped[float] = mapped_column(Float, default=0.0)
+    total_amount: Mapped[float] = mapped_column(Money, default=0.0)
 
     student = relationship("Student")
     academic_session = relationship("AcademicSession")

@@ -21,7 +21,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from ..db import Base
+from ..db import Base, Money
 
 
 class DocStatus(str, enum.Enum):
@@ -98,8 +98,8 @@ class JournalLine(Base):
         ForeignKey("journal_entry.id", ondelete="CASCADE"), nullable=False
     )
     account_id: Mapped[int] = mapped_column(ForeignKey("account.id"), nullable=False)
-    debit: Mapped[float] = mapped_column(Float, default=0.0)
-    credit: Mapped[float] = mapped_column(Float, default=0.0)
+    debit: Mapped[float] = mapped_column(Money, default=0.0)
+    credit: Mapped[float] = mapped_column(Money, default=0.0)
     memo: Mapped[Optional[str]] = mapped_column(String(255))
     # Optional contact pointers for AR/AP sub-ledger inquiry.
     customer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("customer.id"))
@@ -149,7 +149,7 @@ class QuotationLine(Base):
     product_id: Mapped[Optional[int]] = mapped_column(ForeignKey("product.id"))
     description: Mapped[str] = mapped_column(String(255), nullable=False)
     qty: Mapped[float] = mapped_column(Float, default=0.0)
-    unit_price: Mapped[float] = mapped_column(Float, default=0.0)
+    unit_price: Mapped[float] = mapped_column(Money, default=0.0)
     tax_rate: Mapped[float] = mapped_column(Float, default=0.0)
 
     quotation: Mapped[Quotation] = relationship(back_populates="lines")
@@ -195,7 +195,7 @@ class SalesOrderLine(Base):
     product_id: Mapped[Optional[int]] = mapped_column(ForeignKey("product.id"))
     description: Mapped[str] = mapped_column(String(255), nullable=False)
     qty: Mapped[float] = mapped_column(Float, default=0.0)
-    unit_price: Mapped[float] = mapped_column(Float, default=0.0)
+    unit_price: Mapped[float] = mapped_column(Money, default=0.0)
     tax_rate: Mapped[float] = mapped_column(Float, default=0.0)
 
     order: Mapped[SalesOrder] = relationship(back_populates="lines")
@@ -212,7 +212,7 @@ class SalesInvoice(Base):
     sales_order_id: Mapped[Optional[int]] = mapped_column(ForeignKey("sales_order.id"))
     notes: Mapped[Optional[str]] = mapped_column(Text)
     status: Mapped[DocStatus] = mapped_column(Enum(DocStatus), default=DocStatus.DRAFT)
-    amount_paid: Mapped[float] = mapped_column(Float, default=0.0)
+    amount_paid: Mapped[float] = mapped_column(Money, default=0.0)
     je_id: Mapped[Optional[int]] = mapped_column(ForeignKey("journal_entry.id"))
     cogs_je_id: Mapped[Optional[int]] = mapped_column(ForeignKey("journal_entry.id"))
     # Multi-currency: document is denominated in `currency_code`; `fx_rate` is
@@ -253,8 +253,8 @@ class SalesInvoiceLine(Base):
     product_id: Mapped[Optional[int]] = mapped_column(ForeignKey("product.id"))
     description: Mapped[str] = mapped_column(String(255), nullable=False)
     qty: Mapped[float] = mapped_column(Float, default=0.0)
-    unit_price: Mapped[float] = mapped_column(Float, default=0.0)
-    unit_cost: Mapped[float] = mapped_column(Float, default=0.0)  # captured at invoice
+    unit_price: Mapped[float] = mapped_column(Money, default=0.0)
+    unit_cost: Mapped[float] = mapped_column(Money, default=0.0)  # captured at invoice
     tax_rate: Mapped[float] = mapped_column(Float, default=0.0)
 
     invoice: Mapped[SalesInvoice] = relationship(back_populates="lines")
@@ -286,11 +286,11 @@ class Receipt(Base):
     customer_id: Mapped[int] = mapped_column(ForeignKey("customer.id"), nullable=False)
     invoice_id: Mapped[Optional[int]] = mapped_column(ForeignKey("sales_invoice.id"))
     bank_account_id: Mapped[int] = mapped_column(ForeignKey("bank_account.id"), nullable=False)
-    amount: Mapped[float] = mapped_column(Float, nullable=False)
+    amount: Mapped[float] = mapped_column(Money, nullable=False)
     # Amount applied to the invoice, in the invoice's currency (see
     # services.sales.record_receipt); equals `amount` for NGN. A void reverses
     # invoice.amount_paid by these same units, not the NGN cash figure.
-    applied_amount: Mapped[float] = mapped_column(Float, default=0.0)
+    applied_amount: Mapped[float] = mapped_column(Money, default=0.0)
     method: Mapped[str] = mapped_column(String(32), default="BANK")  # BANK | CASH | CARD
     reference: Mapped[Optional[str]] = mapped_column(String(64))
     je_id: Mapped[Optional[int]] = mapped_column(ForeignKey("journal_entry.id"))
@@ -329,7 +329,7 @@ class PurchaseOrderLine(Base):
     product_id: Mapped[Optional[int]] = mapped_column(ForeignKey("product.id"))
     description: Mapped[str] = mapped_column(String(255), nullable=False)
     qty: Mapped[float] = mapped_column(Float, default=0.0)
-    unit_cost: Mapped[float] = mapped_column(Float, default=0.0)
+    unit_cost: Mapped[float] = mapped_column(Money, default=0.0)
     tax_rate: Mapped[float] = mapped_column(Float, default=0.0)
 
     order: Mapped[PurchaseOrder] = relationship(back_populates="lines")
@@ -346,7 +346,7 @@ class Bill(Base):
     po_id: Mapped[Optional[int]] = mapped_column(ForeignKey("purchase_order.id"))
     notes: Mapped[Optional[str]] = mapped_column(Text)
     status: Mapped[DocStatus] = mapped_column(Enum(DocStatus), default=DocStatus.DRAFT)
-    amount_paid: Mapped[float] = mapped_column(Float, default=0.0)
+    amount_paid: Mapped[float] = mapped_column(Money, default=0.0)
     je_id: Mapped[Optional[int]] = mapped_column(ForeignKey("journal_entry.id"))
     # Multi-currency: see SalesInvoice. NGN / 1.0 by default.
     currency_code: Mapped[str] = mapped_column(String(3), default="NGN")
@@ -384,7 +384,7 @@ class BillLine(Base):
     product_id: Mapped[Optional[int]] = mapped_column(ForeignKey("product.id"))
     description: Mapped[str] = mapped_column(String(255), nullable=False)
     qty: Mapped[float] = mapped_column(Float, default=0.0)
-    unit_cost: Mapped[float] = mapped_column(Float, default=0.0)
+    unit_cost: Mapped[float] = mapped_column(Money, default=0.0)
     tax_rate: Mapped[float] = mapped_column(Float, default=0.0)
     # Optional override of the inventory/expense account this line posts to.
     account_id: Mapped[Optional[int]] = mapped_column(ForeignKey("account.id"))
@@ -416,9 +416,9 @@ class Payment(Base):
     supplier_id: Mapped[int] = mapped_column(ForeignKey("supplier.id"), nullable=False)
     bill_id: Mapped[Optional[int]] = mapped_column(ForeignKey("bill.id"))
     bank_account_id: Mapped[int] = mapped_column(ForeignKey("bank_account.id"), nullable=False)
-    amount: Mapped[float] = mapped_column(Float, nullable=False)
+    amount: Mapped[float] = mapped_column(Money, nullable=False)
     # Amount applied to the bill, in the bill's currency (see record_payment).
-    applied_amount: Mapped[float] = mapped_column(Float, default=0.0)
+    applied_amount: Mapped[float] = mapped_column(Money, default=0.0)
     method: Mapped[str] = mapped_column(String(32), default="BANK")
     reference: Mapped[Optional[str]] = mapped_column(String(64))
     je_id: Mapped[Optional[int]] = mapped_column(ForeignKey("journal_entry.id"))
@@ -442,8 +442,8 @@ class StockMovement(Base):
     warehouse_id: Mapped[Optional[int]] = mapped_column(ForeignKey("warehouse.id"))
     qty_in: Mapped[float] = mapped_column(Float, default=0.0)
     qty_out: Mapped[float] = mapped_column(Float, default=0.0)
-    unit_cost: Mapped[float] = mapped_column(Float, default=0.0)
-    avg_cost_after: Mapped[float] = mapped_column(Float, default=0.0)
+    unit_cost: Mapped[float] = mapped_column(Money, default=0.0)
+    avg_cost_after: Mapped[float] = mapped_column(Money, default=0.0)
     qty_on_hand_after: Mapped[float] = mapped_column(Float, default=0.0)
     source_kind: Mapped[Optional[str]] = mapped_column(String(32))  # BILL|INVOICE|ADJUSTMENT|OPENING
     source_id: Mapped[Optional[int]] = mapped_column(Integer)
@@ -479,12 +479,12 @@ class PayrollPayslip(Base):
         ForeignKey("payroll_run.id", ondelete="CASCADE"), nullable=False
     )
     employee_id: Mapped[int] = mapped_column(ForeignKey("employee.id"), nullable=False)
-    gross: Mapped[float] = mapped_column(Float, default=0.0)
-    paye: Mapped[float] = mapped_column(Float, default=0.0)
-    pension_employee: Mapped[float] = mapped_column(Float, default=0.0)
-    pension_employer: Mapped[float] = mapped_column(Float, default=0.0)
-    other_deductions: Mapped[float] = mapped_column(Float, default=0.0)
-    net_pay: Mapped[float] = mapped_column(Float, default=0.0)
+    gross: Mapped[float] = mapped_column(Money, default=0.0)
+    paye: Mapped[float] = mapped_column(Money, default=0.0)
+    pension_employee: Mapped[float] = mapped_column(Money, default=0.0)
+    pension_employer: Mapped[float] = mapped_column(Money, default=0.0)
+    other_deductions: Mapped[float] = mapped_column(Money, default=0.0)
+    net_pay: Mapped[float] = mapped_column(Money, default=0.0)
 
     run: Mapped[PayrollRun] = relationship(back_populates="payslips")
     employee = relationship("Employee")

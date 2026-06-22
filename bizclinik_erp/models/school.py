@@ -19,7 +19,7 @@ from sqlalchemy import (Boolean, Date, Float, ForeignKey, Integer, String,
                         UniqueConstraint)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from ..db import Base
+from ..db import Base, Money
 
 
 class AcademicSession(Base):
@@ -96,7 +96,7 @@ class StudentFeeSchedule(Base):
     class_id: Mapped[Optional[int]] = mapped_column(ForeignKey("school_class.id"))
     fee_type_id: Mapped[int] = mapped_column(ForeignKey("fee_type.id"), nullable=False)
     term_number: Mapped[int] = mapped_column(Integer, default=0, nullable=False)  # 0=annual
-    amount: Mapped[float] = mapped_column(Float, default=0.0)
+    amount: Mapped[float] = mapped_column(Money, default=0.0)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     fee_type = relationship("FeeType")

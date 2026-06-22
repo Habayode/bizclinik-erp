@@ -27,7 +27,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from ..db import Base
+from ..db import Base, Money
 
 
 class RecurringKind(str, enum.Enum):
@@ -72,8 +72,8 @@ class RecurringTemplate(Base):
     # Shared line fields for INVOICE + BILL
     line_description: Mapped[Optional[str]] = mapped_column(String(255))
     qty: Mapped[Optional[float]] = mapped_column(Float)
-    unit_price: Mapped[Optional[float]] = mapped_column(Float)   # INVOICE
-    unit_cost: Mapped[Optional[float]] = mapped_column(Float)    # BILL
+    unit_price: Mapped[Optional[float]] = mapped_column(Money)   # INVOICE
+    unit_cost: Mapped[Optional[float]] = mapped_column(Money)    # BILL
     tax_rate: Mapped[Optional[float]] = mapped_column(Float)
 
     # JOURNAL fields

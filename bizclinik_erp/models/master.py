@@ -17,7 +17,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from ..db import Base
+from ..db import Base, Money
 
 
 # ---- Chart of Accounts -----------------------------------------------------
@@ -111,7 +111,7 @@ class Customer(Base):
     phone: Mapped[Optional[str]] = mapped_column(String(64))
     address: Mapped[Optional[str]] = mapped_column(String(512))
     receivable_account_id: Mapped[Optional[int]] = mapped_column(ForeignKey("account.id"))
-    credit_limit: Mapped[float] = mapped_column(Float, default=0.0)
+    credit_limit: Mapped[float] = mapped_column(Money, default=0.0)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     receivable_account: Mapped[Optional[Account]] = relationship()
@@ -149,10 +149,10 @@ class Product(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(String(512))
     unit: Mapped[str] = mapped_column(String(16), default="ea")
-    standard_price: Mapped[float] = mapped_column(Float, default=0.0)
-    standard_cost: Mapped[float] = mapped_column(Float, default=0.0)
+    standard_price: Mapped[float] = mapped_column(Money, default=0.0)
+    standard_cost: Mapped[float] = mapped_column(Money, default=0.0)
     # Running weighted-average cost — updated by inventory.service on receipt.
-    avg_cost: Mapped[float] = mapped_column(Float, default=0.0)
+    avg_cost: Mapped[float] = mapped_column(Money, default=0.0)
     qty_on_hand: Mapped[float] = mapped_column(Float, default=0.0)
     reorder_level: Mapped[float] = mapped_column(Float, default=0.0)
     is_stockable: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -179,7 +179,7 @@ class BankAccount(Base):
     bank: Mapped[Optional[str]] = mapped_column(String(128))
     account_number: Mapped[Optional[str]] = mapped_column(String(64))
     gl_account_id: Mapped[int] = mapped_column(ForeignKey("account.id"), nullable=False)
-    opening_balance: Mapped[float] = mapped_column(Float, default=0.0)
+    opening_balance: Mapped[float] = mapped_column(Money, default=0.0)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     gl_account: Mapped[Account] = relationship()
@@ -192,7 +192,7 @@ class Employee(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     email: Mapped[Optional[str]] = mapped_column(String(255))
     phone: Mapped[Optional[str]] = mapped_column(String(64))
-    monthly_gross: Mapped[float] = mapped_column(Float, default=0.0)
+    monthly_gross: Mapped[float] = mapped_column(Money, default=0.0)
     paye_rate: Mapped[float] = mapped_column(Float, default=0.0)
     pension_rate: Mapped[float] = mapped_column(Float, default=0.08)  # 8% employee
     pension_employer_rate: Mapped[float] = mapped_column(Float, default=0.10)

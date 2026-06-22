@@ -52,7 +52,10 @@ NON_MONEY_COLUMNS = {
 def money_columns() -> list[tuple[str, str]]:
     """Derive (table, column) money pairs from the ORM: Float columns minus the
     known non-money names. Print and eyeball this list before applying."""
-    from sqlalchemy import Float
+    # Numeric covers both legacy Float columns (Float subclasses Numeric) and
+    # the new Money type (Numeric(18,2)); the NON_MONEY_COLUMNS name filter
+    # below keeps quantities/rates/scores out either way.
+    from sqlalchemy import Numeric as Float  # noqa: N813 (kept name for minimal diff)
     out: list[tuple[str, str]] = []
     for table in Base.metadata.sorted_tables:
         for col in table.columns:

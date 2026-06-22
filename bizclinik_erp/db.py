@@ -16,7 +16,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator, Optional
 
-from sqlalchemy import create_engine, event
+from sqlalchemy import Numeric, create_engine, event
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
@@ -25,6 +25,15 @@ from .config import get_settings
 
 class Base(DeclarativeBase):
     """Single declarative base for all per-tenant ORM models."""
+
+
+# Monetary column type. Stores as NUMERIC(18,2) — exact decimal on Postgres,
+# matching the production decimalize migration — so newly provisioned tenants
+# and fresh installs get exact money storage from create_all(). asdecimal=False
+# keeps Python-side values as float, so the service layer needs no Decimal
+# refactor and there is no Decimal/float mixing. Quantities, rates and scores
+# intentionally stay Float (they are not 2dp money).
+Money = Numeric(18, 2, asdecimal=False)
 
 
 @event.listens_for(Engine, "connect")

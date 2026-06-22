@@ -28,7 +28,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from ..db import Base
+from ..db import Base, Money
 
 
 class StatementStatus(str, enum.Enum):
@@ -46,8 +46,8 @@ class BankStatement(Base):
     )
     period_start: Mapped[date] = mapped_column(Date, nullable=False)
     period_end: Mapped[date] = mapped_column(Date, nullable=False)
-    opening_balance: Mapped[float] = mapped_column(Float, default=0.0)
-    closing_balance: Mapped[float] = mapped_column(Float, default=0.0)
+    opening_balance: Mapped[float] = mapped_column(Money, default=0.0)
+    closing_balance: Mapped[float] = mapped_column(Money, default=0.0)
     source_file: Mapped[Optional[str]] = mapped_column(String(255))
     imported_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow
@@ -77,7 +77,7 @@ class BankStatementLine(Base):
     )
     txn_date: Mapped[date] = mapped_column(Date, nullable=False)
     description: Mapped[str] = mapped_column(String(512), default="")
-    amount: Mapped[float] = mapped_column(Float, nullable=False)
+    amount: Mapped[float] = mapped_column(Money, nullable=False)
     reference: Mapped[Optional[str]] = mapped_column(String(64))
     matched_je_line_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("journal_line.id"), nullable=True

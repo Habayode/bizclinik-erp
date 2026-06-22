@@ -22,7 +22,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from ..db import Base
+from ..db import Base, Money
 
 
 class DepreciationMethod(str, enum.Enum):
@@ -49,8 +49,8 @@ class FixedAsset(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     category: Mapped[str] = mapped_column(String(64), nullable=False)
     acquired_date: Mapped[date] = mapped_column(Date, nullable=False)
-    cost: Mapped[float] = mapped_column(Float, nullable=False)
-    salvage_value: Mapped[float] = mapped_column(Float, default=0.0)
+    cost: Mapped[float] = mapped_column(Money, nullable=False)
+    salvage_value: Mapped[float] = mapped_column(Money, default=0.0)
     useful_life_months: Mapped[int] = mapped_column(Integer, nullable=False)
     depreciation_method: Mapped[DepreciationMethod] = mapped_column(
         Enum(DepreciationMethod), default=DepreciationMethod.STRAIGHT_LINE
@@ -68,10 +68,10 @@ class FixedAsset(Base):
         Enum(AssetStatus), default=AssetStatus.ACTIVE
     )
     disposed_date: Mapped[Optional[date]] = mapped_column(Date)
-    disposal_proceeds: Mapped[Optional[float]] = mapped_column(Float)
+    disposal_proceeds: Mapped[Optional[float]] = mapped_column(Money)
     # Running total of depreciation booked against this asset. Kept in sync
     # by run_depreciation() so the register doesn't need to scan the GL.
-    accumulated_depreciation: Mapped[float] = mapped_column(Float, default=0.0)
+    accumulated_depreciation: Mapped[float] = mapped_column(Money, default=0.0)
     last_depreciation_date: Mapped[Optional[date]] = mapped_column(Date)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 

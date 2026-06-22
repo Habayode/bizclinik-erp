@@ -21,7 +21,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from ..db import Base
+from ..db import Base, Money
 
 
 class Budget(Base):
@@ -58,7 +58,7 @@ class BudgetLine(Base):
     )
     account_id: Mapped[int] = mapped_column(ForeignKey("account.id"), nullable=False)
     month: Mapped[int] = mapped_column(Integer, nullable=False)  # 1-12
-    amount: Mapped[float] = mapped_column(Float, default=0.0)
+    amount: Mapped[float] = mapped_column(Money, default=0.0)
 
     budget: Mapped["Budget"] = relationship("Budget", back_populates="lines")
 

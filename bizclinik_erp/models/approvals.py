@@ -19,7 +19,7 @@ from typing import Optional
 from sqlalchemy import DateTime, Enum, Float, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ..db import Base
+from ..db import Base, Money
 
 
 class ApprovalStatus(str, enum.Enum):
@@ -34,7 +34,7 @@ class ApprovalLimit(Base):
     __tablename__ = "approval_limit"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     role: Mapped[str] = mapped_column(String(32), unique=True, nullable=False)
-    limit_ngn: Mapped[Optional[float]] = mapped_column(Float)  # None = unlimited
+    limit_ngn: Mapped[Optional[float]] = mapped_column(Money)  # None = unlimited
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
@@ -43,7 +43,7 @@ class ApprovalRequest(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     doc_type: Mapped[str] = mapped_column(String(20), nullable=False)  # BILL/PO/PAYMENT/PAYROLL
     title: Mapped[str] = mapped_column(String(255), nullable=False)
-    amount_ngn: Mapped[float] = mapped_column(Float, default=0.0)
+    amount_ngn: Mapped[float] = mapped_column(Money, default=0.0)
     payload_json: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[ApprovalStatus] = mapped_column(
         Enum(ApprovalStatus), default=ApprovalStatus.PENDING)
