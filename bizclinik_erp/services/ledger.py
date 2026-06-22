@@ -64,6 +64,14 @@ def post_journal(
     if not line_list:
         raise ValueError("Refusing to post an empty journal entry.")
 
+    # A manual journal (no source document) requires post.journal at the service
+    # layer — defense-in-depth beyond the page gate. Service-driven postings
+    # (sales/purchase/payroll/banking/reversal/etc.) always carry a source_kind
+    # and are gated by their own service permission, so they pass through here.
+    if source_kind is None:
+        from .. import authz
+        authz.require_perm("post.journal")
+
     total_dr = msum(l.debit for l in line_list)
     total_cr = msum(l.credit for l in line_list)
     if abs(total_dr - total_cr) > 0.01:

@@ -26,6 +26,7 @@ from ..models import (
     StockMovement,
 )
 from ..models.audit import AuditAction
+from .. import authz
 from .audit import record
 from .ledger import reverse_journal
 
@@ -71,6 +72,7 @@ def _reverse_stock_movements(session: Session, source_kind: str, source_id: int,
 def void_invoice(session: Session, invoice_id: int, *,
                   reason: str, on: Optional[date] = None,
                   user_id: Optional[int] = None) -> dict:
+    authz.require_perm("void.any")
     inv = session.get(SalesInvoice, invoice_id)
     if not inv:
         raise ValueError("Invoice not found.")
@@ -113,6 +115,7 @@ def void_invoice(session: Session, invoice_id: int, *,
 def void_bill(session: Session, bill_id: int, *,
                 reason: str, on: Optional[date] = None,
                 user_id: Optional[int] = None) -> dict:
+    authz.require_perm("void.any")
     bill = session.get(Bill, bill_id)
     if not bill:
         raise ValueError("Bill not found.")
@@ -154,6 +157,7 @@ def void_bill(session: Session, bill_id: int, *,
 def void_receipt(session: Session, receipt_id: int, *,
                   reason: str, on: Optional[date] = None,
                   user_id: Optional[int] = None) -> dict:
+    authz.require_perm("void.any")
     rct = session.get(Receipt, receipt_id)
     if not rct:
         raise ValueError("Receipt not found.")
@@ -194,6 +198,7 @@ def void_receipt(session: Session, receipt_id: int, *,
 def void_payment(session: Session, payment_id: int, *,
                   reason: str, on: Optional[date] = None,
                   user_id: Optional[int] = None) -> dict:
+    authz.require_perm("void.any")
     pay = session.get(Payment, payment_id)
     if not pay:
         raise ValueError("Payment not found.")
