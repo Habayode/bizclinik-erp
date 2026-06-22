@@ -38,9 +38,14 @@ from bizclinik_erp.config import get_settings
 # Float columns that are NOT money (quantities, rates, scores, days). Every
 # other Float column in the schema is treated as money and converted.
 NON_MONEY_COLUMNS = {
+    # quantities
     "qty", "qty_on_hand", "qty_in", "qty_out", "qty_on_hand_after",
-    "reorder_level", "tax_rate", "fx_rate", "paye_rate", "pension_rate",
-    "annual_leave_days", "ca_score", "exam_score", "days",
+    "reorder_level", "annual_leave_days", "days",
+    # rates / percentages — MUST NOT be rounded to 2dp (would corrupt FX & tax)
+    "rate", "tax_rate", "fx_rate", "paye_rate", "pension_rate",
+    "pension_employer_rate", "pension_employee_rate",
+    # exam scores / non-money totals
+    "ca_score", "exam_score", "total",
 }
 
 
