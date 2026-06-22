@@ -7,6 +7,7 @@ from typing import Optional
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     Date,
     DateTime,
     Enum,
@@ -80,6 +81,17 @@ class JournalEntry(Base):
 
 class JournalLine(Base):
     __tablename__ = "journal_line"
+    # Database-level backstop for the double-entry invariants that
+    # services.ledger.post_journal enforces in Python: amounts are non-negative
+    # and a line is single-sided. (DR==CR is a cross-row aggregate and is
+    # re-asserted in post_journal after flush.) Applies to all freshly created
+    # databases; existing SQLite tables keep the Python guard.
+    __table_args__ = (
+        CheckConstraint("debit >= 0", name="ck_journal_line_debit_nonneg"),
+        CheckConstraint("credit >= 0", name="ck_journal_line_credit_nonneg"),
+        CheckConstraint("NOT (debit > 0 AND credit > 0)",
+                        name="ck_journal_line_single_sided"),
+    )
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     entry_id: Mapped[int] = mapped_column(
         ForeignKey("journal_entry.id", ondelete="CASCADE"), nullable=False
@@ -274,6 +286,10 @@ class Receipt(Base):
     invoice_id: Mapped[Optional[int]] = mapped_column(ForeignKey("sales_invoice.id"))
     bank_account_id: Mapped[int] = mapped_column(ForeignKey("bank_account.id"), nullable=False)
     amount: Mapped[float] = mapped_column(Float, nullable=False)
+    # Amount applied to the invoice, in the invoice's currency (see
+    # services.sales.record_receipt); equals `amount` for NGN. A void reverses
+    # invoice.amount_paid by these same units, not the NGN cash figure.
+    applied_amount: Mapped[float] = mapped_column(Float, default=0.0)
     method: Mapped[str] = mapped_column(String(32), default="BANK")  # BANK | CASH | CARD
     reference: Mapped[Optional[str]] = mapped_column(String(64))
     je_id: Mapped[Optional[int]] = mapped_column(ForeignKey("journal_entry.id"))
@@ -400,6 +416,8 @@ class Payment(Base):
     bill_id: Mapped[Optional[int]] = mapped_column(ForeignKey("bill.id"))
     bank_account_id: Mapped[int] = mapped_column(ForeignKey("bank_account.id"), nullable=False)
     amount: Mapped[float] = mapped_column(Float, nullable=False)
+    # Amount applied to the bill, in the bill's currency (see record_payment).
+    applied_amount: Mapped[float] = mapped_column(Float, default=0.0)
     method: Mapped[str] = mapped_column(String(32), default="BANK")
     reference: Mapped[Optional[str]] = mapped_column(String(64))
     je_id: Mapped[Optional[int]] = mapped_column(ForeignKey("journal_entry.id"))

@@ -44,7 +44,7 @@ named tunnel + DNS, Windows services, and starts everything.
    Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
    .\deploy\bootstrap.ps1 `
        -Subdomain "erp.hagai.online" `
-       -Password  "uBJMglKjLhcWS4KkNjSe"
+       -Password  "<APP_PASSWORD — see password manager / Downloads\BizClinik_ERP_SECRETS.md, never commit>"
    ```
 
    The script is idempotent — safe to re-run if anything fails.
@@ -56,7 +56,7 @@ named tunnel + DNS, Windows services, and starts everything.
 
 6. **Wait ~30 seconds** for DNS propagation, then open
    **https://erp.hagai.online**. The lock screen appears.
-   Password: `uBJMglKjLhcWS4KkNjSe`.
+   Password: `<APP_PASSWORD — see password manager / Downloads\BizClinik_ERP_SECRETS.md, never commit>`.
 
 ## Verifying after deploy
 
@@ -108,7 +108,7 @@ Stop-Service cloudflared
 | Item                        | Value |
 |-----------------------------|-------|
 | Subdomain                   | erp.hagai.online |
-| App password                | `uBJMglKjLhcWS4KkNjSe` |
+| App password                | `<APP_PASSWORD — see password manager / Downloads\BizClinik_ERP_SECRETS.md, never commit>` |
 | Tunnel name                 | bizclinik-erp |
 | Local port                  | 8501 |
 | DB path on VPS              | `C:\opt\bizclinik-erp\data\bizclinik.db` |

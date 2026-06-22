@@ -111,6 +111,15 @@ def post_journal(
         ))
     session.add(entry)
     session.flush()
+    # Defense-in-depth: re-assert balance from the persisted, per-line-rounded
+    # amounts. Catches rounding drift across many lines and any future write
+    # that reaches the DB bypassing the pre-flush input check above. The
+    # session rolls back on this raise (see db.get_session).
+    pdr = round(sum(l.debit for l in entry.lines), 2)
+    pcr = round(sum(l.credit for l in entry.lines), 2)
+    if abs(pdr - pcr) > 0.01:
+        raise ValueError(
+            f"Journal entry unbalanced after persist: DR {pdr:,.2f} != CR {pcr:,.2f}.")
     return entry
 
 
@@ -200,11 +209,9 @@ def trial_balance(session: Session, *, as_of: Optional[date] = None) -> list[dic
         dr, cr = float(r.dr or 0), float(r.cr or 0)
         if dr == 0 and cr == 0:
             continue
-        normal = NORMAL_BALANCE[r.type]
-        if normal == "DR":
-            dr_bal, cr_bal = max(dr - cr, 0), max(cr - dr, 0)
-        else:
-            dr_bal, cr_bal = max(dr - cr, 0), max(cr - dr, 0)
+        # Net each account onto whichever side it actually lands; the maths is
+        # the same regardless of the account's normal balance.
+        dr_bal, cr_bal = max(dr - cr, 0), max(cr - dr, 0)
         rows.append({
             "code": r.code, "name": r.name, "type": r.type.value,
             "debit": round(dr_bal, 2), "credit": round(cr_bal, 2),

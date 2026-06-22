@@ -244,6 +244,8 @@ def record_payment(
         supplier_id=supplier_id, bill_id=bill_id,
         bank_account_id=bank_account_id,
         amount=ngn_from_bank,
+        # Amount applied to the bill, in the BILL's currency (see record_receipt).
+        applied_amount=amount,
         method=method, reference=reference,
         status=DocStatus.DRAFT,
     )

@@ -359,6 +359,10 @@ def record_receipt(
         invoice_id=invoice_id,
         bank_account_id=bank_account_id,
         amount=ngn_to_bank,
+        # Amount applied to the invoice, in the INVOICE's currency — so a void
+        # subtracts exactly what was added to invoice.amount_paid (which is
+        # tracked in invoice currency), not the NGN cash figure.
+        applied_amount=amount,
         method=method,
         reference=reference,
         status=DocStatus.DRAFT,

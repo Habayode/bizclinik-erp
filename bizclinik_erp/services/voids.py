@@ -169,10 +169,19 @@ def void_receipt(session: Session, receipt_id: int, *,
     if rct.invoice_id:
         inv = session.get(SalesInvoice, rct.invoice_id)
         if inv:
-            inv.amount_paid = round(inv.amount_paid - rct.amount, 2)
-            if inv.amount_paid + 0.01 < inv.grand_total and inv.status == DocStatus.PAID:
-                inv.status = (DocStatus.PARTIAL if inv.amount_paid > 0
-                               else DocStatus.POSTED)
+            # Reverse by the invoice-currency amount applied (not the NGN cash
+            # figure rct.amount), so foreign-currency invoices don't corrupt
+            # amount_paid. Legacy receipts (applied_amount 0) fall back to amount
+            # — exact for NGN, which is all historical data.
+            applied = rct.applied_amount or rct.amount
+            inv.amount_paid = round(inv.amount_paid - applied, 2)
+            if inv.status != DocStatus.CANCELLED:
+                if inv.amount_paid + 0.01 >= inv.grand_total:
+                    inv.status = DocStatus.PAID
+                elif inv.amount_paid > 0:
+                    inv.status = DocStatus.PARTIAL
+                else:
+                    inv.status = DocStatus.POSTED
     rct.status = DocStatus.CANCELLED
     record(session, action=AuditAction.VOID, entity_type="receipt",
            entity_id=rct.id, description=f"Voided receipt {rct.number}: {reason}",
@@ -199,10 +208,16 @@ def void_payment(session: Session, payment_id: int, *,
     if pay.bill_id:
         bill = session.get(Bill, pay.bill_id)
         if bill:
-            bill.amount_paid = round(bill.amount_paid - pay.amount, 2)
-            if bill.amount_paid + 0.01 < bill.grand_total and bill.status == DocStatus.PAID:
-                bill.status = (DocStatus.PARTIAL if bill.amount_paid > 0
-                                else DocStatus.POSTED)
+            # Reverse by the bill-currency amount applied (see void_receipt).
+            applied = pay.applied_amount or pay.amount
+            bill.amount_paid = round(bill.amount_paid - applied, 2)
+            if bill.status != DocStatus.CANCELLED:
+                if bill.amount_paid + 0.01 >= bill.grand_total:
+                    bill.status = DocStatus.PAID
+                elif bill.amount_paid > 0:
+                    bill.status = DocStatus.PARTIAL
+                else:
+                    bill.status = DocStatus.POSTED
     pay.status = DocStatus.CANCELLED
     record(session, action=AuditAction.VOID, entity_type="payment",
            entity_id=pay.id, description=f"Voided payment {pay.number}: {reason}",
