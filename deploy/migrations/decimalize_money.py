@@ -120,9 +120,10 @@ def main(argv=None) -> int:
     results.append(migrate_active_db(dry_run=args.dry_run))
     if args.all_tenants:
         for t in tenancy.list_tenants():
-            tenancy.set_active(t.slug)
+            slug = t["slug"] if isinstance(t, dict) else t.slug
+            tenancy.set_active(slug)
             r = migrate_active_db(dry_run=args.dry_run)
-            r["tenant"] = t.slug
+            r["tenant"] = slug
             results.append(r)
 
     for r in results:
