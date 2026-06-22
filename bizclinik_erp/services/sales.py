@@ -339,7 +339,10 @@ def record_receipt(
     accts = _resolve_accounts(session)
     ar_account_id = customer.receivable_account_id or accts["AR"].id
 
-    invoice = session.get(SalesInvoice, invoice_id) if invoice_id else None
+    # Lock the invoice row for the amount_paid read-modify-write below
+    # (FOR UPDATE on Postgres; no-op on SQLite).
+    invoice = (session.get(SalesInvoice, invoice_id, with_for_update=True)
+               if invoice_id else None)
     if invoice and amount > invoice.outstanding + 0.01:
         raise ValueError(
             f"Receipt {amount:,.2f} exceeds the outstanding balance "

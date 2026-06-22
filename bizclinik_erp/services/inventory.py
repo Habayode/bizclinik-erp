@@ -24,6 +24,9 @@ def record_stock_in(
     """
     if qty <= 0:
         raise ValueError("Stock-in qty must be positive.")
+    # Lock the product row so concurrent stock moves serialise the weighted-avg
+    # read-modify-write (SELECT ... FOR UPDATE on Postgres; a no-op on SQLite).
+    product = session.get(Product, product.id, with_for_update=True)
     on_hand = product.qty_on_hand or 0.0
     avg = product.avg_cost or 0.0
     if on_hand + qty <= 0:
@@ -54,6 +57,8 @@ def record_stock_out(
     """Record stock issue (sale / adjustment-out). Avg cost is unchanged."""
     if qty <= 0:
         raise ValueError("Stock-out qty must be positive.")
+    # Lock the product row (FOR UPDATE on Postgres; no-op on SQLite).
+    product = session.get(Product, product.id, with_for_update=True)
     if unit_cost is None:
         unit_cost = product.avg_cost or 0.0
     product.qty_on_hand = round((product.qty_on_hand or 0.0) - qty, 4)

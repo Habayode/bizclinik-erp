@@ -225,7 +225,9 @@ def record_payment(
     accts = _resolve_accounts(session)
     ap_acct = supplier.payable_account_id or accts["AP"].id
 
-    bill = session.get(Bill, bill_id) if bill_id else None
+    # Lock the bill row for the amount_paid read-modify-write below
+    # (FOR UPDATE on Postgres; no-op on SQLite).
+    bill = session.get(Bill, bill_id, with_for_update=True) if bill_id else None
     if bill and amount > bill.outstanding + 0.01:
         raise ValueError(
             f"Payment {amount:,.2f} exceeds the outstanding balance "

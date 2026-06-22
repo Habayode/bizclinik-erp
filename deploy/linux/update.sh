@@ -41,6 +41,9 @@ run_py init
 echo "==> Schema migration across default + every tenant DB"
 run_py migrate
 
+echo "==> Production hardening (NUMERIC money + ledger CHECK constraints; Postgres-only, idempotent)"
+run_py harden
+
 chown -R bizclinik:bizclinik "$APP_DIR"
 
 # ---- User-manual PDF (served by the in-app Download button) -----------------

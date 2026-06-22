@@ -45,6 +45,9 @@ def _sqlite_pragmas(dbapi_conn, _conn_record):
     cur.execute("PRAGMA foreign_keys=ON")
     cur.execute("PRAGMA journal_mode=WAL")
     cur.execute("PRAGMA synchronous=NORMAL")
+    # Wait up to 5s for a competing writer's lock instead of failing immediately
+    # with "database is locked" (dev/test backend).
+    cur.execute("PRAGMA busy_timeout=5000")
     cur.close()
 
 

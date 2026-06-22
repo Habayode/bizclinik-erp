@@ -87,12 +87,15 @@ def post_journal(
     # still works.
     try:
         from .fiscal import check_open
+    except ImportError as exc:
+        # Expected only during early bootstrap before the fiscal model is
+        # registered. Re-raise anything that is NOT the fiscal module itself, so
+        # a genuinely broken import can never silently disable period locks.
+        if "fiscal" not in str(exc):
+            raise
+    else:
+        # PeriodClosedError (and any real error) propagates to the caller.
         check_open(session, entry_date, allow_override=allow_closed_period)
-    except ImportError:
-        pass
-    except Exception:
-        # Re-raise PeriodClosedError so callers see the specific error.
-        raise
 
     entry = JournalEntry(
         entry_no=entry_no or next_number(session, "JE", entry_date),

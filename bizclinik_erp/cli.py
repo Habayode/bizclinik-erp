@@ -246,6 +246,30 @@ def cmd_migrate(_args) -> int:
     return 0
 
 
+def cmd_harden(_args) -> int:
+    """Apply the idempotent production-hardening migrations to the default DB and
+    every tenant DB: NUMERIC(18,2) money storage and the journal_line CHECK
+    constraints. Postgres-only — a no-op on SQLite. Safe to re-run (each migration
+    skips columns/constraints already in place)."""
+    import importlib.util
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parent.parent  # repo root
+    rc = 0
+    for name, rel in (("decimalize_money", "deploy/migrations/decimalize_money.py"),
+                      ("add_ledger_checks", "deploy/migrations/add_ledger_checks.py")):
+        path = root / rel
+        if not path.exists():
+            print(f"(skip {name}: {path} not found)")
+            continue
+        spec = importlib.util.spec_from_file_location(f"_trakit_harden_{name}", path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        print(f"== {name} ==")
+        rc |= int(mod.main(["--all-tenants"]) or 0)
+    return rc
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="bizclinik_erp",
                                  description="Trakit365 ERP — CLI")
@@ -300,6 +324,10 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("migrate", help="Add missing columns to default + all tenant DBs")
     sub.add_parser("pg-migrate",
                    help="Copy all SQLite books to PostgreSQL (BIZCLINIK_DB_BACKEND=postgres)")
+    sub.add_parser("harden",
+                   help="Apply idempotent prod-hardening migrations (NUMERIC money "
+                        "+ ledger CHECK constraints) to default + all tenant DBs "
+                        "(Postgres-only; no-op on SQLite)")
 
     return p
 
@@ -324,6 +352,7 @@ HANDLERS = {
     "api-key-list": cmd_api_key_list,
     "migrate": cmd_migrate,
     "pg-migrate": cmd_pg_migrate,
+    "harden": cmd_harden,
 }
 
 
