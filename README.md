@@ -1,7 +1,8 @@
 # Trakit365 ERP
 
-A Nigerian SME ERP built on a double-entry system-of-record (PostgreSQL in
-production, SQLite for local dev) with a proper double-entry general ledger. Modules: Sales (quote → order → invoice →
+A Nigerian SME ERP with a proper double-entry general ledger. SQLite backs
+local/dev and single-tenant installs; Postgres backs multi-tenant production —
+both share one SQLAlchemy model layer. Modules: Sales (quote → order → invoice →
 receipt), Purchases (PO → bill → payment), Inventory (weighted-avg cost),
 Banking (transfers · charges · reconciliation), Payroll (PAYE · pension ·
 net), General Ledger (TB · journal entry · account inquiry), and Reports

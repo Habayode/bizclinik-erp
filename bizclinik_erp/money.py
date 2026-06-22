@@ -1,10 +1,10 @@
 """Money quantization helpers.
 
-Monetary columns are stored as NUMERIC(18,2) (see db.Money) — exact decimal on
-Postgres — with asdecimal=False so the ORM still hands callers plain floats. All
-*summation* of money also routes through Decimal here so we never accumulate the
-sub-cent float drift that ``round(sum([...]), 2)`` can produce across many lines.
-Values come back as float so callers and the ORM are unchanged.
+Monetary columns are stored as NUMERIC(18,2) via the ``Money`` type (db.py), so
+storage is exact decimal on Postgres. Reads come back as float because that type
+sets ``asdecimal=False``, so callers and the ORM are unchanged. msum() still does
+its summation in Decimal to avoid the sub-cent drift that ``round(sum([...]), 2)``
+can accumulate across many lines.
 
     msum(values)  -> exact 2dp sum of an iterable of money values
     money(x)      -> a single value quantized to 2dp (half-up)
