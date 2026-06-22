@@ -307,6 +307,22 @@ def render_digest_html(digest: dict) -> str:
 # ---- email delivery -------------------------------------------------------
 
 
+def _open_smtp(host: str, port: int) -> "smtplib.SMTP":
+    """Open an SMTP connection: implicit TLS for port 465 (e.g. Hostinger,
+    Gmail SSL) and STARTTLS otherwise. SMTP_SSL=1 forces implicit TLS on any
+    port. The caller logs in and sends."""
+    force_ssl = os.environ.get("SMTP_SSL", "").strip().lower() in ("1", "true", "yes")
+    if port == 465 or force_ssl:
+        return smtplib.SMTP_SSL(host, port, timeout=30)
+    server = smtplib.SMTP(host, port, timeout=30)
+    try:
+        server.starttls()
+    except smtplib.SMTPException:
+        # Server may not support STARTTLS (e.g. local relay) — proceed.
+        pass
+    return server
+
+
 def send_digest_email(digest: dict, *, to_addr: str) -> bool:
     """Send the digest over SMTP. Returns True on success, False otherwise.
 
@@ -332,12 +348,7 @@ def send_digest_email(digest: dict, *, to_addr: str) -> bool:
         msg.attach(MIMEText(render_digest_text(digest), "plain", "utf-8"))
         msg.attach(MIMEText(render_digest_html(digest), "html", "utf-8"))
 
-        with smtplib.SMTP(host, port, timeout=30) as server:
-            try:
-                server.starttls()
-            except smtplib.SMTPException:
-                # Server may not support STARTTLS (e.g. local relay) — proceed.
-                pass
+        with _open_smtp(host, port) as server:
             if user:
                 server.login(user, password)
             server.sendmail(from_addr, [to_addr], msg.as_string())
@@ -397,11 +408,7 @@ def send_email_with_attachment(
                             filename=attachment_name or p.name)
             msg.attach(part)
 
-        with smtplib.SMTP(host, port, timeout=30) as server:
-            try:
-                server.starttls()
-            except smtplib.SMTPException:
-                pass
+        with _open_smtp(host, port) as server:
             if user:
                 server.login(user, password)
             server.sendmail(from_addr, [to_addr], msg.as_string())
