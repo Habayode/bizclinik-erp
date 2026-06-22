@@ -450,7 +450,11 @@ def _send_via_resend(*, to_addr: str, subject: str, body_text: str,
             "https://api.resend.com/emails",
             data=_json.dumps(payload).encode(),
             headers={"Authorization": f"Bearer {api_key}",
-                     "Content-Type": "application/json"})
+                     "Content-Type": "application/json",
+                     "Accept": "application/json",
+                     # Cloudflare (in front of api.resend.com) returns 403/1010
+                     # for the default "Python-urllib" UA; identify ourselves.
+                     "User-Agent": "Trakit365/1.0 (+https://trakit365.hagai.online)"})
         with _req.urlopen(req, timeout=15) as resp:
             return 200 <= resp.status < 300
     except Exception:
