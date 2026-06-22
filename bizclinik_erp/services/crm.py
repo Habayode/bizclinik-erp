@@ -6,6 +6,7 @@ so invoicing + statements take over. All numbers/states are plain rows in the
 tenant DB; nothing here touches the GL.
 """
 from __future__ import annotations
+from ..money import msum
 
 from datetime import date, datetime
 from typing import Optional
@@ -163,7 +164,7 @@ def pipeline_summary(session: Session) -> dict:
         key = stage.value if hasattr(stage, "value") else str(stage)
         by_stage[key] = {"count": int(count), "value": round(float(value), 2)}
 
-    open_value = round(sum(by_stage[s.value]["value"] for s in OPEN_STAGES), 2)
+    open_value = msum(by_stage[s.value]["value"] for s in OPEN_STAGES)
     won = by_stage[DealStage.WON.value]["count"]
     lost = by_stage[DealStage.LOST.value]["count"]
     closed = won + lost

@@ -7,6 +7,7 @@ right account automatically. Mutating calls require the ``manage.school``
 permission (enforced here so both the UI and any future API are covered).
 """
 from __future__ import annotations
+from ..money import msum
 
 from datetime import date
 from typing import Optional
@@ -175,5 +176,5 @@ def validate_fee_structure(session: Session, academic_session_id: int) -> dict:
     for r in rows:
         by_term[r.term_number] = round(by_term.get(r.term_number, 0.0) + r.amount, 2)
     return {"cells": len(rows),
-            "total_amount": round(sum(r.amount for r in rows), 2),
+            "total_amount": msum(r.amount for r in rows),
             "by_term": by_term}

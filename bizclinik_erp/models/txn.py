@@ -1,5 +1,6 @@
 """Transactional models: GL entries, sales cycle, purchase cycle, stock, payroll."""
 from __future__ import annotations
+from ..money import msum
 
 import enum
 from datetime import date, datetime
@@ -68,11 +69,11 @@ class JournalEntry(Base):
 
     @property
     def total_debit(self) -> float:
-        return round(sum(l.debit for l in self.lines), 2)
+        return msum(l.debit for l in self.lines)
 
     @property
     def total_credit(self) -> float:
-        return round(sum(l.credit for l in self.lines), 2)
+        return msum(l.credit for l in self.lines)
 
     @property
     def is_balanced(self) -> bool:
@@ -128,11 +129,11 @@ class Quotation(Base):
 
     @property
     def subtotal(self) -> float:
-        return round(sum(l.subtotal for l in self.lines), 2)
+        return msum(l.subtotal for l in self.lines)
 
     @property
     def tax_total(self) -> float:
-        return round(sum(l.tax_amount for l in self.lines), 2)
+        return msum(l.tax_amount for l in self.lines)
 
     @property
     def grand_total(self) -> float:
@@ -228,11 +229,11 @@ class SalesInvoice(Base):
 
     @property
     def subtotal(self) -> float:
-        return round(sum(l.subtotal for l in self.lines), 2)
+        return msum(l.subtotal for l in self.lines)
 
     @property
     def tax_total(self) -> float:
-        return round(sum(l.tax_amount for l in self.lines), 2)
+        return msum(l.tax_amount for l in self.lines)
 
     @property
     def grand_total(self) -> float:
@@ -359,11 +360,11 @@ class Bill(Base):
 
     @property
     def subtotal(self) -> float:
-        return round(sum(l.subtotal for l in self.lines), 2)
+        return msum(l.subtotal for l in self.lines)
 
     @property
     def tax_total(self) -> float:
-        return round(sum(l.tax_amount for l in self.lines), 2)
+        return msum(l.tax_amount for l in self.lines)
 
     @property
     def grand_total(self) -> float:

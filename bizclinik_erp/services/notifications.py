@@ -14,6 +14,7 @@ plain-text and branded HTML, and `send_digest_email` ships it over SMTP when
 configured.
 """
 from __future__ import annotations
+from ..money import msum
 
 import os
 import smtplib
@@ -165,8 +166,8 @@ def build_digest(session: Session, *, as_of: date) -> dict:
     low = low_stock(session)
     cash = cash_position(session, as_of=as_of)
 
-    overdue_total = round(sum(r["outstanding"] for r in overdue), 2)
-    upcoming_total = round(sum(r["outstanding"] for r in upcoming), 2)
+    overdue_total = msum(r["outstanding"] for r in overdue)
+    upcoming_total = msum(r["outstanding"] for r in upcoming)
 
     return {
         "generated_at": datetime.now().isoformat(timespec="seconds"),

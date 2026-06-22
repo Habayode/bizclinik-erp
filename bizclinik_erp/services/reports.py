@@ -6,6 +6,7 @@ standard accounting equation Assets = Liabilities + Equity (where Equity
 includes period earnings).
 """
 from __future__ import annotations
+from ..money import msum
 
 from collections import defaultdict
 from datetime import date
@@ -140,9 +141,9 @@ def balance_sheet(session: Session, *, as_of: date,
         equity.append({"code": "3300", "name": "Current Year Earnings",
                         "amount": round(ytd_earnings, 2)})
 
-    total_assets = round(sum(r["amount"] for r in assets), 2)
-    total_liab = round(sum(r["amount"] for r in liabilities), 2)
-    total_equity = round(sum(r["amount"] for r in equity), 2)
+    total_assets = msum(r["amount"] for r in assets)
+    total_liab = msum(r["amount"] for r in liabilities)
+    total_equity = msum(r["amount"] for r in equity)
     diff = round(total_assets - (total_liab + total_equity), 2)
 
     return {

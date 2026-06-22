@@ -5,6 +5,7 @@ debit == credit, persists the lines, and stamps the entry POSTED. Trial
 Balance and account inquiries read from the persisted lines.
 """
 from __future__ import annotations
+from ..money import msum
 
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -63,8 +64,8 @@ def post_journal(
     if not line_list:
         raise ValueError("Refusing to post an empty journal entry.")
 
-    total_dr = round(sum(l.debit for l in line_list), 2)
-    total_cr = round(sum(l.credit for l in line_list), 2)
+    total_dr = msum(l.debit for l in line_list)
+    total_cr = msum(l.credit for l in line_list)
     if abs(total_dr - total_cr) > 0.01:
         raise ValueError(
             f"Journal entry unbalanced: DR {total_dr:,.2f} != CR {total_cr:,.2f}. "
@@ -115,8 +116,8 @@ def post_journal(
     # amounts. Catches rounding drift across many lines and any future write
     # that reaches the DB bypassing the pre-flush input check above. The
     # session rolls back on this raise (see db.get_session).
-    pdr = round(sum(l.debit for l in entry.lines), 2)
-    pcr = round(sum(l.credit for l in entry.lines), 2)
+    pdr = msum(l.debit for l in entry.lines)
+    pcr = msum(l.credit for l in entry.lines)
     if abs(pdr - pcr) > 0.01:
         raise ValueError(
             f"Journal entry unbalanced after persist: DR {pdr:,.2f} != CR {pcr:,.2f}.")

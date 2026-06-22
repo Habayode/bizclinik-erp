@@ -12,6 +12,7 @@ short-circuits a repeat so a class run never double-invoices. Mutating calls
 require the ``manage.school`` permission.
 """
 from __future__ import annotations
+from ..money import msum
 
 from datetime import date
 from typing import Optional
@@ -153,8 +154,8 @@ def student_balance(session: Session, student_id: int) -> dict:
     """Roll up a student's fee position across all their SalesInvoices:
     {billed, paid, outstanding}."""
     invs = _student_invoices(session, student_id)
-    billed = round(sum(i.grand_total for i in invs), 2)
-    paid = round(sum(i.amount_paid for i in invs), 2)
+    billed = msum(i.grand_total for i in invs)
+    paid = msum(i.amount_paid for i in invs)
     return {"billed": billed, "paid": paid,
             "outstanding": round(billed - paid, 2)}
 

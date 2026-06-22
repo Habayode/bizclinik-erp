@@ -9,6 +9,7 @@ captured by Phases 1-4 and the sales/AR engine — nothing here posts to the GL.
 Mutating calls require the ``manage.school`` permission.
 """
 from __future__ import annotations
+from ..money import msum
 
 from typing import Optional
 
@@ -124,7 +125,7 @@ def school_dashboard(session: Session,
             StudentFeeBilling.academic_session_id == academic_session_id)
     billings = session.execute(bq).scalars().all()
 
-    fees_billed = round(sum(b.total_amount for b in billings), 2)
+    fees_billed = msum(b.total_amount for b in billings)
     fees_collected = 0.0
     outstanding_by_student: dict[int, float] = {}
     for b in billings:

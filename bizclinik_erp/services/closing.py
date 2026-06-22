@@ -13,6 +13,7 @@ Account codes used (from services.seed defaults):
                                           falls back to 2160 when not seeded.
 """
 from __future__ import annotations
+from ..money import msum
 
 import calendar
 from datetime import date
@@ -222,8 +223,8 @@ def close_checklist(session: Session, *, year: int, month: int) -> list[dict]:
 
     # 5. Trial balance balances.
     tb = trial_balance(session, as_of=end)
-    tot_dr = round(sum(r["debit"] for r in tb), 2)
-    tot_cr = round(sum(r["credit"] for r in tb), 2)
+    tot_dr = msum(r["debit"] for r in tb)
+    tot_cr = msum(r["credit"] for r in tb)
     balanced = abs(tot_dr - tot_cr) < 0.01
     items.append({
         "task": "Trial balance balances",
