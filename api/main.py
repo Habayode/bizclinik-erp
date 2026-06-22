@@ -571,7 +571,7 @@ def _notify_demo_lead(payload: "DemoIn") -> None:
     if not to_addr:
         return
     from bizclinik_erp.services import notifications
-    if not notifications.smtp_configured():
+    if not notifications.email_configured():
         return
     name = (payload.name or "").strip()
     business = (payload.business or "").strip()
@@ -591,7 +591,7 @@ def _notify_demo_lead(payload: "DemoIn") -> None:
         "View all leads in the ERP: System → Tenants → Demo requests.",
     ]
     try:
-        notifications.send_email_with_attachment(
+        notifications.send_message(
             to_addr=to_addr, subject=subj, body_text="\n".join(lines),
             reply_to=(payload.email or "").strip() or None)
     except Exception:

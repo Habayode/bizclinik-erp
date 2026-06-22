@@ -415,3 +415,62 @@ def send_email_with_attachment(
         return True
     except Exception:
         return False
+
+
+# --------------------------------------------------------------------------- #
+# Resend HTTP API (works over 443 where outbound SMTP is blocked, e.g. on      #
+# DigitalOcean droplets). Preferred transport when RESEND_API_KEY is set.      #
+# --------------------------------------------------------------------------- #
+
+def resend_configured() -> bool:
+    return bool(os.environ.get("RESEND_API_KEY", "").strip())
+
+
+def _send_via_resend(*, to_addr: str, subject: str, body_text: str,
+                     reply_to: "str | None" = None,
+                     body_html: "str | None" = None) -> bool:
+    """Send one email through Resend's REST API over HTTPS. Reads RESEND_API_KEY
+    and RESEND_FROM (defaults to Resend's shared 'onboarding@resend.dev' sender).
+    Returns True on a 2xx response; all failures swallowed."""
+    api_key = os.environ.get("RESEND_API_KEY", "").strip()
+    if not api_key or not to_addr:
+        return False
+    import json as _json
+    from urllib import request as _req
+    from_addr = os.environ.get(
+        "RESEND_FROM", "Trakit365 <onboarding@resend.dev>").strip()
+    payload = {"from": from_addr, "to": [to_addr],
+               "subject": subject, "text": body_text}
+    if body_html:
+        payload["html"] = body_html
+    if reply_to:
+        payload["reply_to"] = reply_to
+    try:
+        req = _req.Request(
+            "https://api.resend.com/emails",
+            data=_json.dumps(payload).encode(),
+            headers={"Authorization": f"Bearer {api_key}",
+                     "Content-Type": "application/json"})
+        with _req.urlopen(req, timeout=15) as resp:
+            return 200 <= resp.status < 300
+    except Exception:
+        return False
+
+
+def email_configured() -> bool:
+    """True if any send transport is available (Resend HTTP or SMTP)."""
+    return resend_configured() or smtp_configured()
+
+
+def send_message(*, to_addr: str, subject: str, body_text: str,
+                 reply_to: "str | None" = None,
+                 body_html: "str | None" = None) -> bool:
+    """Send a simple email, preferring the Resend HTTP API (works over 443) and
+    falling back to SMTP. Returns True on success."""
+    if resend_configured():
+        return _send_via_resend(to_addr=to_addr, subject=subject,
+                                body_text=body_text, reply_to=reply_to,
+                                body_html=body_html)
+    return send_email_with_attachment(to_addr=to_addr, subject=subject,
+                                      body_text=body_text, reply_to=reply_to,
+                                      body_html=body_html)
