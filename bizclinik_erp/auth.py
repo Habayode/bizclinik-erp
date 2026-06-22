@@ -460,6 +460,7 @@ def require_login() -> None:
     _apply_tenant()
 
     if _any_users_configured():
+        authz.set_request_context(True)   # configured auth -> unbound fails closed
         if st.session_state.get(_USER_KEY):
             # Bind the actor so service-layer authz enforces this user's role.
             authz.set_actor_role(st.session_state.get(_ROLE_KEY))
@@ -471,6 +472,7 @@ def require_login() -> None:
 
     if _expected_password() is None:
         return                       # dev: no auth configured -> unrestricted
+    authz.set_request_context(True)  # configured auth -> unbound fails closed
     if st.session_state.get(_LEGACY_KEY):
         authz.set_actor_role("ADMIN")   # legacy single-password = implicit admin
         authz.set_platform_admin(is_platform_admin())

@@ -125,7 +125,9 @@ async def require_api_key(x_api_key: Optional[str] = Header(default=None)):
     from bizclinik_erp import authz
     token = _db._active_db_path.set(db_path)
     # The key acts as its stored role (the matrix is then enforced in the
-    # services). The env/master key and legacy keys default to ADMIN.
+    # services). The env/master key and legacy keys default to ADMIN. Mark this
+    # as a request context so an unbound actor would fail closed.
+    authz.set_request_context(True)
     authz.set_actor_role(actor_role)
     try:
         yield {"tenant": tenant_slug, "role": actor_role}

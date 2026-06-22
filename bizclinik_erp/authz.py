@@ -29,6 +29,14 @@ _actor_role: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
 _platform_admin: contextvars.ContextVar[bool] = contextvars.ContextVar(
     "bizclinik_platform_admin", default=False)
 
+# Whether we are inside an interactive request (a Streamlit page run or a REST
+# API request). Set True at those boundaries. When True but NO actor role is
+# bound, permission checks fail CLOSED — an interactive entry point that forgot
+# to bind an actor is denied rather than running unrestricted. CLI / scheduled
+# jobs / seed / migrations / tests never set this, so they keep the break-glass.
+_request_context: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    "bizclinik_request_context", default=False)
+
 
 class PermissionDenied(PermissionError):
     """Raised by require_perm() when the current actor lacks a permission."""
@@ -59,6 +67,12 @@ def set_platform_admin(flag: bool) -> None:
     _platform_admin.set(bool(flag))
 
 
+def set_request_context(flag: bool) -> None:
+    """Mark (or unmark) the current context as an interactive request (web/API).
+    When set, an unbound actor fails CLOSED (see has_perm)."""
+    _request_context.set(bool(flag))
+
+
 def is_platform_admin() -> bool:
     return _platform_admin.get()
 
@@ -66,6 +80,7 @@ def is_platform_admin() -> bool:
 def clear_actor() -> None:
     _actor_role.set(None)
     _platform_admin.set(False)
+    _request_context.set(False)
 
 
 def current_role() -> Optional[str]:
@@ -75,7 +90,10 @@ def current_role() -> Optional[str]:
 def has_perm(perm: str) -> bool:
     role = _actor_role.get()
     if role is None:
-        return True   # system / CLI / scheduled / test context — unrestricted
+        # No bound actor. Inside an interactive request this means the boundary
+        # forgot to bind a role — fail CLOSED. Outside one (CLI, scheduled jobs,
+        # seed, migrations, tests) keep the documented break-glass (fail-open).
+        return not _request_context.get()
     from .models.users import PERMISSIONS, Role
     try:
         return perm in PERMISSIONS.get(Role(role), set())
@@ -105,6 +123,6 @@ def require_platform() -> None:
     """
     if _platform_admin.get():
         return
-    if _actor_role.get() is None:
+    if _actor_role.get() is None and not _request_context.get():
         return   # system / CLI / scheduled / test — unrestricted break-glass
     raise PlatformAdminRequired()
