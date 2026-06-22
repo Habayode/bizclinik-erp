@@ -1,0 +1,13 @@
+[Unit]
+Description=Trakit365 ERP offsite backup restore-drill (decrypt + verify latest)
+After=network-online.target
+OnFailure=bizclinik-alert@%n.service
+
+[Service]
+Type=oneshot
+User=bizclinik
+WorkingDirectory=/opt/bizclinik-erp
+EnvironmentFile=-/etc/bizclinik/pg.env
+EnvironmentFile=-/etc/bizclinik/backup.env
+EnvironmentFile=-/opt/bizclinik-erp/.env
+ExecStart=/opt/bizclinik-erp/venv/bin/python scripts/backup.py verify

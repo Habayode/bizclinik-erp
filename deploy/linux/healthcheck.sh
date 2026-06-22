@@ -6,7 +6,7 @@
 #
 # Env (optional, e.g. from /etc/bizclinik/backup.env or the unit):
 #   HEALTH_URLS         space-separated URLs to check
-#                       (default: erp + api + wendysrack tenant health)
+#                       (default: the shared erp + api public health endpoints)
 #   ALERT_EMAIL         where to send alerts (uses SMTP_* via the app)
 #   SMTP_HOST ...       same SMTP_* vars the app's notifications use
 set -u
@@ -15,8 +15,7 @@ APP_DIR="/opt/bizclinik-erp"
 PY="$APP_DIR/venv/bin/python"
 
 DEFAULT_URLS="https://erp.hagai.online/_stcore/health \
-https://api.hagai.online/health \
-https://wendysrack-erp.hagai.online/_stcore/health"
+https://api.hagai.online/health"
 URLS="${HEALTH_URLS:-$DEFAULT_URLS}"
 
 # Map a hostname to the systemd service that backs it, for auto-restart.
@@ -50,22 +49,23 @@ done
 
 [ -z "$failures" ] && exit 0
 
-# Still-failing endpoints: send an email alert if we can.
-ALERT_EMAIL="${ALERT_EMAIL:-}"
-if [ -n "$ALERT_EMAIL" ] && [ -n "${SMTP_HOST:-}" ]; then
-  body="$(printf 'BizClinik ERP health check FAILED at %s UTC:%b\n' "$(date -u +%FT%TZ)" "$failures")"
+# Still-failing endpoints: alert the operator. Sent via the app's notifications
+# transport (Resend HTTP API) because the droplet blocks outbound SMTP, so an
+# smtplib alert would silently never arrive.
+ALERT_EMAIL="${ALERT_EMAIL:-${DEMO_REQUEST_EMAIL:-}}"
+if [ -n "$ALERT_EMAIL" ]; then
+  body="$(printf 'Trakit365 ERP health check FAILED at %s UTC:%b\n' "$(date -u +%FT%TZ)" "$failures")"
   MSG="$body" TO="$ALERT_EMAIL" "$PY" - <<'PY' 2>/dev/null || true
-import os, smtplib
-from email.mime.text import MIMEText
-host=os.environ.get("SMTP_HOST"); port=int(os.environ.get("SMTP_PORT","587"))
-user=os.environ.get("SMTP_USER"); pw=os.environ.get("SMTP_PASS")
-frm=os.environ.get("SMTP_FROM", user or "alerts@bizclinik"); to=os.environ["TO"]
-m=MIMEText(os.environ["MSG"]); m["Subject"]="[BizClinik ERP] health alert"
-m["From"]=frm; m["To"]=to
-s=smtplib.SMTP(host,port,timeout=20); s.starttls()
-if user and pw: s.login(user,pw)
-s.sendmail(frm,[to],m.as_string()); s.quit()
-print("alert sent")
+import os, sys
+sys.path.insert(0, "/opt/bizclinik-erp")
+try:
+    from bizclinik_erp.services import notifications
+    if notifications.email_configured():
+        notifications.send_message(to_addr=os.environ["TO"],
+            subject="[Trakit365] health alert", body_text=os.environ["MSG"])
+        print("alert sent")
+except Exception as e:
+    print("alert failed:", e)
 PY
 fi
 printf 'health check failures:%b\n' "$failures" >&2

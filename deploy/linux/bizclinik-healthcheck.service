@@ -1,0 +1,11 @@
+[Unit]
+Description=Trakit365 ERP health watchdog (restart a failed service, alert on failure)
+After=network-online.target
+
+[Service]
+# Runs as root so it can `systemctl restart` the app services. Sources the app
+# env so the alert path has the Resend API key (the droplet blocks SMTP).
+Type=oneshot
+EnvironmentFile=-/opt/bizclinik-erp/.env
+EnvironmentFile=-/etc/bizclinik/backup.env
+ExecStart=/bin/bash /opt/bizclinik-erp/deploy/linux/healthcheck.sh

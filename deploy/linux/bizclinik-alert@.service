@@ -1,0 +1,8 @@
+[Unit]
+Description=Trakit365 failure alert for %i
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/opt/bizclinik-erp/.env
+EnvironmentFile=-/etc/bizclinik/backup.env
+ExecStart=/opt/bizclinik-erp/venv/bin/python /opt/bizclinik-erp/deploy/linux/alert.py %i

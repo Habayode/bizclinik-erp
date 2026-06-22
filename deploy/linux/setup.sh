@@ -197,12 +197,18 @@ chown bizclinik:bizclinik /etc/bizclinik/backup.env
 
 cat > /etc/systemd/system/bizclinik-backup.service <<EOF
 [Unit]
-Description=BizClinik ERP nightly DB snapshot (+ encrypted offsite to R2)
+Description=Trakit365 ERP nightly DB snapshot (+ encrypted offsite to R2)
+OnFailure=bizclinik-alert@%n.service
 [Service]
 Type=oneshot
 User=bizclinik
 WorkingDirectory=$APP_DIR
 Environment=BIZCLINIK_DB_PATH=$APP_DIR/data/bizclinik.db
+# pg.env makes the snapshot back up the LIVE Postgres databases (pg_dump) when
+# the install is on Postgres; without it the snapshot would dump the stale local
+# SQLite files instead. .env carries RESEND_* so an OnFailure alert can send.
+EnvironmentFile=-/etc/bizclinik/pg.env
+EnvironmentFile=-$APP_DIR/.env
 EnvironmentFile=-/etc/bizclinik/backup.env
 ExecStart=$APP_DIR/venv/bin/python scripts/backup.py snapshot
 EOF
@@ -217,6 +223,17 @@ WantedBy=timers.target
 EOF
 systemctl daemon-reload
 systemctl enable --now bizclinik-backup.timer
+
+# ---- 9b. health watchdog + weekly backup restore-drill ------------------
+step "Installing health watchdog + backup restore-drill timers"
+cp "$APP_DIR/deploy/linux/bizclinik-alert@.service"        /etc/systemd/system/
+cp "$APP_DIR/deploy/linux/bizclinik-healthcheck.service"   /etc/systemd/system/
+cp "$APP_DIR/deploy/linux/bizclinik-healthcheck.timer"     /etc/systemd/system/
+cp "$APP_DIR/deploy/linux/bizclinik-verify-backup.service" /etc/systemd/system/
+cp "$APP_DIR/deploy/linux/bizclinik-verify-backup.timer"   /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable --now bizclinik-healthcheck.timer
+systemctl enable --now bizclinik-verify-backup.timer
 
 # ---- 10. health ---------------------------------------------------------
 step "Waiting for health"

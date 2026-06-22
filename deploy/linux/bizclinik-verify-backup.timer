@@ -1,0 +1,10 @@
+[Unit]
+Description=Weekly restore-drill of Trakit365 ERP offsite backups
+
+[Timer]
+OnCalendar=Sun 04:00
+Persistent=true
+Unit=bizclinik-verify-backup.service
+
+[Install]
+WantedBy=timers.target

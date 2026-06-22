@@ -45,3 +45,49 @@ jobs:
               print("\n".join(bad)); sys.exit(1)
           print("All app pages parse OK.")
           PY
+
+  # Exercise the REAL production backend (Postgres). The main `test` job runs on
+  # SQLite; this proves money columns are NUMERIC and read back as float, and the
+  # ledger ties, on actual Postgres.
+  test-postgres:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest httpx
+
+      - name: Postgres smoke tests
+        run: pytest tests/test_pg_smoke.py -q
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+          BIZCLINIK_DB_BACKEND: postgres
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          BIZCLINIK_PG_PREFIX: biztest

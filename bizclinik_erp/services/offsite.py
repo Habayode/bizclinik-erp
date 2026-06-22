@@ -176,7 +176,13 @@ def push_snapshots(
             continue
         newest = snaps[-1]
         try:
-            blob = encrypt_bytes(newest.read_bytes(), passphrase)
+            original = newest.read_bytes()
+            blob = encrypt_bytes(original, passphrase)
+            # Restorability check: confirm the artifact we are about to rely on
+            # actually decrypts with the configured passphrase before uploading.
+            # Catches a corrupt encrypt / passphrase that can't round-trip.
+            if decrypt_bytes(blob, passphrase) != original:
+                raise ValueError("encryption round-trip verification failed")
             key = f"{cfg.prefix}/{scope_dir.name}/{newest.name}.enc"
             client.put_object(Bucket=cfg.bucket, Key=key, Body=blob,
                               ContentType="application/octet-stream")
@@ -185,4 +191,57 @@ def push_snapshots(
                             "bytes": len(blob), "pruned": len(pruned)})
         except Exception as exc:  # pragma: no cover - defensive per-scope
             results.append({"scope": scope_dir.name, "error": str(exc)})
+    return results
+
+
+# --------------------------------------------------------------------------- #
+# Restore drill — prove the offsite copy is actually restorable                #
+# --------------------------------------------------------------------------- #
+
+def _looks_like_backup(data: bytes) -> bool:
+    """True if the decrypted bytes look like a DB backup we could restore:
+    a SQLite database file, a pg_dump custom-format archive, or a plain-text
+    pg_dump (.sql) — which is what the Postgres backend produces."""
+    head = data[:512]
+    stripped = head.lstrip()
+    return (
+        head.startswith(b"SQLite format 3\x00")     # SQLite
+        or head.startswith(b"PGDMP")                 # pg_dump custom format
+        or b"PostgreSQL database dump" in head       # pg_dump plain (.sql) header
+        or stripped.startswith(b"--")                # SQL comment header
+        or stripped.startswith(b"SET ")
+    )
+
+
+def verify_latest(*, cfg: R2Config, passphrase: str, client=None) -> list[dict]:
+    """Download the NEWEST encrypted object for each scope in R2, decrypt it with
+    the configured passphrase, and confirm it is a non-empty, recognisable backup.
+
+    This is a real restore drill: it catches a silently-broken offsite copy
+    (wrong passphrase, truncated/garbage object, unrecognised content) BEFORE a
+    disaster forces an actual restore. Returns one dict per scope with ok=bool.
+    """
+    if not passphrase:
+        raise ValueError("A non-empty backup passphrase is required.")
+    client = client or make_client(cfg)
+    resp = client.list_objects_v2(Bucket=cfg.bucket, Prefix=f"{cfg.prefix}/")
+    keys = sorted(o["Key"] for o in resp.get("Contents", []))
+    scopes: dict[str, list[str]] = {}
+    for k in keys:
+        rest = k[len(cfg.prefix) + 1:]
+        scope = rest.split("/", 1)[0]
+        scopes.setdefault(scope, []).append(k)
+    results: list[dict] = []
+    for scope, ks in sorted(scopes.items()):
+        newest = sorted(ks)[-1]
+        try:
+            blob = client.get_object(Bucket=cfg.bucket, Key=newest)["Body"].read()
+            data = decrypt_bytes(blob, passphrase)
+            ok = bool(data) and _looks_like_backup(data)
+            results.append({"scope": scope, "key": newest, "ok": ok,
+                            "bytes": len(data),
+                            "detail": "" if ok else "decrypted but unrecognised content"})
+        except Exception as exc:
+            results.append({"scope": scope, "key": newest, "ok": False,
+                            "detail": str(exc)})
     return results

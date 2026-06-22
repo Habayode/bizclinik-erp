@@ -1,0 +1,10 @@
+[Unit]
+Description=Run the Trakit365 ERP health watchdog every 5 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+Unit=bizclinik-healthcheck.service
+
+[Install]
+WantedBy=timers.target
