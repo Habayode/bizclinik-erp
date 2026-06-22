@@ -31,6 +31,7 @@ import sys
 from sqlalchemy import text
 
 from bizclinik_erp.db import Base, get_engine
+from bizclinik_erp import models as _models  # noqa: F401  register all tables on Base.metadata
 from bizclinik_erp import tenancy
 from bizclinik_erp.config import get_settings
 
