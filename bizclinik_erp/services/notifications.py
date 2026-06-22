@@ -357,7 +357,7 @@ def smtp_configured() -> bool:
 def send_email_with_attachment(
     *, to_addr: str, subject: str, body_text: str,
     attachment_path: "str | None" = None, attachment_name: "str | None" = None,
-    body_html: "str | None" = None,
+    body_html: "str | None" = None, reply_to: "str | None" = None,
 ) -> bool:
     """Send an email (optionally with one file attachment) over SMTP.
 
@@ -381,6 +381,8 @@ def send_email_with_attachment(
         msg["Subject"] = subject
         msg["From"] = from_addr
         msg["To"] = to_addr
+        if reply_to:
+            msg["Reply-To"] = reply_to
         msg.attach(MIMEText(body_text, "plain", "utf-8"))
         if body_html:
             msg.attach(MIMEText(body_html, "html", "utf-8"))

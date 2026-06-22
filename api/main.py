@@ -23,7 +23,8 @@ import os
 from datetime import date
 from typing import Iterator, Optional
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
+from fastapi import (
+    BackgroundTasks, Depends, FastAPI, Header, HTTPException, Query, Request)
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -561,11 +562,49 @@ def _verify_turnstile(token: Optional[str], remoteip: Optional[str]) -> bool:
         return False
 
 
+def _notify_demo_lead(payload: "DemoIn") -> None:
+    """Best-effort email alert to the operator when a demo lead comes in. Runs in
+    a background task so the request returns immediately; all failures are
+    swallowed (the lead is already saved in the control DB regardless). Sends
+    only if SMTP and a recipient are configured."""
+    to_addr = os.environ.get("DEMO_REQUEST_EMAIL", "").strip()
+    if not to_addr:
+        return
+    from bizclinik_erp.services import notifications
+    if not notifications.smtp_configured():
+        return
+    name = (payload.name or "").strip()
+    business = (payload.business or "").strip()
+    subj = f"New Trakit365 demo request — {name}" + (f" ({business})" if business else "")
+    lines = [
+        "A new demo request just came in from the Trakit365 site.",
+        "",
+        f"Name:     {name}",
+        f"Business: {business or '—'}",
+        f"Email:    {(payload.email or '—').strip()}",
+        f"Phone:    {(payload.phone or '—').strip()}",
+        "",
+        "Message:",
+        (payload.message or "—").strip(),
+        "",
+        "— Reply directly to this email to reach the prospect.",
+        "View all leads in the ERP: System → Tenants → Demo requests.",
+    ]
+    try:
+        notifications.send_email_with_attachment(
+            to_addr=to_addr, subject=subj, body_text="\n".join(lines),
+            reply_to=(payload.email or "").strip() or None)
+    except Exception:
+        pass
+
+
 @app.post("/api/v1/demo-request")
-async def public_demo_request(payload: DemoIn, request: Request) -> dict:
+async def public_demo_request(payload: DemoIn, request: Request,
+                              background: BackgroundTasks) -> dict:
     """Public lead capture for the marketing site — no API key. Protected by a
     honeypot and (once configured) Cloudflare Turnstile. Records the lead in the
-    control DB, the same queue as the in-app 'Request a demo'."""
+    control DB, the same queue as the in-app 'Request a demo', and emails the
+    operator (best-effort, in the background)."""
     if (payload.website or "").strip():          # honeypot tripped — drop quietly
         return {"ok": True}
     ip = request.headers.get("cf-connecting-ip") or (
@@ -581,6 +620,7 @@ async def public_demo_request(payload: DemoIn, request: Request) -> dict:
     tenancy.create_demo_request(
         name=name, business=payload.business, email=payload.email,
         phone=payload.phone, message=payload.message)
+    background.add_task(_notify_demo_lead, payload)
     return {"ok": True}
 
 
