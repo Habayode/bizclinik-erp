@@ -23,11 +23,12 @@ class FPAAgent(Agent):
     key = "fpa"
     label = "FP&A Agent"
     icon = "📈"
-    description = ("financial planning & analysis — period-over-period revenue "
-                   "and expense variance, margin trends, and cash movement")
+    description = ("financial planning & analysis — period-over-period variance and "
+                   "margins, plus a forward trend forecast, rolling cash flow, and a "
+                   "full next-year budget you can save")
 
     def gather(self, session: Session, start: date, end: date) -> dict:
-        from ..services import reports
+        from ..services import forecast, reports
         span = (end - start).days
         prev_end = start - timedelta(days=1)
         prev_start = prev_end - timedelta(days=span)
@@ -36,6 +37,8 @@ class FPAAgent(Agent):
             "prev": reports.profit_and_loss(session, period_start=prev_start,
                                             period_end=prev_end),
             "cash": reports.cash_flow(session, period_start=start, period_end=end),
+            "forecast": forecast.forecast_bundle(session, as_of=end, horizon=12,
+                                                 months_back=12),
         }
 
     def analyze(self, session: Session, context: dict, memory: Memory) -> list[Finding]:
@@ -104,6 +107,42 @@ class FPAAgent(Agent):
                 detail="Cash decreased over the period — reconcile against "
                        "receivables and payables timing.",
                 metric_value=ncc, signature="fpa:cash_outflow"))
+
+        # ---- forward-looking: forecast, cash runway, next-year budget -------
+        fc = context["forecast"]
+        ann = fc["annual"]
+        gp = ann.get("growth_pct")
+        gtxt = f" ({gp:+.0f}% vs trailing 12m)" if gp is not None else ""
+        findings.append(Finding(
+            kind="forecast_revenue", severity="info",
+            title=f"Projected FY{ann['year']} revenue ₦{ann['revenue']:,.0f}{gtxt}",
+            detail="Trend-based projection from your trailing per-account run-rate. "
+                   "Indicative — see the Forecast tab for the full build.",
+            metric_value=ann["revenue"], baseline_value=gp,
+            signature="fpa:forecast_revenue"))
+        if ann["net"] < 0:
+            findings.append(Finding(
+                kind="forecast_loss", severity="warn",
+                title=f"Projected FY{ann['year']} net LOSS of ₦{abs(ann['net']):,.0f}",
+                detail="On current trends, next year is projected to be loss-making "
+                       "— revisit pricing, cost base, or growth assumptions.",
+                metric_value=ann["net"], signature="fpa:forecast_loss"))
+        else:
+            findings.append(Finding(
+                kind="forecast_net", severity="info",
+                title=f"Projected FY{ann['year']} net profit ₦{ann['net']:,.0f}",
+                detail="Indicative trend-based projection for next year.",
+                metric_value=ann["net"], signature="fpa:forecast_net"))
+
+        fn = fc["cash_flow"]["first_negative"]
+        if fn:
+            findings.append(Finding(
+                kind="cash_gap", severity="critical",
+                title=f"Cash projected to run negative in {fn['label']} "
+                      f"(₦{abs(fn['shortfall']):,.0f} gap)",
+                detail="The rolling cash-flow projection dips below zero — arrange "
+                       "financing or accelerate collections before then.",
+                metric_value=fn["shortfall"], signature="fpa:cash_gap"))
 
         if not findings:
             findings.append(Finding(

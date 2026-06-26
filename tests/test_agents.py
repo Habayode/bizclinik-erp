@@ -150,3 +150,87 @@ def test_api_module_imports_with_agent_endpoints(fresh_db):
     paths = {r.path for r in main.app.routes}
     assert "/api/v1/agents" in paths
     assert "/api/v1/agents/{key}/run" in paths
+    assert "/api/v1/agents/fpa/forecast" in paths
+    assert "/api/v1/agents/fpa/budget" in paths
+
+
+# ---- FP&A forecasting ------------------------------------------------------
+
+def _seed_months(s, *, months=8, growth=0.0):
+    """Post monthly revenue + expense across the trailing `months` months."""
+    from bizclinik_erp.services.ledger import JELine, post_journal
+    exp, sales, cash = _accounts(s)
+    today = date.today()
+    yidx = today.year * 12 + (today.month - 1)
+    for k in range(months, 0, -1):
+        idx = yidx - k
+        yy, mm = idx // 12, idx % 12 + 1
+        d = date(yy, mm, 15)
+        rev = 400_000 * (1 + growth) ** (months - k)
+        post_journal(s, d, f"rev {yy}-{mm}",
+                     [JELine(account_id=cash.id, debit=rev),
+                      JELine(account_id=sales.id, credit=rev)], source_kind="TEST")
+        post_journal(s, d, f"exp {yy}-{mm}",
+                     [JELine(account_id=exp.id, debit=rev * 0.5),
+                      JELine(account_id=cash.id, credit=rev * 0.5)],
+                     source_kind="TEST")
+    s.flush()
+
+
+def test_forecast_bundle_structure(fresh_db):
+    from bizclinik_erp.db import get_session
+    from bizclinik_erp.services import forecast
+
+    with get_session() as s:
+        _seed_months(s, months=8)
+    with get_session() as s:
+        b = forecast.forecast_bundle(s, as_of=date.today(), horizon=12, months_back=12)
+    assert len(b["pnl_forecast"]) == 12
+    assert b["budget_year"] == date.today().year + 1
+    assert b["budget_rows"], "expected a next-year budget from seeded history"
+    assert b["annual"]["revenue"] > 0
+    assert len(b["cash_flow"]["rows"]) == 12
+    assert "opening" in b["cash_flow"]
+
+
+def test_forecast_reflects_growth(fresh_db):
+    from bizclinik_erp.db import get_session
+    from bizclinik_erp.services import forecast
+
+    with get_session() as s:
+        _seed_months(s, months=8, growth=0.10)  # 10%/month uptrend
+    with get_session() as s:
+        b = forecast.forecast_bundle(s, as_of=date.today(), horizon=12)
+    pf = b["pnl_forecast"]
+    assert pf[-1]["revenue"] >= pf[0]["revenue"]  # projection trends upward
+    assert b["annual"]["growth_pct"] is not None
+
+
+def test_save_as_budget_creates_budget(fresh_db):
+    from bizclinik_erp.db import get_session
+    from bizclinik_erp.services import forecast
+    from bizclinik_erp.models import Budget
+
+    with get_session() as s:
+        _seed_months(s, months=8)
+    with get_session() as s:
+        res = forecast.save_as_budget(s, as_of=date.today())
+        assert res["lines"] > 0
+    with get_session() as s:
+        b = s.execute(select(Budget).where(
+            Budget.year == date.today().year + 1)).scalars().first()
+        assert b is not None
+        assert b.lines  # budget lines were written
+
+
+def test_fpa_agent_emits_forecast_findings(fresh_db):
+    from bizclinik_erp import agents
+    from bizclinik_erp.db import get_session
+
+    with get_session() as s:
+        _seed_months(s, months=8)
+    with get_session() as s:
+        run = agents.get_agent("fpa").run(s, use_llm=False)
+        kinds = {f.kind for f in agents.findings_for_run(s, run.id)}
+    assert "forecast_revenue" in kinds
+    assert ("forecast_net" in kinds) or ("forecast_loss" in kinds)

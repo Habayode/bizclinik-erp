@@ -799,3 +799,31 @@ async def agent_feedback_ep(finding_id: int, payload: AgentFeedbackIn) -> dict:
             return _finding_out(f)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/api/v1/agents/fpa/forecast", dependencies=[Depends(require_api_key)])
+async def fpa_forecast_ep(as_of: Optional[date] = None, horizon: int = 12,
+                          months_back: int = 12) -> dict:
+    from bizclinik_erp.services import forecast as forecast_svc
+    with get_session() as s:
+        return forecast_svc.forecast_bundle(s, as_of=as_of, horizon=horizon,
+                                            months_back=months_back)
+
+
+class BudgetSaveIn(BaseModel):
+    as_of: Optional[date] = None
+    months_back: int = 12
+    name: Optional[str] = None
+
+
+@app.post("/api/v1/agents/fpa/budget", status_code=201,
+          dependencies=[Depends(require_api_key)])
+async def fpa_save_budget_ep(payload: BudgetSaveIn) -> dict:
+    from bizclinik_erp.services import forecast as forecast_svc
+    with get_session() as s:
+        try:
+            return forecast_svc.save_as_budget(
+                s, as_of=payload.as_of, months_back=payload.months_back,
+                name=payload.name)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc

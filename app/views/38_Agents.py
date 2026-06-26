@@ -104,6 +104,89 @@ if findings:
 else:
     st.caption("No findings in the latest run.")
 
+# ---- FP&A forward view: forecast · rolling cash flow · next-year budget -----
+if agent.key == "fpa":
+    from bizclinik_erp.services import forecast as fc_svc
+
+    ui.section("Forecast · Rolling cash flow · Next-year budget")
+    with get_session() as s:
+        bundle = fc_svc.forecast_bundle(s, as_of=pe, horizon=12, months_back=12)
+    t_fc, t_cf, t_bud = st.tabs(
+        ["📈 P&L forecast", "💧 Rolling cash flow", "🗓 Next-year budget"])
+
+    with t_fc:
+        act = pd.DataFrame(bundle["monthly_actuals"])
+        fcast = pd.DataFrame(bundle["pnl_forecast"])
+        frames = []
+        if not act.empty:
+            frames.append(act[["label", "net"]].assign(series="Actual net"))
+        if not fcast.empty:
+            frames.append(fcast[["label", "net"]].assign(series="Forecast net"))
+        if frames:
+            chart = pd.concat(frames).pivot(index="label", columns="series",
+                                            values="net")
+            st.line_chart(chart)
+        if not fcast.empty:
+            st.markdown("**Projected P&L — next 12 months**")
+            fdf = fcast.rename(columns={"label": "Month", "revenue": "Revenue",
+                                        "costs": "Costs", "net": "Net"})
+            fdf.insert(0, "S/N", range(1, len(fdf) + 1))
+            ui.dataframe(fdf, hide_index=True, width="stretch")
+        else:
+            st.caption("Not enough posted history yet to project — the forecast "
+                       "builds once there are a few months of activity.")
+
+    with t_cf:
+        cf = bundle["cash_flow"]
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Opening cash", ui.money(cf["opening"]))
+        c2.metric("Lowest projected", ui.money(cf["min_balance"]))
+        c3.metric("Ending (12m)", ui.money(cf["ending"]))
+        if cf["first_negative"]:
+            st.warning(f"⚠️ Cash is projected to go negative in "
+                       f"{cf['first_negative']['label']} "
+                       f"({ui.money(cf['first_negative']['shortfall'])}).")
+        rows_cf = pd.DataFrame(cf["rows"])
+        if not rows_cf.empty:
+            st.line_chart(rows_cf.set_index("label")[["balance"]])
+            disp = rows_cf.rename(columns={"label": "Month", "inflow": "Inflow",
+                                           "outflow": "Outflow", "net": "Net",
+                                           "balance": "Balance"})
+            disp.insert(0, "S/N", range(1, len(disp) + 1))
+            ui.dataframe(disp, hide_index=True, width="stretch")
+
+    with t_bud:
+        ann = bundle["annual"]
+        c1, c2, c3 = st.columns(3)
+        c1.metric(f"FY{ann['year']} revenue", ui.money(ann["revenue"]))
+        c2.metric("Costs", ui.money(ann["costs"]))
+        c3.metric("Net", ui.money(ann["net"]))
+        agg: dict = {}
+        for r in bundle["budget_rows"]:
+            a = agg.setdefault((r["account_id"], r["account_name"]),
+                               {"kind": r["kind"], "amount": 0.0})
+            a["amount"] += r["amount"]
+        brows = [{"Account": name, "Type": v["kind"],
+                  "Annual budget": round(v["amount"], 2)}
+                 for (aid, name), v in agg.items()]
+        brows.sort(key=lambda x: (x["Type"], -x["Annual budget"]))
+        if brows:
+            bdf = pd.DataFrame(brows)
+            bdf.insert(0, "S/N", range(1, len(bdf) + 1))
+            ui.dataframe(bdf, hide_index=True, width="stretch")
+            if can_run and st.button(
+                    f"💾 Save FY{ann['year']} budget to the Budgets module",
+                    key="save_budget", type="primary"):
+                with get_session() as s:
+                    res = fc_svc.save_as_budget(s, as_of=pe)
+                ui.flash(f"Saved '{res['name']}' — {res['lines']} budget lines. "
+                         f"Open the Budgets page to review budget-vs-actual.")
+                st.rerun()
+        else:
+            st.caption("Not enough history to build a next-year budget yet.")
+
+    st.caption("Assumptions — " + " ".join(bundle["assumptions"]))
+
 # ---- feedback (the learning loop) ------------------------------------------
 if can_run and findings:
     ui.section("Teach the agent", "Grade a finding — the agent prioritises what "
