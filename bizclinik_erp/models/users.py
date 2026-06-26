@@ -42,24 +42,25 @@ PERMISSIONS: dict[Role, set[str]] = {
         "manage.banks", "manage.employees", "manage.assets",
         "run.payroll", "run.depreciation", "import.data", "reset.db",
         "view.reports", "view.audit", "export.pdf", "manage.school",
+        "agents.view", "agents.run",
     },
     Role.ACCOUNTANT: {
         "view.dashboard", "post.invoice", "post.bill", "post.receipt", "post.payment",
         "post.journal", "void.any", "manage.coa", "manage.products", "manage.customers",
         "manage.suppliers", "manage.banks", "manage.employees", "manage.assets",
         "run.payroll", "run.depreciation", "view.reports", "view.audit", "export.pdf",
-        "import.data", "manage.school",
+        "import.data", "manage.school", "agents.view", "agents.run",
     },
     Role.SALES: {
         "view.dashboard", "post.invoice", "post.receipt", "manage.customers",
-        "view.reports", "export.pdf",
+        "view.reports", "export.pdf", "agents.view",
     },
     Role.AP: {
         "view.dashboard", "post.bill", "post.payment", "manage.suppliers",
-        "view.reports", "export.pdf",
+        "view.reports", "export.pdf", "agents.view",
     },
     Role.VIEWER: {
-        "view.dashboard", "view.reports", "export.pdf",
+        "view.dashboard", "view.reports", "export.pdf", "agents.view",
     },
 }
 

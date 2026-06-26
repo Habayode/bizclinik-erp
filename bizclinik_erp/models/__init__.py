@@ -93,6 +93,7 @@ from .school_notify import (
     NotifyStatus,
     ParentNotification,
 )
+from .agents import AgentBaseline, AgentFinding, AgentRun
 
 __all__ = [
     # master
@@ -143,4 +144,6 @@ __all__ = [
     "StaffType", "TeacherProfile",
     # School (parent notifications, GL-free)
     "ParentNotification", "NotifyChannel", "NotifyKind", "NotifyStatus",
+    # AI agents (runs, findings, learned baselines)
+    "AgentRun", "AgentFinding", "AgentBaseline",
 ]

@@ -719,3 +719,83 @@ async def report_balance_sheet(as_of: date = Query(...)) -> dict:
             return reports_svc.balance_sheet(s, as_of=as_of)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+# ---- AI agents -------------------------------------------------------------
+import json as _json
+
+from bizclinik_erp import agents as agents_svc
+
+
+class AgentRunIn(BaseModel):
+    from_: Optional[date] = Field(default=None, alias="from")
+    to: Optional[date] = None
+    use_llm: bool = True
+
+
+class AgentFeedbackIn(BaseModel):
+    status: str  # accepted | dismissed | resolved | open
+    rating: Optional[int] = None
+    note: Optional[str] = None
+
+
+def _finding_out(f) -> dict:
+    return {"id": f.id, "kind": f.kind, "severity": f.severity, "title": f.title,
+            "detail": f.detail, "metric_value": f.metric_value,
+            "baseline_value": f.baseline_value, "signature": f.signature,
+            "status": f.status}
+
+
+def _run_out(run, findings) -> dict:
+    return {"id": run.id, "agent": run.agent_key,
+            "run_at": run.run_at.isoformat(),
+            "headline": run.headline, "summary": run.summary,
+            "recommendations": _json.loads(run.recommendations or "[]"),
+            "model_used": run.model_used, "findings_count": run.findings_count,
+            "findings": [_finding_out(f) for f in findings]}
+
+
+@app.get("/api/v1/agents", dependencies=[Depends(require_api_key)])
+async def list_agents_ep() -> list[dict]:
+    return [{"key": a.key, "label": a.label, "icon": a.icon,
+             "description": a.description} for a in agents_svc.list_agents()]
+
+
+@app.post("/api/v1/agents/{key}/run", dependencies=[Depends(require_api_key)])
+async def run_agent_ep(key: str, payload: AgentRunIn) -> dict:
+    try:
+        agent = agents_svc.get_agent(key)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"Unknown agent: {key}")
+    with get_session() as s:
+        try:
+            run = agent.run(s, period_start=payload.from_, period_end=payload.to,
+                            use_llm=payload.use_llm)
+            return _run_out(run, agents_svc.findings_for_run(s, run.id))
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/api/v1/agents/{key}/findings", dependencies=[Depends(require_api_key)])
+async def agent_findings_ep(key: str) -> dict:
+    try:
+        agents_svc.get_agent(key)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"Unknown agent: {key}")
+    with get_session() as s:
+        run = agents_svc.latest_run(s, key)
+        if run is None:
+            return {"agent": key, "id": None, "findings": []}
+        return _run_out(run, agents_svc.findings_for_run(s, run.id))
+
+
+@app.post("/api/v1/agents/findings/{finding_id}/feedback",
+          dependencies=[Depends(require_api_key)])
+async def agent_feedback_ep(finding_id: int, payload: AgentFeedbackIn) -> dict:
+    with get_session() as s:
+        try:
+            f = agents_svc.record_feedback(s, finding_id, status=payload.status,
+                                           rating=payload.rating, note=payload.note)
+            return _finding_out(f)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc

@@ -76,6 +76,7 @@ def build_nav_spec(vertical: str = "general",
     monthend = _p("views/11_Month_End.py", "Month-End", "📅")
     statements = _p("views/12_Statements.py", "Statements", "📃")
     reports = _p("views/15_Reports.py", "Reports", "📈")
+    agents = _p("views/38_Agents.py", "AI Agents", "🤖")
 
     if vertical == "school":
         # School-first: a School Dashboard is the landing, the School group is
@@ -99,6 +100,7 @@ def build_nav_spec(vertical: str = "general",
                 finance_dash, sales, purchases, inventory, banking, bankrec,
                 assets, recurring, gl, budgets, monthend, statements, reports,
                 approvals]),
+            ("Intelligence", [agents]),
             ("HR", list(_HR_PAGES)),
             ("System", _system_pages(platform_admin)),
         ]
@@ -109,6 +111,7 @@ def build_nav_spec(vertical: str = "general",
         ("Finance & Accounting", [
             sales, purchases, inventory, banking, bankrec, assets, recurring,
             firs, currencies, gl, budgets, monthend, statements, reports, approvals]),
+        ("Intelligence", [agents]),
         ("CRM", [_p("views/23_CRM.py", "CRM", "🤝")]),
         ("HR", list(_HR_PAGES)),
         ("System", _system_pages(platform_admin)),
