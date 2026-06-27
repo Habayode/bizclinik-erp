@@ -75,6 +75,36 @@ def test_idempotent(fresh_db):
     assert adds == []
 
 
+def test_default_literal_boolean_is_sql_literal_not_int():
+    """Regression: a boolean default must render as true/false, never 1/0.
+    `BOOLEAN DEFAULT 1` is rejected by Postgres and once broke login when the
+    welcome_show/welcome_voice columns silently failed to migrate."""
+    from sqlalchemy import Boolean, Column
+    from bizclinik_erp.services.migrate import _default_literal
+    assert _default_literal(Column("x", Boolean, default=True)) == "true"
+    assert _default_literal(Column("y", Boolean, default=False)) == "false"
+
+
+def test_ensure_schema_readds_dropped_boolean_column(fresh_db):
+    """A DB predating a boolean column gets it back with no failed DDL."""
+    import sqlite3
+    if sqlite3.sqlite_version_info < (3, 35, 0):
+        import pytest
+        pytest.skip("needs SQLite >= 3.35 for ALTER TABLE DROP COLUMN")
+    from sqlalchemy import inspect, text
+    from bizclinik_erp.db import get_engine
+    from bizclinik_erp.services.migrate import ensure_schema
+
+    eng = get_engine()
+    with eng.begin() as conn:
+        conn.execute(text('ALTER TABLE "user" DROP COLUMN welcome_voice'))
+    assert "welcome_voice" not in {c["name"] for c in inspect(eng).get_columns("user")}
+
+    applied = ensure_schema(eng)
+    assert not any("FAILED" in a for a in applied), applied
+    assert "welcome_voice" in {c["name"] for c in inspect(eng).get_columns("user")}
+
+
 def test_ensure_database_noop_on_sqlite():
     """ensure_database is a no-op (returns False) when not on Postgres."""
     from bizclinik_erp.services.pg_migrate import ensure_database

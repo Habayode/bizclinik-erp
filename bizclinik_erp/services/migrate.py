@@ -16,6 +16,7 @@ design). Call it after create_all() in init_db().
 """
 from __future__ import annotations
 
+import sys
 from typing import Optional
 
 from sqlalchemy import inspect, text
@@ -30,7 +31,10 @@ def _default_literal(col) -> Optional[str]:
     if d is not None and getattr(d, "is_scalar", False):
         val = d.arg
         if isinstance(val, bool):
-            return "1" if val else "0"
+            # Use the SQL boolean literal, not 1/0. Postgres rejects
+            # `BOOLEAN DEFAULT 1` (type mismatch); `true`/`false` is valid on
+            # both Postgres and modern SQLite (>= 3.23).
+            return "true" if val else "false"
         if isinstance(val, (int, float)):
             return str(val)
         if isinstance(val, str):
@@ -67,7 +71,12 @@ def ensure_schema(engine: Optional[Engine] = None) -> list[str]:
                     conn.execute(text(ddl))
                     applied.append(ddl)
                 except Exception as exc:  # pragma: no cover - defensive
-                    applied.append(f"-- FAILED: {ddl}  ({exc})")
+                    # Surface loudly: a swallowed ADD COLUMN failure leaves the
+                    # live DB out of sync with the model and breaks every query
+                    # that loads the table (this once broke login).
+                    msg = f"-- FAILED: {ddl}  ({exc})"
+                    applied.append(msg)
+                    print(f"[ensure_schema] {msg}", file=sys.stderr)
 
         # Create any indexes declared on the models but missing on existing
         # tables (e.g. the receipt/payment idempotency indexes added later).
