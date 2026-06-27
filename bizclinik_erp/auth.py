@@ -33,6 +33,7 @@ _USERNAME_KEY = "_bizclinik_username"
 _ROLE_KEY = "_bizclinik_role"
 _TOKEN_KEY = "_bizclinik_session_token"
 _FAIL_KEY = "_bizclinik_login_fails"
+_GREET_KEY = "_bizclinik_greet"   # set on login success -> one-shot welcome
 _MAX_FAILS = 5
 
 
@@ -253,6 +254,7 @@ def _user_login_screen() -> None:
                     st.session_state[_FAIL_KEY] = 0
                     # Legacy flag kept True so has_perm() works for callers that haven't migrated.
                     st.session_state[_LEGACY_KEY] = True
+                    st.session_state[_GREET_KEY] = True
                     st.rerun()
                 else:
                     st.session_state[_FAIL_KEY] = fails + 1
@@ -278,6 +280,7 @@ def _legacy_password_screen() -> None:
             if expected and hmac.compare_digest(pw, expected):
                 st.session_state[_LEGACY_KEY] = True
                 st.session_state[_FAIL_KEY] = 0
+                st.session_state[_GREET_KEY] = True
                 st.rerun()
             else:
                 st.session_state[_FAIL_KEY] = fails + 1
@@ -446,6 +449,23 @@ def _apply_tenant() -> None:
     tenancy.set_active(sel)
 
 
+def _maybe_greet() -> None:
+    """Render the JARVIS-style welcome once, right after a successful login."""
+    if not st.session_state.pop(_GREET_KEY, False):
+        return
+    try:
+        from . import welcome
+        from .db import get_session
+        user = current_user() or {
+            "username": st.session_state.get(_USERNAME_KEY) or "Admin",
+            "role": st.session_state.get(_ROLE_KEY) or "ADMIN",
+        }
+        with get_session() as s:
+            welcome.render(user, s)
+    except Exception:
+        pass
+
+
 def require_login() -> None:
     """Top of every page. Picks a tenant (if multi-tenant), then renders the
     lock screen + st.stop() until signed in.
@@ -465,6 +485,7 @@ def require_login() -> None:
             # Bind the actor so service-layer authz enforces this user's role.
             authz.set_actor_role(st.session_state.get(_ROLE_KEY))
             authz.set_platform_admin(is_platform_admin())
+            _maybe_greet()
             return
         authz.clear_actor()
         _user_login_screen()
@@ -476,6 +497,7 @@ def require_login() -> None:
     if st.session_state.get(_LEGACY_KEY):
         authz.set_actor_role("ADMIN")   # legacy single-password = implicit admin
         authz.set_platform_admin(is_platform_admin())
+        _maybe_greet()
         return
     authz.clear_actor()
     _legacy_password_screen()
