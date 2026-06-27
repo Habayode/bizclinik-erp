@@ -167,72 +167,40 @@ with tab_inv:
             cur_codes = [c.code for c in s.execute(
                 _sel(Currency).where(Currency.is_active == True)  # noqa: E712
                 .order_by(Currency.is_base.desc(), Currency.code)).scalars()]
-        with st.form("new_invoice"):
-            sel_cust = st.selectbox("Customer", list(cust_opts.keys()))
-            c1, c2, c3 = st.columns(3)
-            inv_date = c1.date_input("Invoice date", value=date.today())
-            due = c2.date_input("Due date", value=date.today() + timedelta(days=30))
-            sel_cur = c3.selectbox("Currency", cur_codes or ["NGN"],
-                                    help="Foreign-currency invoices post to the "
-                                         "ledger in NGN at the latest rate.")
-            prod_by_label = {f"{p['sku']} — {p['name']}": p for p in prods}
-            seed = [{"product": "(none)", "description": "", "qty": 1.0,
-                     "unit_price": 0.0, "tax_rate": 0.075}]
-            grid = st.data_editor(pd.DataFrame(seed), num_rows="dynamic",
-                                  key="inv_grid",
-                                  column_config={
-                                      "product": st.column_config.SelectboxColumn(
-                                          "Product",
-                                          options=["(none)"] + list(prod_by_label),
-                                          help="Pick a product, or leave (none) "
-                                               "for a free-text line"),
-                                      "description": st.column_config.TextColumn(
-                                          "Description", width="large"),
-                                      "qty": st.column_config.NumberColumn("Qty", min_value=0.0),
-                                      "unit_price": st.column_config.NumberColumn(
-                                          "Unit price (₦)", min_value=0.0, format="%.2f",
-                                          help="0 with a product selected = use its list price"),
-                                      "tax_rate": st.column_config.NumberColumn(
-                                          "Tax (decimal)", min_value=0.0, max_value=1.0,
-                                          format="%.3f"),
-                                  })
-            notes = st.text_area("Notes")
-            submit = st.form_submit_button("Issue invoice", type="primary")
-        if submit:
-            lines = []
-            for _, row in grid.iterrows():
-                prod = prod_by_label.get(str(row.get("product") or ""))
-                desc = str(row.get("description") or "").strip()
-                if not desc and prod:
-                    desc = prod["name"]
-                if not desc:
-                    continue
-                price = float(row["unit_price"] or 0)
-                if price == 0 and prod:
-                    price = float(prod["price"] or 0)
-                lines.append(sales_svc.LineInput(
-                    product_id=prod["id"] if prod else None,
-                    description=desc, qty=float(row["qty"] or 0),
-                    unit_price=price,
-                    tax_rate=float(row["tax_rate"] or 0),
-                ))
-            if not lines:
-                st.error("Add at least one line.")
-            else:
-                try:
-                    with get_session() as s:
-                        inv = sales_svc.issue_invoice(
-                            s, customer_id=cust_opts[sel_cust], invoice_date=inv_date,
-                            due_date=due, lines=lines, notes=notes or None,
-                            currency_code=sel_cur,
-                        )
-                        cur = inv.currency_code
-                        st.success(f"Issued {inv.number} — total {cur} "
-                                   f"{inv.grand_total:,.2f}"
-                                   + (f" (₦{inv.grand_total * inv.fx_rate:,.2f})"
-                                      if cur != "NGN" else ""))
-                except ValueError as e:
-                    st.error(str(e))
+        sel_cust = st.selectbox("Customer", list(cust_opts.keys()))
+        c1, c2, c3 = st.columns(3)
+        inv_date = c1.date_input("Invoice date", value=date.today())
+        due = c2.date_input("Due date", value=date.today() + timedelta(days=30))
+        sel_cur = c3.selectbox("Currency", cur_codes or ["NGN"],
+                               help="Foreign-currency invoices post to the ledger "
+                                    "in NGN at the latest rate.")
+        notes = st.text_area("Notes")
+        inv_prods = [{"id": p["id"], "sku": p["sku"], "name": p["name"],
+                      "default_price": p["price"]} for p in prods]
+        lines = ui.line_builder("inv_lines", inv_prods, price_label="Unit price (₦)")
+        if lines and st.button("Issue invoice", type="primary", key="inv_save",
+                               use_container_width=True):
+            line_inputs = [sales_svc.LineInput(
+                product_id=l["product_id"], description=l["description"],
+                qty=l["qty"], unit_price=l["price"], tax_rate=l["tax_rate"],
+            ) for l in lines]
+            try:
+                with get_session() as s:
+                    inv = sales_svc.issue_invoice(
+                        s, customer_id=cust_opts[sel_cust], invoice_date=inv_date,
+                        due_date=due, lines=line_inputs, notes=notes or None,
+                        currency_code=sel_cur,
+                    )
+                    cur = inv.currency_code
+                    ngn = (f" (₦{inv.grand_total * inv.fx_rate:,.2f})"
+                           if cur != "NGN" else "")
+                    msg = (f"Issued {inv.number} — total {cur} "
+                           f"{inv.grand_total:,.2f}{ngn}.")
+                ui.line_builder_clear("inv_lines")
+                ui.flash(msg)
+                st.rerun()
+            except ValueError as e:
+                st.error(str(e))
 
 
 # ----- Quotations tab -------------------------------------------------------
@@ -255,40 +223,32 @@ with tab_quote:
         cust_opts = _customer_options(s)
         prods = _product_options(s)
     if cust_opts:
-        with st.form("new_quote"):
-            sel_cust = st.selectbox("Customer", list(cust_opts.keys()), key="quo_cust")
-            issue = st.date_input("Issue date", value=date.today(), key="quo_issue")
-            valid = st.date_input("Valid until",
-                                   value=date.today() + timedelta(days=30), key="quo_valid")
-            seed = [{"product_id": p["id"], "description": p["name"], "qty": 1,
-                     "unit_price": p["price"], "tax_rate": 0.075}
-                    for p in prods[:3]] or [{"product_id": None, "description": "",
-                                                "qty": 1, "unit_price": 0.0,
-                                                "tax_rate": 0.075}]
-            grid = st.data_editor(pd.DataFrame(seed), num_rows="dynamic", key="quo_grid")
-            notes = st.text_area("Notes", key="quo_notes")
-            submit = st.form_submit_button("Save quotation", type="primary")
-        if submit:
-            lines = []
-            for _, row in grid.iterrows():
-                desc = str(row.get("description") or "").strip()
-                if not desc:
-                    continue
-                lines.append(sales_svc.LineInput(
-                    product_id=int(row["product_id"]) if pd.notna(row["product_id"]) else None,
-                    description=desc, qty=float(row["qty"] or 0),
-                    unit_price=float(row["unit_price"] or 0),
-                    tax_rate=float(row["tax_rate"] or 0),
-                ))
-            if not lines:
-                st.error("Add at least one line.")
-            else:
+        sel_cust = st.selectbox("Customer", list(cust_opts.keys()), key="quo_cust")
+        issue = st.date_input("Issue date", value=date.today(), key="quo_issue")
+        valid = st.date_input("Valid until",
+                              value=date.today() + timedelta(days=30), key="quo_valid")
+        notes = st.text_area("Notes", key="quo_notes")
+        quo_prods = [{"id": p["id"], "sku": p["sku"], "name": p["name"],
+                      "default_price": p["price"]} for p in prods]
+        lines = ui.line_builder("quo_lines", quo_prods, price_label="Unit price (₦)")
+        if lines and st.button("Save quotation", type="primary", key="quo_save",
+                               use_container_width=True):
+            line_inputs = [sales_svc.LineInput(
+                product_id=l["product_id"], description=l["description"],
+                qty=l["qty"], unit_price=l["price"], tax_rate=l["tax_rate"],
+            ) for l in lines]
+            try:
                 with get_session() as s:
                     q = sales_svc.create_quotation(
                         s, customer_id=cust_opts[sel_cust], issue_date=issue,
-                        valid_until=valid, lines=lines, notes=notes or None,
+                        valid_until=valid, lines=line_inputs, notes=notes or None,
                     )
-                    st.success(f"Saved {q.number} — total ₦{q.grand_total:,.2f}")
+                    msg = f"Saved {q.number} — total ₦{q.grand_total:,.2f}."
+                ui.line_builder_clear("quo_lines")
+                ui.flash(msg)
+                st.rerun()
+            except ValueError as e:
+                st.error(str(e))
 
 
 # ----- Sales orders tab -----------------------------------------------------
