@@ -310,12 +310,15 @@ with tab_po:
                 payload = {"supplier_id": sup_opts[sel_sup],
                            "order_date": order_date.isoformat(),
                            "lines": line_dicts, "notes": notes or None}
-                with get_session() as s:
-                    res = approvals.gate(
-                        s, doc_type="PO", amount=ngn_total,
-                        title=f"PO — {sel_sup} (₦{ngn_total:,.0f})",
-                        payload=payload, user_id=UID, role=ROLE)
-                _gate_msg(res, "Saved {ref}.")
+                try:
+                    with get_session() as s:
+                        res = approvals.gate(
+                            s, doc_type="PO", amount=ngn_total,
+                            title=f"PO — {sel_sup} (₦{ngn_total:,.0f})",
+                            payload=payload, user_id=UID, role=ROLE)
+                    _gate_msg(res, "Saved {ref}.")
+                except ValueError as e:
+                    st.error(str(e))
 
 
 with tab_pay:
@@ -360,11 +363,14 @@ with tab_pay:
                 "method": method, "reference": ref or None,
                 "settlement_fx_rate": None,
             }
-            with get_session() as s:
-                res = approvals.gate(
-                    s, doc_type="PAYMENT", amount=float(amt),
-                    title=f"Payment — {sel_sup} (₦{amt:,.0f})",
-                    payload=payload, user_id=UID, role=ROLE)
-            _gate_msg(res, "Payment {ref} posted.")
+            try:
+                with get_session() as s:
+                    res = approvals.gate(
+                        s, doc_type="PAYMENT", amount=float(amt),
+                        title=f"Payment — {sel_sup} (₦{amt:,.0f})",
+                        payload=payload, user_id=UID, role=ROLE)
+                _gate_msg(res, "Payment {ref} posted.")
+            except ValueError as e:
+                st.error(str(e))
 
 auth.render_logout_in_sidebar()

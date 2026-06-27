@@ -387,13 +387,16 @@ with tab_rct:
             rdate = st.date_input("Receipt date", value=date.today())
             submit = st.form_submit_button("Record receipt", type="primary")
         if submit:
-            with get_session() as s:
-                r = sales_svc.record_receipt(
-                    s, customer_id=cust_opts[sel_cust], receipt_date=rdate,
-                    amount=amt, bank_account_id=bank_opts[sel_bank],
-                    invoice_id=inv_opts.get(sel_inv) if sel_inv else None,
-                    method=method, reference=ref or None,
-                )
-                st.success(f"Recorded {r.number} — ₦{r.amount:,.2f}")
+            try:
+                with get_session() as s:
+                    r = sales_svc.record_receipt(
+                        s, customer_id=cust_opts[sel_cust], receipt_date=rdate,
+                        amount=amt, bank_account_id=bank_opts[sel_bank],
+                        invoice_id=inv_opts.get(sel_inv) if sel_inv else None,
+                        method=method, reference=ref or None,
+                    )
+                    st.success(f"Recorded {r.number} — ₦{r.amount:,.2f}")
+            except ValueError as e:
+                st.error(str(e))
 
 auth.render_logout_in_sidebar()

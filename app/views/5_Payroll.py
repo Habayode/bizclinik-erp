@@ -113,21 +113,24 @@ with tab_run:
                 "bank_account_id": bank_opts[sel_bank], "notes": notes or None,
                 "inputs": input_dicts,
             }
-            with get_session() as s:
-                res = approvals.gate(
-                    s, doc_type="PAYROLL", amount=total_gross,
-                    title=f"Payroll {p_start:%b %Y} (₦{total_gross:,.0f})",
-                    payload=payload, user_id=UID, role=ROLE)
-            if res["status"] == "pending":
-                lim = res.get("limit")
-                lim_txt = f"₦{lim:,.0f}" if lim is not None else "your"
-                st.warning(
-                    f"🔒 Gross ₦{total_gross:,.0f} is above your approval limit "
-                    f"({lim_txt}) — submitted for approval (request "
-                    f"#{res['request_id']}). It posts once approved on the "
-                    "**Approvals** page.", icon="🔒")
-            else:
-                st.success(f"Payroll {res['ref']} posted.")
+            try:
+                with get_session() as s:
+                    res = approvals.gate(
+                        s, doc_type="PAYROLL", amount=total_gross,
+                        title=f"Payroll {p_start:%b %Y} (₦{total_gross:,.0f})",
+                        payload=payload, user_id=UID, role=ROLE)
+                if res["status"] == "pending":
+                    lim = res.get("limit")
+                    lim_txt = f"₦{lim:,.0f}" if lim is not None else "your"
+                    st.warning(
+                        f"🔒 Gross ₦{total_gross:,.0f} is above your approval limit "
+                        f"({lim_txt}) — submitted for approval (request "
+                        f"#{res['request_id']}). It posts once approved on the "
+                        "**Approvals** page.", icon="🔒")
+                else:
+                    st.success(f"Payroll {res['ref']} posted.")
+            except ValueError as e:
+                st.error(str(e))
 
 
 with tab_slip:
