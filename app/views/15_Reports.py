@@ -12,7 +12,10 @@ import streamlit as st
 
 from bizclinik_erp.db import get_session
 from bizclinik_erp.services import reports
+from bizclinik_erp.services import inventory as inv_svc
+from bizclinik_erp.services import assets as assets_svc
 from bizclinik_erp.services.tax import vat_return, wht_position
+from bizclinik_erp.models import AssetStatus
 from bizclinik_erp import ui_kit as ui
 from bizclinik_erp import auth
 
@@ -28,9 +31,10 @@ def money(x: float) -> str:
     return ui.money(x)
 
 
-tab_pnl, tab_bs, tab_cf, tab_ar, tab_ap, tab_vat = st.tabs(
+tab_pnl, tab_bs, tab_cf, tab_ar, tab_ap, tab_vat, tab_inv, tab_fa = st.tabs(
     ["📊 Profit & Loss", "⚖️ Balance Sheet", "💧 Cash Flow",
-     "→ AR Aging", "← AP Aging", "🧾 VAT & WHT"]
+     "→ AR Aging", "← AP Aging", "🧾 VAT & WHT",
+     "📦 Inventory", "🏭 Fixed Assets"]
 )
 
 
@@ -139,5 +143,37 @@ with tab_vat:
     a, b = st.columns(2)
     a.metric("WHT receivable (suffered)", money(wht["wht_suffered_receivable"]))
     b.metric("WHT payable (withheld)", money(wht["wht_withheld_payable"]))
+
+
+with tab_inv:
+    with get_session() as s:
+        rows = inv_svc.inventory_valuation(s)
+    if rows:
+        df = pd.DataFrame(rows)
+        st.metric("Total inventory at cost", money(df["value_at_cost"].sum()))
+        ui.dataframe(df, hide_index=True, width="stretch")
+        below = df[df["below_reorder"]]
+        if not below.empty:
+            st.warning(f"{len(below)} product(s) below reorder level.")
+    else:
+        st.info("No stockable products yet.")
+
+
+with tab_fa:
+    fa_asof = st.date_input("As of", value=date.today(), key="fa_asof")
+    with get_session() as s:
+        rows = assets_svc.asset_register(s, as_of=fa_asof)
+    if rows:
+        df = pd.DataFrame(rows).drop(columns=["id"])
+        active = df[df["status"] == AssetStatus.ACTIVE.value]
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Active assets", len(active))
+        c2.metric("Total cost",
+                  money(float(active["cost"].sum()) if not active.empty else 0.0))
+        c3.metric("Total NBV",
+                  money(float(active["nbv"].sum()) if not active.empty else 0.0))
+        ui.dataframe(df, hide_index=True, width="stretch")
+    else:
+        st.info("No fixed assets registered yet.")
 
 auth.render_logout_in_sidebar()

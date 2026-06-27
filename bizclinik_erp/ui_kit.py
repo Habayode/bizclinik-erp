@@ -219,13 +219,26 @@ footer { visibility: hidden; }
         padding-left: 0.75rem !important; padding-right: 0.75rem !important;
         padding-top: 1rem !important;
     }
-    /* Stack st.columns() vertically instead of squeezing them side-by-side. */
+    /* Stack st.columns() vertically instead of squeezing them side-by-side.
+       Cover both the legacy ("column") and current ("stColumn", Streamlit
+       >=1.30) test ids so the rule actually matches on this build. */
     [data-testid="stHorizontalBlock"] {
         flex-direction: column !important; gap: 0.5rem !important;
     }
-    [data-testid="stHorizontalBlock"] > [data-testid="column"] {
+    [data-testid="stHorizontalBlock"] > [data-testid="column"],
+    [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
         width: 100% !important; flex: 1 1 100% !important;
         min-width: 100% !important;
+    }
+    /* Many tabs (e.g. Reports) — let the strip scroll instead of overflowing. */
+    [data-testid="stTabs"] [role="tablist"] {
+        overflow-x: auto !important; flex-wrap: nowrap !important;
+    }
+    /* Inputs, selects and the form submit span the row for easy tapping. */
+    [data-testid="stFormSubmitButton"] > button { width: 100% !important; }
+    [data-baseweb="select"], [data-testid="stTextInput"],
+    [data-testid="stNumberInput"], [data-testid="stDateInput"] {
+        width: 100% !important;
     }
     /* Hero + headings scale down. */
     h1 { font-size: 1.5rem !important; line-height: 1.25 !important; }
@@ -337,6 +350,78 @@ def bulk_import_expander(kind: str, label: str, noun: Optional[str] = None) -> N
                 for e in res["errors"][:8]:
                     st.caption("• " + e)
                 st.rerun()
+
+
+def line_builder(state_key: str, products: list[dict], *,
+                 price_label: str = "Unit price (₦)",
+                 default_tax: float = 0.075) -> list[dict]:
+    """Payment-style line entry for multi-line documents (PO / SO).
+
+    Renders a clean 'Add a line' form (product · qty · price · tax + an Add-line
+    button) instead of a spreadsheet grid, accumulates lines in
+    st.session_state[state_key], shows the running lines (S/N first) with a
+    total + Clear button, and returns the current list. Each line is
+    {product_id, description, qty, price, tax_rate}. `products` are dicts with
+    sku/name/id and an optional 'default_price' used to prefill the price.
+    """
+    by_label = {f"{p['sku']} — {p['name']}": p for p in products}
+    st.session_state.setdefault(state_key, [])
+
+    with st.form(f"{state_key}_add", clear_on_submit=True):
+        st.markdown("**Add a line**")
+        sel = st.selectbox("Product", ["(custom / no product)"] + list(by_label),
+                           key=f"{state_key}_prod")
+        desc = st.text_input("Description (optional)", key=f"{state_key}_desc")
+        c1, c2, c3 = st.columns(3)
+        qty = c1.number_input("Qty", min_value=0.0, value=1.0, step=1.0,
+                              key=f"{state_key}_qty")
+        price = c2.number_input(price_label, min_value=0.0, format="%.2f",
+                                key=f"{state_key}_price")
+        tax = c3.number_input("Tax rate", min_value=0.0, max_value=1.0,
+                              value=default_tax, format="%.3f",
+                              key=f"{state_key}_tax")
+        add = st.form_submit_button("➕ Add line", type="primary",
+                                    use_container_width=True)
+    if add:
+        prod = by_label.get(sel)
+        d = (desc or "").strip() or (prod["name"] if prod else "")
+        pr = price or (float(prod.get("default_price") or 0) if prod else 0.0)
+        if not d:
+            st.error("Pick a product or enter a description.")
+        elif qty <= 0:
+            st.error("Quantity must be greater than zero.")
+        else:
+            st.session_state[state_key].append({
+                "product_id": prod["id"] if prod else None,
+                "description": d, "qty": float(qty),
+                "price": float(pr), "tax_rate": float(tax),
+            })
+            st.rerun()
+
+    lines = st.session_state[state_key]
+    if lines:
+        disp = pd.DataFrame([{
+            "S/N": i + 1, "Description": l["description"], "Qty": l["qty"],
+            "Price": l["price"], "Tax": l["tax_rate"],
+            "Line total": round(l["qty"] * l["price"] * (1 + l["tax_rate"]), 2),
+        } for i, l in enumerate(lines)])
+        dataframe(disp, hide_index=True, width="stretch")
+        total = round(sum(l["qty"] * l["price"] * (1 + l["tax_rate"])
+                          for l in lines), 2)
+        cc1, cc2 = st.columns([1, 1])
+        cc1.metric("Total", f"₦{total:,.2f}")
+        if cc2.button("🗑 Clear lines", key=f"{state_key}_clear",
+                      use_container_width=True):
+            st.session_state[state_key] = []
+            st.rerun()
+    else:
+        st.caption("No lines yet — add at least one above.")
+    return lines
+
+
+def line_builder_clear(state_key: str) -> None:
+    """Reset a line_builder's accumulated lines (call after a successful save)."""
+    st.session_state[state_key] = []
 
 
 def pick_row(df, *, key: str, column_config=None, height=None):

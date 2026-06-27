@@ -314,38 +314,29 @@ with tab_so:
         st.info("No customers yet.")
         st.page_link("views/17_Settings.py", label="➕ Add a customer in Settings", icon="⚙️")
     else:
-        with st.form("new_so"):
-            sel_cust = st.selectbox("Customer", list(cust_opts.keys()), key="so_cust")
-            order_date = st.date_input("Order date", value=date.today(), key="so_date")
-            seed = [{"product_id": p["id"], "description": p["name"], "qty": 1,
-                     "unit_price": p["price"], "tax_rate": 0.075}
-                    for p in prods[:3]] or [{"product_id": None, "description": "",
-                                                "qty": 1, "unit_price": 0.0,
-                                                "tax_rate": 0.075}]
-            grid = st.data_editor(pd.DataFrame(seed), num_rows="dynamic", key="so_grid")
-            notes = st.text_area("Notes", key="so_notes")
-            submit = st.form_submit_button("Save sales order", type="primary")
-        if submit:
-            lines = []
-            for _, row in grid.iterrows():
-                desc = str(row.get("description") or "").strip()
-                if not desc:
-                    continue
-                lines.append(sales_svc.LineInput(
-                    product_id=int(row["product_id"]) if pd.notna(row["product_id"]) else None,
-                    description=desc, qty=float(row["qty"] or 0),
-                    unit_price=float(row["unit_price"] or 0),
-                    tax_rate=float(row["tax_rate"] or 0),
-                ))
-            if not lines:
-                st.error("Add at least one line.")
-            else:
+        sel_cust = st.selectbox("Customer", list(cust_opts.keys()), key="so_cust")
+        order_date = st.date_input("Order date", value=date.today(), key="so_date")
+        notes = st.text_area("Notes", key="so_notes")
+        so_prods = [{"id": p["id"], "sku": p["sku"], "name": p["name"],
+                     "default_price": p["price"]} for p in prods]
+        lines = ui.line_builder("so_lines", so_prods, price_label="Unit price (₦)")
+        if lines and st.button("Save sales order", type="primary",
+                               key="so_save", use_container_width=True):
+            line_inputs = [sales_svc.LineInput(
+                product_id=l["product_id"], description=l["description"],
+                qty=l["qty"], unit_price=l["price"], tax_rate=l["tax_rate"],
+            ) for l in lines]
+            try:
                 with get_session() as s:
                     so = sales_svc.create_sales_order(
                         s, customer_id=cust_opts[sel_cust], order_date=order_date,
-                        lines=lines, notes=notes or None,
+                        lines=line_inputs, notes=notes or None,
                     )
-                    st.success(f"Saved {so.number}")
+                ui.line_builder_clear("so_lines")
+                ui.flash(f"Saved {so.number}.")
+                st.rerun()
+            except ValueError as e:
+                st.error(str(e))
 
 
 # ----- Receipts tab ---------------------------------------------------------

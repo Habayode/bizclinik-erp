@@ -260,65 +260,42 @@ with tab_po:
         st.info("No suppliers yet.")
         st.page_link("views/17_Settings.py", label="➕ Add a supplier in Settings", icon="⚙️")
     else:
-        with st.form("new_po"):
-            sel_sup = st.selectbox("Supplier", list(sup_opts.keys()), key="po_sup")
-            order_date = st.date_input("Order date", value=date.today(), key="po_date")
-            po_prod_by_label = {f"{p['sku']} — {p['name']}": p for p in prods}
-            seed = [{"product": "(none)", "description": "", "qty": 1.0,
-                     "unit_cost": 0.0, "tax_rate": 0.075}]
-            grid = st.data_editor(
-                pd.DataFrame(seed), num_rows="dynamic", key="po_grid",
-                column_config={
-                    "product": st.column_config.SelectboxColumn(
-                        "Product", options=["(none)"] + list(po_prod_by_label)),
-                    "description": st.column_config.TextColumn(
-                        "Description", width="large"),
-                    "qty": st.column_config.NumberColumn("Qty", min_value=0.0),
-                    "unit_cost": st.column_config.NumberColumn(
-                        "Unit cost (₦)", min_value=0.0, format="%.2f"),
-                    "tax_rate": st.column_config.NumberColumn(
-                        "Tax (decimal)", min_value=0.0, max_value=1.0,
-                        format="%.3f"),
-                })
-            notes = st.text_area("Notes", key="po_notes")
-            submit = st.form_submit_button("Save purchase order", type="primary")
-        if submit:
-            line_dicts = []
-            for _, row in grid.iterrows():
-                prod = po_prod_by_label.get(str(row.get("product") or ""))
-                desc = str(row.get("description") or "").strip()
-                if not desc and prod:
-                    desc = prod["name"]
-                if not desc:
-                    continue
-                cost = float(row["unit_cost"] or 0)
-                if cost == 0 and prod:
-                    cost = float(prod["cost"] or 0)
-                line_dicts.append({
-                    "product_id": prod["id"] if prod else None,
-                    "description": desc, "qty": float(row["qty"] or 0),
-                    "unit_cost": cost,
-                    "tax_rate": float(row["tax_rate"] or 0),
-                    "expense_account_id": None,
-                })
-            if not line_dicts:
-                st.error("Add at least one line.")
-            else:
-                ngn_total = round(sum(
-                    l["qty"] * l["unit_cost"] * (1 + l["tax_rate"])
-                    for l in line_dicts), 2)
-                payload = {"supplier_id": sup_opts[sel_sup],
-                           "order_date": order_date.isoformat(),
-                           "lines": line_dicts, "notes": notes or None}
-                try:
-                    with get_session() as s:
-                        res = approvals.gate(
-                            s, doc_type="PO", amount=ngn_total,
-                            title=f"PO — {sel_sup} (₦{ngn_total:,.0f})",
-                            payload=payload, user_id=UID, role=ROLE)
-                    _gate_msg(res, "Saved {ref}.")
-                except ValueError as e:
-                    st.error(str(e))
+        sel_sup = st.selectbox("Supplier", list(sup_opts.keys()), key="po_sup")
+        order_date = st.date_input("Order date", value=date.today(), key="po_date")
+        notes = st.text_area("Notes", key="po_notes")
+        po_prods = [{"id": p["id"], "sku": p["sku"], "name": p["name"],
+                     "default_price": p["cost"]} for p in prods]
+        lines = ui.line_builder("po_lines", po_prods, price_label="Unit cost (₦)")
+        if lines and st.button("Save purchase order", type="primary",
+                               key="po_save", use_container_width=True):
+            ngn_total = round(sum(
+                l["qty"] * l["price"] * (1 + l["tax_rate"]) for l in lines), 2)
+            payload = {
+                "supplier_id": sup_opts[sel_sup],
+                "order_date": order_date.isoformat(),
+                "lines": [{"product_id": l["product_id"],
+                           "description": l["description"], "qty": l["qty"],
+                           "unit_cost": l["price"], "tax_rate": l["tax_rate"],
+                           "expense_account_id": None} for l in lines],
+                "notes": notes or None,
+            }
+            try:
+                with get_session() as s:
+                    res = approvals.gate(
+                        s, doc_type="PO", amount=ngn_total,
+                        title=f"PO — {sel_sup} (₦{ngn_total:,.0f})",
+                        payload=payload, user_id=UID, role=ROLE)
+                ui.line_builder_clear("po_lines")
+                if res["status"] == "pending":
+                    lim = res.get("limit")
+                    lt = f"₦{lim:,.0f}" if lim is not None else "your"
+                    ui.flash(f"🔒 Above your approval limit ({lt}) — submitted for "
+                             f"approval (#{res['request_id']}).", icon="🔒")
+                else:
+                    ui.flash(f"Saved {res['ref']}.")
+                st.rerun()
+            except ValueError as e:
+                st.error(str(e))
 
 
 with tab_pay:
