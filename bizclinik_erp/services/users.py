@@ -114,6 +114,26 @@ def set_password(session: Session, user_id: int, new_password: str,
            user_id=acting_user_id, source="services.users")
 
 
+def get_welcome_prefs(session: Session, user_id: int) -> tuple[bool, bool]:
+    """(show_banner, speak_aloud) for the login welcome. Defaults to (True, True)."""
+    user = session.get(User, user_id)
+    if not user:
+        return True, True
+    return (bool(getattr(user, "welcome_show", True)),
+            bool(getattr(user, "welcome_voice", True)))
+
+
+def set_welcome_prefs(session: Session, user_id: int, *, show: bool,
+                      voice: bool) -> None:
+    """Self-service: update the current user's login-welcome preferences."""
+    user = session.get(User, user_id)
+    if not user:
+        raise ValueError("User not found.")
+    user.welcome_show = bool(show)
+    user.welcome_voice = bool(voice)
+    session.flush()
+
+
 def set_role(session: Session, user_id: int, role: Role | str,
               acting_user_id: Optional[int] = None) -> None:
     user = session.get(User, user_id)

@@ -1,9 +1,11 @@
 """JARVIS-style welcome shown once when a user signs in.
 
-A sleek animated banner that greets the user by name with a time-aware line and
-a short live briefing (pending approvals, critical agent flags), and speaks it
+A sleek animated banner that greets the user by name with a time-aware, lightly
+butler-toned line, today's date, a headline KPI (month-to-date revenue) and a
+short live briefing (pending approvals, critical agent flags) — and speaks it
 aloud via the browser's Web Speech API. The text-building functions are pure and
-testable; render() does the Streamlit/HTML side.
+testable; render() does the Streamlit/HTML side. Each user can mute the voice or
+hide the banner entirely from Settings (welcome_show / welcome_voice).
 """
 from __future__ import annotations
 
@@ -31,8 +33,37 @@ def display_name(user: dict) -> str:
     return first[:1].upper() + first[1:]
 
 
+def naira(x: float) -> str:
+    x = float(x or 0)
+    if abs(x) >= 1e9:
+        return f"₦{x / 1e9:.1f}b"
+    if abs(x) >= 1e6:
+        return f"₦{x / 1e6:.1f}m"
+    if abs(x) >= 1e3:
+        return f"₦{x / 1e3:.0f}k"
+    return f"₦{x:,.0f}"
+
+
+def kpi_line(session) -> Optional[str]:
+    """A single headline KPI — month-to-date revenue. Best-effort."""
+    try:
+        from datetime import date
+
+        from .services import reports
+        today = date.today()
+        p = reports.profit_and_loss(session,
+                                    period_start=date(today.year, today.month, 1),
+                                    period_end=today)
+        rev = p.get("total_revenue", 0.0) or 0.0
+        if rev > 0:
+            return f"{naira(rev)} in revenue so far this month"
+    except Exception:
+        pass
+    return None
+
+
 def build_briefing(session, user: Optional[dict] = None) -> list[str]:
-    """Best-effort live status lines. Never raises — a greeting must not break
+    """Best-effort live status items. Never raises — a greeting must not break
     login if a query fails."""
     lines: list[str] = []
     try:
@@ -65,17 +96,23 @@ def build_briefing(session, user: Optional[dict] = None) -> list[str]:
     return lines
 
 
-def subline(briefing: list[str]) -> str:
-    if briefing:
-        return "Welcome back to Trakit365. You have " + " and ".join(briefing) + "."
-    return "Welcome back to Trakit365. Everything is in order."
+def brief_clause(kpi: Optional[str], items: list[str]) -> str:
+    """The middle sentence(s) of the greeting — KPI + outstanding items."""
+    if kpi and items:
+        return f"{kpi}. You have {' and '.join(items)}."
+    if kpi:
+        return f"{kpi}."
+    if items:
+        return f"You have {' and '.join(items)}."
+    return "All quiet on the books."
 
 
-def spoken_text(greeting: str, name: str, briefing: list[str]) -> str:
-    body = ("You have " + " and ".join(briefing) + ". ") if briefing \
-        else "Everything is in order. "
-    return (f"{greeting}, {name}. Welcome back to Trakit365. {body}"
-            "All systems are online. How may I help?")
+def assemble(greeting: str, name: str, clause: str) -> tuple[str, str]:
+    """(displayed subline, spoken line) in the butler tone."""
+    sub = f"Trakit365 at your service. {clause} Shall we begin?"
+    spoken = (f"{greeting}, {name}. Trakit365 at your service. {clause} "
+              "All systems are online — shall we begin?")
+    return sub, spoken
 
 
 _HTML = """<!doctype html><html><head><meta charset="utf-8"><style>
@@ -96,7 +133,7 @@ body{background:transparent;font-family:'Segoe UI',system-ui,-apple-system,sans-
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes pulse{0%,100%{opacity:.5}50%{opacity:1}}
 .txt{flex:1;min-width:0;color:#e8eefc}
-.kic{font-size:.66rem;letter-spacing:.28em;color:#0EA5A4;font-weight:700;text-transform:uppercase;margin-bottom:7px;opacity:.92}
+.kic{font-size:.66rem;letter-spacing:.22em;color:#0EA5A4;font-weight:700;text-transform:uppercase;margin-bottom:7px;opacity:.92}
 .hl{font-size:1.5rem;font-weight:700;line-height:1.15;white-space:nowrap;overflow:hidden}
 .cur{border-right:2px solid #0EA5A4;margin-left:1px;animation:blink 1s steps(1) infinite}
 @keyframes blink{50%{border-color:transparent}}
@@ -109,22 +146,30 @@ body{background:transparent;font-family:'Segoe UI',system-ui,-apple-system,sans-
 .x{border-color:rgba(255,255,255,.18);color:#9fb0cf;background:transparent;padding:5px 9px}
 </style></head><body>
 <div class="jv" id="jv">
- <div class="act"><span class="btn" id="rep">&#128266; Replay</span><span class="btn x" id="cls">&#10005;</span></div>
+ <div class="act">__REPLAY__<span class="btn x" id="cls">&#10005;</span></div>
  <div class="ring"><svg viewBox="0 0 100 100">
    <circle class="r1" cx="50" cy="50" r="44" fill="none" stroke="#0EA5A4" stroke-width="2" stroke-dasharray="10 8" opacity=".85"/>
    <circle class="r2" cx="50" cy="50" r="34" fill="none" stroke="#3b82f6" stroke-width="1.5" stroke-dasharray="4 10" opacity=".6"/>
    <circle class="core" cx="50" cy="50" r="20" fill="none" stroke="#0EA5A4" stroke-width="6" opacity=".8"/>
    <circle cx="50" cy="50" r="7" fill="#0EA5A4"/></svg></div>
  <div class="txt">
-   <div class="kic">Trakit365 &bull; Assistant</div>
+   <div class="kic">__KIC__</div>
    <div class="hl"><span id="hl"></span><span class="cur" id="cur"></span></div>
    <div class="sb">__SUB__</div>
  </div>
 </div>
 <script>
-var HEAD=__HEAD__, SPK=__SPK__;
+var HEAD=__HEAD__;
 var el=document.getElementById('hl'),cur=document.getElementById('cur'),i=0;
 (function type(){ if(i<=HEAD.length){ el.textContent=HEAD.slice(0,i); i++; setTimeout(type,42); } else { cur.style.display='none'; } })();
+document.getElementById('cls').onclick=function(){ try{window.speechSynthesis.cancel();}catch(e){}
+  var j=document.getElementById('jv'); j.style.transition='.3s'; j.style.opacity='0'; setTimeout(function(){ j.style.display='none'; },300); };
+</script>
+__VOICEJS__
+</body></html>"""
+
+_VOICE_JS = """<script>
+var SPK=__SPK__;
 function speak(){ try{ if(!window.speechSynthesis) return; window.speechSynthesis.cancel();
   var u=new SpeechSynthesisUtterance(SPK); u.rate=.98; u.pitch=1.0;
   var vs=window.speechSynthesis.getVoices();
@@ -135,21 +180,26 @@ function ready(){ if(!window.speechSynthesis) return;
   if(window.speechSynthesis.getVoices().length){ speak(); }
   else { window.speechSynthesis.onvoiceschanged=function(){ window.speechSynthesis.onvoiceschanged=null; speak(); }; } }
 setTimeout(ready,350);
-document.getElementById('rep').onclick=speak;
-document.getElementById('cls').onclick=function(){ try{window.speechSynthesis.cancel();}catch(e){}
-  var j=document.getElementById('jv'); j.style.transition='.3s'; j.style.opacity='0'; setTimeout(function(){ j.style.display='none'; },300); };
-</script></body></html>"""
+var rb=document.getElementById('rep'); if(rb) rb.onclick=speak;
+</script>"""
 
 
-def build_html(head: str, sub: str, spoken: str) -> str:
+def build_html(kicker: str, head: str, sub: str, spoken: str,
+               voice: bool = True) -> str:
     """Substitute the greeting into the component template (pure / testable)."""
+    replay = ('<span class="btn" id="rep">&#128266; Replay</span>'
+              if voice else "")
+    voicejs = _VOICE_JS.replace("__SPK__", json.dumps(spoken)) if voice else ""
     return (_HTML
+            .replace("__KIC__", _html.escape(kicker))
             .replace("__SUB__", _html.escape(sub))
             .replace("__HEAD__", json.dumps(head))
-            .replace("__SPK__", json.dumps(spoken)))
+            .replace("__REPLAY__", replay)
+            .replace("__VOICEJS__", voicejs))
 
 
-def render(user: dict, session, *, now: Optional[datetime.datetime] = None) -> None:
+def render(user: dict, session, *, voice: bool = True,
+           now: Optional[datetime.datetime] = None) -> None:
     """Render the one-shot welcome banner (Streamlit runtime only)."""
     import streamlit.components.v1 as components
 
@@ -157,9 +207,14 @@ def render(user: dict, session, *, now: Optional[datetime.datetime] = None) -> N
     greeting = time_greeting(now.hour)
     name = display_name(user)
     try:
-        briefing = build_briefing(session, user)
+        items = build_briefing(session, user)
     except Exception:
-        briefing = []
-    doc = build_html(f"{greeting}, {name}", subline(briefing),
-                     spoken_text(greeting, name, briefing))
+        items = []
+    try:
+        kpi = kpi_line(session)
+    except Exception:
+        kpi = None
+    sub, spoken = assemble(greeting, name, brief_clause(kpi, items))
+    kicker = f"Trakit365 • Assistant · {now.strftime('%a %d %b %Y')}"
+    doc = build_html(kicker, f"{greeting}, {name}.", sub, spoken, voice=voice)
     components.html(doc, height=216)

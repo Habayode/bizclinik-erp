@@ -32,10 +32,10 @@ ui.hero("Settings",
           else "Company profile · customers · suppliers · banks"),
          badge="ST", right_label="Module", right_value="Master data")
 
-tab_co, tab_cu, tab_su, tab_ba, tab_tpl = st.tabs(
+tab_co, tab_cu, tab_su, tab_ba, tab_tpl, tab_wel = st.tabs(
     ["🏫 School profile" if _school else "🏢 Company",
      "🎓 Students / Parents" if _school else "👥 Customers",
-     "🚚 Suppliers", "🏦 Bank accounts", "🎨 Invoice template"]
+     "🚚 Suppliers", "🏦 Bank accounts", "🎨 Invoice template", "🤖 Welcome"]
 )
 
 
@@ -205,6 +205,38 @@ with tab_tpl:
                            footer_note=footer, logo=logo_bytes, logo_mime=logo_mime,
                            clear_logo=bool(remove_logo))
         st.success("Invoice template saved.")
+
+
+with tab_wel:
+    st.markdown("#### Login welcome")
+    st.caption("The animated assistant that greets you (by name, with a short "
+               "briefing) when you sign in.")
+    _uid = auth.current_user_id()
+    if _uid:
+        from bizclinik_erp.services.users import get_welcome_prefs, set_welcome_prefs
+        with get_session() as s:
+            _show0, _voice0 = get_welcome_prefs(s, _uid)
+        w_show = st.toggle("Show the welcome banner on login", value=_show0,
+                           key="wel_show")
+        w_voice = st.toggle("Speak it aloud", value=_voice0, key="wel_voice",
+                            disabled=not w_show,
+                            help="Uses your browser's voice. Some browsers only "
+                                 "play after you tap Replay.")
+        if st.button("Save welcome preferences", type="primary", key="wel_save"):
+            with get_session() as s:
+                set_welcome_prefs(s, _uid, show=w_show, voice=w_voice)
+            ui.flash("Welcome preferences saved.")
+            st.rerun()
+    else:
+        w_show = st.toggle("Show the welcome banner on login",
+                           value=st.session_state.get("_welcome_show", True),
+                           key="wel_show_l")
+        w_voice = st.toggle("Speak it aloud", disabled=not w_show,
+                            value=st.session_state.get("_welcome_voice", True),
+                            key="wel_voice_l")
+        st.session_state["_welcome_show"] = w_show
+        st.session_state["_welcome_voice"] = w_voice
+        st.caption("Saved for this session (single-password mode).")
 
 
 auth.render_logout_in_sidebar()

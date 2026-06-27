@@ -450,18 +450,28 @@ def _apply_tenant() -> None:
 
 
 def _maybe_greet() -> None:
-    """Render the JARVIS-style welcome once, right after a successful login."""
+    """Render the JARVIS-style welcome once, right after a successful login —
+    honouring the user's show/voice preferences (Settings → Welcome)."""
     if not st.session_state.pop(_GREET_KEY, False):
         return
     try:
         from . import welcome
         from .db import get_session
+        uid = current_user_id()
         user = current_user() or {
             "username": st.session_state.get(_USERNAME_KEY) or "Admin",
             "role": st.session_state.get(_ROLE_KEY) or "ADMIN",
         }
         with get_session() as s:
-            welcome.render(user, s)
+            if uid:
+                from .services.users import get_welcome_prefs
+                show, voice = get_welcome_prefs(s, uid)
+            else:  # legacy single-password: per-session only
+                show = st.session_state.get("_welcome_show", True)
+                voice = st.session_state.get("_welcome_voice", True)
+            if not show:
+                return
+            welcome.render(user, s, voice=voice)
     except Exception:
         pass
 
