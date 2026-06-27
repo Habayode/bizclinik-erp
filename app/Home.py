@@ -93,4 +93,9 @@ for _group, _pages in build_nav_spec(_vertical(), _appr_title,
     ]
 
 pg = st.navigation(NAV, position="sidebar")
+# Render the sign-out globally (before the page body) so it is present on EVERY
+# page — including pages that early-stop before their own bottom-of-page call,
+# e.g. the company-setup screen the operator's empty tenant lands on. The
+# per-page calls then no-op for this run (force=True resets the guard).
+auth.render_logout_in_sidebar(force=True)
 pg.run()

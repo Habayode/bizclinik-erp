@@ -34,6 +34,7 @@ _ROLE_KEY = "_bizclinik_role"
 _TOKEN_KEY = "_bizclinik_session_token"
 _FAIL_KEY = "_bizclinik_login_fails"
 _GREET_KEY = "_bizclinik_greet"   # set on login success -> one-shot welcome
+_LOGOUT_RENDERED_KEY = "_bizclinik_logout_rendered"  # once-per-run sign-out guard
 _MAX_FAILS = 5
 
 
@@ -513,9 +514,22 @@ def require_login() -> None:
     _legacy_password_screen()
 
 
-def render_logout_in_sidebar() -> None:
+def render_logout_in_sidebar(force: bool = False) -> None:
+    """Render the "Signed in as … / Sign out" block in the sidebar.
+
+    Rendered at most once per script run. The app entry (Home.py) calls this
+    with force=True *before* running the page body, so the Sign-out control is
+    ALWAYS present — even on pages that early-stop (e.g. the "set up your
+    company" screen) before their own bottom-of-page call. Those per-page calls
+    then no-op under the app entry, and still work when a page is run standalone.
+    """
     if not (_any_users_configured() or _expected_password()):
         return
+    if force:
+        st.session_state[_LOGOUT_RENDERED_KEY] = False
+    if st.session_state.get(_LOGOUT_RENDERED_KEY):
+        return
+    st.session_state[_LOGOUT_RENDERED_KEY] = True
     with st.sidebar:
         st.divider()
         u = current_user()
