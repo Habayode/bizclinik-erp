@@ -146,6 +146,9 @@ class Product(Base):
     __tablename__ = "product"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     sku: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    # Scan code for the POS till (retail). Distinct from SKU so an EAN/UPC
+    # barcode can be matched at checkout; the POS falls back to SKU when blank.
+    barcode: Mapped[Optional[str]] = mapped_column(String(64), index=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(String(512))
     unit: Mapped[str] = mapped_column(String(16), default="ea")

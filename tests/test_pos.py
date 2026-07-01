@@ -84,3 +84,32 @@ def test_retail_nav_is_pos_first():
     till_pages = dict(spec)["Till"]
     assert till_pages[0]["title"] == "Point of Sale"
     assert till_pages[0]["default"] is True
+
+
+def test_checkout_applies_line_discount_and_returns_lines(fresh_db):
+    from bizclinik_erp.db import get_session
+    from bizclinik_erp.services import pos
+    with get_session() as s:
+        bank_id, pid = _seed_store(s)
+    with get_session() as s:
+        res = pos.checkout(
+            s, lines=[pos.CartLine(product_id=pid, qty=2.0, discount_pct=0.10)],
+            bank_account_id=bank_id, method="CARD")
+    # 2 × ₦1,000 less 10% = ₦1,800 + 7.5% VAT = ₦1,935.
+    assert res["subtotal"] == 1800.0
+    assert res["total"] == 1935.0
+    assert res["lines"][0]["price"] == 900.0          # discounted unit price
+    assert res["lines"][0]["line_total"] == 1935.0
+
+
+def test_find_product_by_barcode_then_sku(fresh_db):
+    from bizclinik_erp.db import get_session
+    from bizclinik_erp.models import Product
+    from bizclinik_erp.services import pos
+    with get_session() as s:
+        s.add(Product(sku="RICE5KG", barcode="6001234567890", name="Rice 5kg",
+                      standard_price=8000.0, is_stockable=True))
+    with get_session() as s:
+        assert pos.find_product(s, "6001234567890").sku == "RICE5KG"  # by barcode
+        assert pos.find_product(s, "RICE5KG").sku == "RICE5KG"        # by SKU
+        assert pos.find_product(s, "does-not-exist") is None

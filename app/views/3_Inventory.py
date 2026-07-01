@@ -65,7 +65,7 @@ with tab_prods:
     with get_session() as s:
         prods = s.execute(select(Product).order_by(Product.sku)).scalars().all()
         rows = [{
-            "id": p.id, "sku": p.sku, "name": p.name,
+            "id": p.id, "sku": p.sku, "barcode": p.barcode or "", "name": p.name,
             "unit": p.unit, "qty_on_hand": p.qty_on_hand,
             "avg_cost": p.avg_cost, "standard_price": p.standard_price,
             "reorder_level": p.reorder_level, "stockable": p.is_stockable,
@@ -79,6 +79,8 @@ with tab_prods:
     st.subheader("Add product")
     with st.form("new_product"):
         sku = st.text_input("SKU")
+        barcode = st.text_input("Barcode (EAN/UPC — for POS scan)",
+                                help="Optional. Leave blank to scan by SKU at the till.")
         name = st.text_input("Name")
         unit = st.text_input("Unit", value="ea")
         price = st.number_input("Standard price (₦)", min_value=0.0, format="%.2f")
@@ -91,8 +93,8 @@ with tab_prods:
             st.error("SKU and name are required.")
         else:
             with get_session() as s:
-                s.add(Product(sku=sku.strip(), name=name.strip(),
-                               unit=unit or "ea",
+                s.add(Product(sku=sku.strip(), barcode=(barcode.strip() or None),
+                               name=name.strip(), unit=unit or "ea",
                                standard_price=price, standard_cost=cost,
                                reorder_level=reorder, is_stockable=stockable))
             st.success(f"Added product {sku}")

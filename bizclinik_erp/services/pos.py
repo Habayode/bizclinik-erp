@@ -34,6 +34,7 @@ class CartLine:
     qty: float = 1.0
     unit_price: Optional[float] = None   # override; else the product's list price
     tax_rate: Optional[float] = None     # override; else the product's tax / 7.5%
+    discount_pct: float = 0.0            # 0..1 line discount off the price
 
 
 def walkin_customer(session: Session) -> Customer:
@@ -48,6 +49,24 @@ def walkin_customer(session: Session) -> Customer:
     return c
 
 
+def find_product(session: Session, code: str) -> Optional[Product]:
+    """Resolve a scanned/typed code to an active product — barcode first, then
+    SKU. Returns None if nothing matches."""
+    code = (code or "").strip()
+    if not code:
+        return None
+    p = session.execute(
+        select(Product).where(Product.barcode == code,
+                              Product.is_active == True)  # noqa: E712
+    ).scalars().first()
+    if p is None:
+        p = session.execute(
+            select(Product).where(Product.sku == code,
+                                  Product.is_active == True)  # noqa: E712
+        ).scalars().first()
+    return p
+
+
 def _resolve_line(session: Session, cl: CartLine) -> LineInput:
     prod = session.get(Product, cl.product_id)
     if prod is None:
@@ -56,6 +75,9 @@ def _resolve_line(session: Session, cl: CartLine) -> LineInput:
         raise ValueError(f"Quantity for {prod.name} must be positive.")
     price = (cl.unit_price if cl.unit_price is not None
              else float(prod.standard_price or 0.0))
+    disc = max(0.0, min(1.0, float(cl.discount_pct or 0.0)))
+    if disc:
+        price = round(price * (1 - disc), 2)
     if cl.tax_rate is not None:
         tax = cl.tax_rate
     elif prod.tax_code is not None:
@@ -95,4 +117,7 @@ def checkout(session: Session, *, lines: list[CartLine], bank_account_id: int,
         "subtotal": subtotal, "tax": tax, "total": total,
         "tendered": tendered, "change": max(change, 0.0),
         "items": len(line_inputs), "method": method,
+        "lines": [{"name": li.description, "qty": li.qty, "price": li.unit_price,
+                   "line_total": round(li.qty * li.unit_price * (1 + li.tax_rate), 2)}
+                  for li in line_inputs],
     }
