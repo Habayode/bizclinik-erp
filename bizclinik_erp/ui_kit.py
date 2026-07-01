@@ -282,17 +282,27 @@ def flash(text: str, icon: str = "✅") -> None:
     st.session_state["_ui_flash"] = {"text": text, "icon": icon}
 
 
-def school_mode() -> bool:
-    """True when the active tenant is a school (Company.vertical == 'school').
-    Lets shared screens use school-friendly labels. Fails safe to False."""
+def _vertical_is(target: str) -> bool:
     try:
         from .db import get_session
         from .models import Company
         with get_session() as s:
             co = s.query(Company).first()
-            return bool(co and (co.vertical or "general") == "school")
+            return bool(co and (co.vertical or "general") == target)
     except Exception:
         return False
+
+
+def school_mode() -> bool:
+    """True when the active tenant is a school (Company.vertical == 'school').
+    Lets shared screens use school-friendly labels. Fails safe to False."""
+    return _vertical_is("school")
+
+
+def retail_mode() -> bool:
+    """True when the active tenant is a retail/supermarket business
+    (Company.vertical == 'retail'). Fails safe to False."""
+    return _vertical_is("retail")
 
 
 def money_col(label: str):

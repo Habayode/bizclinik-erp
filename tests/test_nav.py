@@ -61,12 +61,13 @@ def test_general_vertical_hides_school_keeps_full_finance():
 
 
 def test_unknown_vertical_defaults_to_general():
-    assert [g for g, _ in build_nav_spec("retail")] == \
+    # An unrecognised vertical falls through to the general layout.
+    assert [g for g, _ in build_nav_spec("wholesale")] == \
            [g for g, _ in build_nav_spec("general")]
 
 
 def test_exactly_one_default_landing():
-    for v in ("school", "general"):
+    for v in ("school", "general", "retail"):
         defaults = [p for _, pages in build_nav_spec(v) for p in pages if p["default"]]
         assert len(defaults) == 1
 

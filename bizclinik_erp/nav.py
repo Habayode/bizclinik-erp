@@ -105,6 +105,23 @@ def build_nav_spec(vertical: str = "general",
             ("System", _system_pages(platform_admin)),
         ]
 
+    if vertical == "retail":
+        # Retail-first (supermarket / FMCG): the Point of Sale is the landing;
+        # the till + store dashboard sit up top, trading modules next, and the
+        # full accounting core stays available underneath.
+        pos = _p("views/40_POS.py", "Point of Sale", "🛒", default=True)
+        store_dash = _p("views/41_Retail_Dashboard.py", "Store Dashboard", "🏪")
+        return [
+            ("Till", [pos, store_dash]),
+            ("Trading", [sales, purchases, inventory, bankrec]),
+            ("Finance & Accounting", [
+                banking, assets, recurring, currencies, gl, budgets, monthend,
+                statements, reports, approvals]),
+            ("Intelligence", [agents]),
+            ("HR", list(_HR_PAGES)),
+            ("System", _system_pages(platform_admin)),
+        ]
+
     # General accounting ERP (the School group is not shown).
     return [
         ("Overview", [DASHBOARD]),
