@@ -108,16 +108,17 @@ def checkout(session: Session, *, lines: list[CartLine], bank_account_id: int,
                    bank_account_id=bank_account_id, invoice_id=inv.id,
                    method=method, reference=reference)
 
-    subtotal = round(sum(li.qty * li.unit_price for li in line_inputs), 2)
-    tax = round(sum(li.qty * li.unit_price * li.tax_rate for li in line_inputs), 2)
+    # Receipt figures are read from the POSTED invoice (per-line rounded, then
+    # summed) — never a parallel recompute — so the receipt always foots to
+    # inv.grand_total and its VAT matches what hit Output VAT in the ledger.
     change = (round(tendered - total, 2)
               if (tendered is not None and method == "CASH") else 0.0)
     return {
         "invoice_id": inv.id, "invoice_number": inv.number,
-        "subtotal": subtotal, "tax": tax, "total": total,
-        "tendered": tendered, "change": max(change, 0.0),
-        "items": len(line_inputs), "method": method,
-        "lines": [{"name": li.description, "qty": li.qty, "price": li.unit_price,
-                   "line_total": round(li.qty * li.unit_price * (1 + li.tax_rate), 2)}
-                  for li in line_inputs],
+        "subtotal": round(inv.subtotal, 2), "tax": round(inv.tax_total, 2),
+        "total": total, "tendered": tendered, "change": max(change, 0.0),
+        "items": len(inv.lines), "method": method,
+        "lines": [{"name": ln.description, "qty": ln.qty, "price": ln.unit_price,
+                   "line_total": round(ln.subtotal + ln.tax_amount, 2)}
+                  for ln in inv.lines],
     }

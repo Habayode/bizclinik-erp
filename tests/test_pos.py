@@ -102,6 +102,33 @@ def test_checkout_applies_line_discount_and_returns_lines(fresh_db):
     assert res["lines"][0]["line_total"] == 1935.0
 
 
+def test_receipt_totals_foot_and_match_the_ledger(fresh_db):
+    """On sub-cent prices the receipt subtotal+VAT must equal the total and the
+    posted invoice (regression: the receipt used to recompute VAT independently
+    and could be a cent off)."""
+    from datetime import date
+    from bizclinik_erp.db import get_session
+    from bizclinik_erp.models import BankAccount, Product, SalesInvoice
+    from bizclinik_erp.services import inventory as invsvc, pos
+    with get_session() as s:
+        bank = BankAccount(code="TILL2", name="Till", gl_account_id=_cash_account_id(s))
+        s.add(bank)
+        p = Product(sku="ODD", name="Odd priced 10.10", standard_price=10.10,
+                    is_stockable=True)
+        s.add(p)
+        s.flush()
+        invsvc.record_stock_in(s, p, qty=10, unit_cost=5.0, on=date.today())
+        bid, pid = bank.id, p.id
+    with get_session() as s:
+        res = pos.checkout(s, lines=[pos.CartLine(product_id=pid, qty=2.0)],
+                           bank_account_id=bid, method="CARD")
+        inv = s.get(SalesInvoice, res["invoice_id"])
+        assert round(res["subtotal"] + res["tax"], 2) == res["total"]   # foots
+        assert res["total"] == round(inv.grand_total, 2)                # == GL
+        assert res["tax"] == round(inv.tax_total, 2)                    # VAT == GL
+        assert round(sum(l["line_total"] for l in res["lines"]), 2) == res["total"]
+
+
 def test_find_product_by_barcode_then_sku(fresh_db):
     from bizclinik_erp.db import get_session
     from bizclinik_erp.models import Product

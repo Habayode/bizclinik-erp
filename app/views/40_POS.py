@@ -169,17 +169,29 @@ if not cart:
     st.stop()
 
 # ---- basket ---------------------------------------------------------------
-def _line_total(it) -> float:
-    return round(it["qty"] * it["price"] * (1 - it["discount"]) * (1 + it["tax"]), 2)
+# Round exactly as the posting path (pos._resolve_line + SalesInvoiceLine): the
+# discounted unit price is rounded to 2dp FIRST, then × qty, then VAT on that —
+# so the on-screen total, the cash-tendered default and the printed receipt all
+# equal what checkout() posts to the ledger.
+def _disc_unit(it) -> float:
+    return round(it["price"] * (1 - it["discount"]), 2)
 
-rows = [{"S/N": i + 1, "Item": it["name"], "Qty": it["qty"], "Price": it["price"],
-         "Disc %": round(it["discount"] * 100, 1), "Line total": _line_total(it)}
-        for i, it in enumerate(cart)]
+def _line_sub(it) -> float:
+    return round(it["qty"] * _disc_unit(it), 2)
+
+def _line_tax(it) -> float:
+    return round(_line_sub(it) * it["tax"], 2)
+
+def _line_total(it) -> float:
+    return round(_line_sub(it) + _line_tax(it), 2)
+
+rows = [{"S/N": i + 1, "Item": it["name"], "Qty": it["qty"],
+         "Price": _disc_unit(it), "Disc %": round(it["discount"] * 100, 1),
+         "Line total": _line_total(it)} for i, it in enumerate(cart)]
 ui.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
 
-subtotal = round(sum(it["qty"] * it["price"] * (1 - it["discount"]) for it in cart), 2)
-tax = round(sum(it["qty"] * it["price"] * (1 - it["discount"]) * it["tax"]
-                for it in cart), 2)
+subtotal = round(sum(_line_sub(it) for it in cart), 2)
+tax = round(sum(_line_tax(it) for it in cart), 2)
 total = round(subtotal + tax, 2)
 m1, m2, m3 = st.columns(3)
 m1.metric("Subtotal", ui.money(subtotal))
